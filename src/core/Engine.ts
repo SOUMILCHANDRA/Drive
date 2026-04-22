@@ -8,8 +8,8 @@ export class Engine {
 
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x00ff00); // DEBUG GREEN
-    this.scene.fog = new THREE.Fog(0x00ff00, 100, 600); // Subtle horizon fade
+    this.scene.background = new THREE.Color(0x000000); // PRO DEBUG BLACK
+    this.scene.fog = new THREE.Fog(0x000000, 100, 1000); 
     
     this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 2000);
     // STEP 3: Fix Camera
