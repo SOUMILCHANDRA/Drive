@@ -42,10 +42,10 @@ async function bootstrap() {
         if (speedVal) speedVal.innerText = speedKmh.toString();
         if (distVal) distVal.innerText = Math.floor(distance).toString();
 
-        // Camera Stability Fix
+        // Camera Stability Fix (Cinematic Glide)
         const cameraTarget = car.getCameraTransform();
         if (cameraTarget && !isNaN(cameraTarget.position.x)) {
-            engine.camera.position.lerp(cameraTarget.position, 0.1);
+            engine.camera.position.lerp(cameraTarget.position, 0.05); // 0.05 for maximum glide
             engine.camera.lookAt(cameraTarget.lookTarget);
         } else {
             engine.camera.position.set(0, 15, 25);

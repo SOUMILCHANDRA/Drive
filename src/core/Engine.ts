@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, AfterimagePass } from 'three-stdlib';
+import { EffectComposer, RenderPass, UnrealBloomPass, ShaderPass } from 'three-stdlib';
 
 /**
  * The core rendering engine.
@@ -44,8 +44,8 @@ export class Engine {
     moonlight.position.set(0, 100, -200);
     this.scene.add(moonlight);
 
-    // MOUNTAIN PRESENCE: Deep Purple Ambient (0.05)
-    const ambient = new THREE.AmbientLight(0x1a0a2e, 0.05);
+    // MOUNTAIN PRESENCE: Blue Hour Ambient (0.08)
+    const ambient = new THREE.AmbientLight(0x0a0a2e, 0.08);
     this.scene.add(ambient);
 
     const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.03);
@@ -60,9 +60,9 @@ export class Engine {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-    // 1. AFTERIMAGE: Synthwave Trails (0.7 damp)
-    const afterimage = new AfterimagePass(0.7);
-    this.composer.addPass(afterimage);
+    // 1. AFTERIMAGE: Temporarily disabled for motion verification
+    // const afterimage = new AfterimagePass(0.7);
+    // this.composer.addPass(afterimage);
 
     // 2. SELECTIVE BLOOM
     const bloomPass = new UnrealBloomPass(

@@ -249,10 +249,10 @@ export class RoadManager {
 
     const roadMat = new THREE.MeshPhysicalMaterial({
         color: 0x020205, 
-        roughness: 0.2, 
-        metalness: 0.7, // High sheen for streaks
+        roughness: 0.1, // High reflection
+        metalness: 0.4, // Specular catch
         clearcoat: 0.8,
-        reflectivity: 0.3,
+        reflectivity: 0.5,
         emissive: 0x010103,
         emissiveIntensity: 1.0,
         polygonOffset: true,
@@ -305,24 +305,38 @@ export class RoadManager {
         streetLight.castShadow = true;
         chunkGroup.add(streetLight);
 
-        // Indigo Rim Light (Mountain silhouette)
+        // Sodium Corona (Haze/Bloom)
+        const canvas = document.createElement('canvas');
+        canvas.width = 64; canvas.height = 64;
+        const ctx = canvas.getContext('2d')!;
+        const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        grad.addColorStop(0, 'rgba(255, 149, 0, 0.8)');
+        grad.addColorStop(0.5, 'rgba(255, 149, 0, 0.2)');
+        grad.addColorStop(1, 'rgba(255, 149, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 64, 64);
+        
+        const coronaMat = new THREE.SpriteMaterial({ 
+            map: new THREE.CanvasTexture(canvas),
+            transparent: true,
+            blending: THREE.AdditiveBlending
+        });
+        const corona = new THREE.Sprite(coronaMat);
+        corona.scale.set(6, 6, 1);
+        corona.position.copy(streetLight.position);
+        chunkGroup.add(corona);
+
+        // Indigo Rim Light
         const indigoLight = new THREE.PointLight(0x4444ff, 5, 80, 2);
         indigoLight.position.copy(streetLight.position).add(new THREE.Vector3(0, 2, 0));
         chunkGroup.add(indigoLight);
 
-        // Pole with Gradient and Emissive Glow
+        // Pole
         const poleGeo = new THREE.BoxGeometry(0.4, 15, 0.4);
-        const poleColors = [];
-        for (let i = 0; i < poleGeo.attributes.position.count; i++) {
-            const y = poleGeo.attributes.position.getY(i);
-            const t = (y + 7.5) / 15; // 0 at bottom, 1 at top
-            poleColors.push(t * 1.0, t * 0.5, 0); 
-        }
-        poleGeo.setAttribute('color', new THREE.Float32BufferAttribute(poleColors, 3));
         const poleMat = new THREE.MeshStandardMaterial({ 
-            vertexColors: true,
+            color: 0x111111,
             emissive: sodiumColor,
-            emissiveIntensity: 5.0 // High emissive for "Sodium Glow"
+            emissiveIntensity: 3.0 
         });
         const pole = new THREE.Mesh(poleGeo, poleMat);
         pole.position.copy(streetLight.position).sub(new THREE.Vector3(0, 7.5, 0));
