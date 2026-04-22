@@ -44,15 +44,24 @@ export class Car {
     try {
       const loader = new GLTFLoader();
       const dracoLoader = new DRACOLoader();
-      dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/libs/draco/');
+      dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
       loader.setDRACOLoader(dracoLoader);
 
       const gltf = await loader.loadAsync('/models/car/car.glb');
       const loadedModel = gltf.scene;
 
-      loadedModel.scale.set(1.8, 1.8, 1.8);
-      loadedModel.rotation.y = Math.PI;
-      loadedModel.position.y = 0.25;
+      // Auto-center and Scale based on Bounding Box
+      const bbox = new THREE.Box3().setFromObject(loadedModel);
+      const size = bbox.getSize(new THREE.Vector3());
+      const center = bbox.getCenter(new THREE.Vector3());
+      
+      // Target length of 4.5 units for the car
+      const scale = 4.5 / Math.max(size.x, size.y, size.z);
+      loadedModel.scale.set(scale, scale, scale);
+      
+      // Pivot it so the center is at (0, 0, 0) and it sits on the ground
+      loadedModel.position.sub(center.multiplyScalar(scale));
+      loadedModel.position.y += (size.y * scale) / 2 + 0.1;
 
       loadedModel.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
@@ -70,10 +79,10 @@ export class Car {
       });
 
       this.mesh.add(loadedModel);
-      console.log("Drive: 1970 Chevelle SS 454 Loaded");
+      console.log("Drive: 1970 Chevelle SS 454 Centered and Loaded");
       this.attachLights();
     } catch (e) {
-      console.warn("Drive: Model not found, using procedural fallback.", e);
+      console.warn("Drive: Model loading failed, falling back to procedural.", e);
       this.createProceduralModel();
     }
   }

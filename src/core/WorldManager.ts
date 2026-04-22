@@ -63,7 +63,7 @@ export class WorldManager {
           });
 
           if (BiomeManager.getBiome(cZ) === 'LOWLANDS' && getRoadX) {
-            CityGenerator.spawnCityRow(chunk.mesh as any, cZ - this.chunkSize / 2, cZ + this.chunkSize / 2, getRoadX);
+            CityGenerator.spawnCityRow(chunk.mesh as THREE.Group, cZ - this.chunkSize / 2, cZ + this.chunkSize / 2, getRoadX);
           }
 
           if (Math.random() > 0.98 && getRoadX) {
