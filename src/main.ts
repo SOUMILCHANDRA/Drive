@@ -45,7 +45,7 @@ async function bootstrap() {
         const speed = Math.abs(car.velocity.z);
 
         // 1. Core World Updates
-        world.update(car.mesh.position);
+        world.update(car.mesh.position, (z) => road.getRoadX(z));
         road.update(car.mesh.position.z);
 
         // 2. Car Updates
@@ -67,7 +67,7 @@ async function bootstrap() {
             engine.camera.position.copy(cameraTarget.position);
             firstFrame = false;
         } else {
-            engine.camera.position.lerp(cameraTarget.position, 0.05);
+            engine.camera.position.lerp(cameraTarget.position, 0.15);
         }
         
         engine.camera.lookAt(cameraTarget.lookTarget);

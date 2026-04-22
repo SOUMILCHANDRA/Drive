@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { CONFIG } from '../config';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
@@ -24,7 +25,7 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.8;
+    this.renderer.toneMappingExposure = CONFIG.VISUALS.TONE_EXPOSURE;
 
     const container = document.getElementById('app');
     if (container) container.appendChild(this.renderer.domElement);
@@ -50,10 +51,10 @@ export class Engine {
   }
 
   private setupLights() {
-    this.scene.add(new THREE.AmbientLight(0x1a2035, 0.6));
-    this.scene.add(new THREE.HemisphereLight(0x1e2a3a, 0x0a0a0f, 0.4));
+    this.scene.add(new THREE.AmbientLight(CONFIG.LIGHTING.AMBIENT_COLOR, CONFIG.LIGHTING.AMBIENT_INTENSITY * 0.05));
+    this.scene.add(new THREE.HemisphereLight(CONFIG.LIGHTING.HEMI_SKY_COLOR, CONFIG.LIGHTING.HEMI_GROUND_COLOR, CONFIG.LIGHTING.HEMI_INTENSITY * 0.05));
     
-    const rim = new THREE.DirectionalLight(0x445577, 0.4);
+    const rim = new THREE.DirectionalLight(0x445577, 0.5);
     rim.position.set(0, 10, -20);
     this.scene.add(rim);
   }
