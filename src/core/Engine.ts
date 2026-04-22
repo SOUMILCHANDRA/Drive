@@ -15,8 +15,8 @@ export class Engine {
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050508);
-    // VOLUMETRIC DENSITY: Slow Roads Blueprint (Horizon Fade)
-    this.scene.fog = new THREE.FogExp2(0x050508, 0.015); 
+    // EMERGENCY DEPTH: High-Density Volumetric Haze
+    this.scene.fog = new THREE.FogExp2(0x050508, 0.02); 
     
     this.camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 2000);
     
@@ -49,8 +49,8 @@ export class Engine {
     const ambient = new THREE.AmbientLight(0x0d0d2b, 0.05);
     this.scene.add(ambient);
 
-    // CINEMATIC FILL: Slow Roads 'Cheat' (Indigo Silhouette)
-    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.1);
+    // CINEMATIC REVEAL: Hemisphere 'Cheat' (Indigo Silhouette)
+    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.3);
     this.scene.add(hemi);
 
     // SILHOUETTE LIFT: High-angle Indigo light for car definition

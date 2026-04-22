@@ -250,9 +250,9 @@ export class RoadManager {
 
     const roadMat = new THREE.MeshPhysicalMaterial({
         color: 0x020205, // Deep desaturated indigo
-        roughness: 0.1,  // Mirror-like reflections for 'Hyper-Wet' streaks
-        metalness: 0.9,  // Maximum specular for Halogen catch
-        clearcoat: 1.0,  // Maximum wetness
+        roughness: 0.2,  // Specular smears for streetlight catch
+        metalness: 0.8,  // High sheen for 'Emergency' reveal
+        clearcoat: 1.0,  
         reflectivity: 1.0,
         emissive: 0x000000,
         emissiveIntensity: 0.0,
