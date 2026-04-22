@@ -59,8 +59,16 @@ export class Car {
         this.model.position.set(-center.x, -scaledBox.min.y, -center.z); 
         
         this.mesh.add(this.model);
+        
+        // MATERIAL RESTORATION & NORMAL RECALIBRATION
         this.model.traverse(child => {
             if (child instanceof THREE.Mesh) {
+                child.geometry.computeVertexNormals(); // Fix light swallowing
+                child.material = new THREE.MeshStandardMaterial({
+                    color: child.material.color || 0x111111,
+                    roughness: 0.4,
+                    metalness: 0.6
+                });
                 child.castShadow = true;
                 child.receiveShadow = true;
                 child.frustumCulled = true;
@@ -93,18 +101,18 @@ export class Car {
     createHeadlight(0.7);
     createHeadlight(-0.7);
 
-    // THE "RED RIM" BEACONS (Bright Red #FF0000)
+    // THE "RED RIM" BEACONS - Decoupled to prevent internal bleed
     const tailColor = 0xFF0000;
     const createTailLight = (x: number) => {
-        const light = new THREE.PointLight(tailColor, 50, 20, 2); // Brighter beacon
-        light.position.set(x, 0.6, -2.5);
+        const light = new THREE.PointLight(tailColor, 80, 25, 2); 
+        light.position.set(x, 0.6, -2.8); // Shifted behind bumper
         this.mesh.add(light);
         
         const lens = new THREE.Mesh(
             new THREE.BoxGeometry(0.5, 0.2, 0.1),
             new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0xff0000, emissiveIntensity: 5 })
         );
-        lens.position.set(x, 0.6, -2.5);
+        lens.position.set(x, 0.6, -2.6);
         this.mesh.add(lens);
         this.brakeLights.push(lens);
     };
@@ -128,7 +136,7 @@ export class Car {
    */
   public update(delta: number, getHeight: (x: number, z: number) => number) {
     const isBraking = this.keys['s'] || this.keys['arrowdown'];
-    this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 5 : 1);
+    this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 10 : 5);
 
     if (this.keys['w'] || this.keys['arrowup']) this.velocity.z += this.acceleration * delta;
     else if (isBraking) this.velocity.z -= this.acceleration * delta;
@@ -152,8 +160,8 @@ export class Car {
     // Final Physics Lock: Snap directly to spline Y (-0.25 pivot correction)
     this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight - 0.25 + bobbing, 0.2);
     
-    // KINETIC STEERING: Angular Damping for heavy feel
-    this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.05);
+    // KINETIC STEERING: Heavy weight damping (0.03)
+    this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.03);
     
     // Reset normal for stability
     this.normal.set(0, 1, 0);
@@ -171,8 +179,8 @@ export class Car {
     // Vertical stabilization (-0.25 pivot correction)
     this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY - 0.25, 0.2);
     
-    // KINETIC STEERING: Heavy weight damping
-    this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.05);
+    // KINETIC STEERING: Heavy weight damping (0.03)
+    this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.03);
   }
 
   /**

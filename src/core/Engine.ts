@@ -48,6 +48,10 @@ export class Engine {
     const ambient = new THREE.AmbientLight(0x0d0d2b, 0.05);
     this.scene.add(ambient);
 
+    // CINEMATIC FILL: Hemisphere light for silhouette definition
+    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x050505, 0.15);
+    this.scene.add(hemi);
+
     // SILHOUETTE LIFT: High-angle Indigo light for car definition
     const lift = new THREE.DirectionalLight(0x0a0a2e, 0.1);
     lift.position.set(0, 100, 0);
