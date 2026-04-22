@@ -8,6 +8,22 @@ import { TerrainManager } from './core/TerrainManager';
 
 console.log("Drive: PHASE 1 RECONSTRUCTION - INFINITE RUNNER LOOP");
 
+// EMERGENCY DEBUG: Display errors on screen if black
+window.onerror = function(msg, url, line, col, error) {
+    const debug = document.createElement('div');
+    debug.style.position = 'fixed';
+    debug.style.top = '0';
+    debug.style.left = '0';
+    debug.style.background = 'rgba(255,0,0,0.9)';
+    debug.style.color = 'white';
+    debug.style.zIndex = '9999';
+    debug.style.padding = '20px';
+    debug.style.fontFamily = 'monospace';
+    debug.innerText = `ERROR: ${msg}\nLine: ${line}\nCol: ${col}\nStack: ${error?.stack}`;
+    document.body.appendChild(debug);
+    return false;
+};
+
 const engine = new Engine();
 const worldGroup = new THREE.Group();
 engine.scene.add(worldGroup);
