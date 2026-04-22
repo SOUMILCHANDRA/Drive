@@ -41,9 +41,10 @@ engine.render((delta) => {
     world.update(car.mesh.position);
     road.update(car.mesh.position.z);
 
+    // 2. Car Updates (Always update logic/lights, physics only if gameStarted)
+    car.update(gameStarted ? delta : 0, (x, z) => road.getRoadHeight(x, z));
+
     if (gameStarted) {
-        // 2. Physics (Restrained)
-        car.update(delta, (x, z) => road.getRoadHeight(x, z));
         audio.update(speed * 0.5); // Quieter engine
 
         // 3. HUD Updates (Minimalist)
@@ -59,7 +60,5 @@ engine.render((delta) => {
     engine.camera.position.lerp(cameraTarget.position, 0.03);
     
     // Smooth LookAt
-    const currentLookTarget = new THREE.Vector3();
-    engine.camera.getWorldDirection(currentLookTarget);
     engine.camera.lookAt(cameraTarget.lookTarget);
 });
