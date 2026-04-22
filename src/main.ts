@@ -24,16 +24,17 @@ async function bootstrap() {
         road.update(car.mesh.position.z);
 
         // Physics
-        const roadMeshes = road.getCollisionMeshes();
         if (autopilot) {
             const targetZ = car.mesh.position.z + car.velocityValue * delta;
             const target = road.getAutopilotTarget(targetZ);
-            car.autopilot(target.x, target.z, target.angle, roadMeshes);
+            car.autopilot(target.x, target.z, target.angle, target.y);
         } else {
-            car.update(delta, roadMeshes);
+            car.update(delta, (x, z) => road.getRoadHeight(x, z));
         }
 
-        // HUD Updates
+        // HUD & Stability Logging
+        if (Math.random() < 0.01) console.log("Car Y:", car.mesh.position.y);
+        
         const speedKmh = Math.floor(car.velocityValue * 3.6);
         distance += car.velocityValue * delta;
         const speedVal = document.getElementById('speed-val');
@@ -41,10 +42,15 @@ async function bootstrap() {
         if (speedVal) speedVal.innerText = speedKmh.toString();
         if (distVal) distVal.innerText = Math.floor(distance).toString();
 
-        // Camera
+        // Camera Stability Fix
         const cameraTarget = car.getCameraTransform();
-        engine.camera.position.lerp(cameraTarget.position, 0.05); // Smoother lag
-        engine.camera.lookAt(cameraTarget.lookTarget);
+        if (cameraTarget && !isNaN(cameraTarget.position.x)) {
+            engine.camera.position.lerp(cameraTarget.position, 0.1);
+            engine.camera.lookAt(cameraTarget.lookTarget);
+        } else {
+            engine.camera.position.set(0, 15, 25);
+            engine.camera.lookAt(0, 0, 0);
+        }
     });
 
     const splash = document.getElementById('splash');

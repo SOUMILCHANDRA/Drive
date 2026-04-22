@@ -82,7 +82,7 @@ export class Car {
     return this.velocity.z;
   }
 
-  public update(delta: number, roadMeshes: THREE.Object3D[]) {
+  public update(delta: number, getHeight: (x: number, z: number) => number) {
     const isBraking = this.keys['s'] || this.keys['arrowdown'];
     this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 5 : 1.5);
 
@@ -100,42 +100,30 @@ export class Car {
     this.mesh.position.x += Math.sin(this.angle) * this.velocity.z * delta;
     this.mesh.position.z += Math.cos(this.angle) * this.velocity.z * delta;
 
-    // PHYSICAL RAYCASTING: Stick to road
-    this.raycaster.set(this.mesh.position.clone().add(new THREE.Vector3(0, 5, 0)), new THREE.Vector3(0, -1, 0));
-    const intersects = this.raycaster.intersectObjects(roadMeshes, true);
+    // STABLE SPLINE ANCHOR: Height sampling + Offset
+    const roadHeight = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
+    const time = Date.now() * 0.003;
+    const bobbing = Math.sin(time) * 0.05;
     
-    if (intersects.length > 0) {
-      const hit = intersects[0];
-      const roadHeight = hit.point.y;
-      
-      // Suspension Bobbing
-      const time = Date.now() * 0.003;
-      const bobbing = Math.sin(time) * 0.05;
-      
-      // Settling Lerp (Heavy Suspension)
-      this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.5 + bobbing, 0.2);
-      
-      // SURFACE ALIGNMENT: Tilt car to match road normal
-      if (hit.face) {
-        const targetNormal = hit.face.normal.clone().applyQuaternion(hit.object.quaternion);
-        this.normal.lerp(targetNormal, 0.1);
-        
-        const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.normal);
-        const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.angle);
-        this.mesh.quaternion.slerp(quaternion.multiply(yaw), 0.1);
-      }
-    } else {
-      this.mesh.position.y -= 9.8 * delta; // Gravity if airborne
-      this.mesh.rotation.y = this.angle;
-    }
+    // Smooth settling lerp
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.5 + bobbing, 0.2);
+    
+    // Keep rotation stable
+    this.mesh.rotation.y = this.angle;
+    
+    // Reset normal for stability
+    this.normal.set(0, 1, 0);
   }
 
-  public autopilot(targetX: number, targetZ: number, targetAngle: number, roadMeshes: THREE.Object3D[]) {
+  public autopilot(targetX: number, targetZ: number, targetAngle: number, targetY: number) {
     this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, targetX, 0.1);
     this.mesh.position.z = targetZ;
     this.angle = THREE.MathUtils.lerp(this.angle, targetAngle, 0.1);
     this.velocity.z = 25;
-    this.update(0.016, roadMeshes);
+    
+    // Vertical stabilization
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY + 0.5, 0.2);
+    this.mesh.rotation.y = this.angle;
   }
 
   public getCameraTransform() {
