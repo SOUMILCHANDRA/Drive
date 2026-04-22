@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Noise } from '../utils/Noise';
 import { CONFIG } from '../config';
+import { BiomeManager } from './BiomeManager';
 
 export class RoadManager {
   private roadGroup: THREE.Group;
@@ -13,9 +14,7 @@ export class RoadManager {
   private roadWidth: number = CONFIG.ROAD.WIDTH;
   private renderDistance: number = 30;
   
-  private spline: THREE.CatmullRomCurve3 | null = null;
   private roadMaterial: THREE.MeshStandardMaterial;
-  private terrainMaterial: THREE.MeshStandardMaterial;
 
   constructor(scene: THREE.Scene, noise: Noise) {
     this.scene = scene;
@@ -28,12 +27,6 @@ export class RoadManager {
       roughness: 0.4,
       metalness: 0.3,
       side: THREE.DoubleSide
-    });
-
-    this.terrainMaterial = new THREE.MeshStandardMaterial({
-      color: 0x050810,
-      roughness: 0.9,
-      metalness: 0
     });
 
     this.points.push(new THREE.Vector3(0, this.noise.get(0, -10, 4, 0.5, 0.005) * 50, -10));
@@ -49,7 +42,9 @@ export class RoadManager {
 
     for (let i = 0; i < count; i++) {
         const index = this.points.length;
-        const angle = (this.noise.get(index * 10, 0, 1, 0.5, 1) - 0.5) * 0.4;
+        const params = BiomeManager.getParams(lastPoint.z);
+        const sharpness = (params as any).TURN_SHARPNESS || 0.4;
+        const angle = (this.noise.get(index * 10, 0, 1, 0.5, 1) - 0.5) * sharpness;
         const pitch = (this.noise.get(0, index * 10, 1, 0.5, 1) - 0.5) * 0.1;
 
         const newDir = lastDir.clone()
@@ -58,7 +53,7 @@ export class RoadManager {
             .normalize();
 
         const newPoint = lastPoint.clone().add(newDir.multiplyScalar(this.chunkSize));
-        newPoint.y = this.noise.get(newPoint.x, newPoint.z, 4, 0.5, 0.005) * 50;
+        newPoint.y = this.noise.get(newPoint.x, newPoint.z, 4, 0.5, 0.005) * params.ELEVATION_SCALE;
         this.points.push(newPoint);
         lastPoint = newPoint;
         lastDir = newDir;
@@ -69,8 +64,20 @@ export class RoadManager {
     // No longer using global spline for meshes
   }
 
-  public getRoadHeight(_x: number, z: number): number {
-    return this.noise.get(_x, z, 4, 0.5, 0.005) * 50;
+  public getRoadHeight(x: number, z: number): number {
+    return this.noise.get(x, z, 4, 0.5, 0.005) * 50;
+  }
+
+  public getRoadX(z: number): number {
+    // Estimate X position of road at Z by finding nearest spline point
+    // This is used for terrain carving
+    const index = Math.floor((z + 20) / this.chunkSize);
+    if (index < 0 || index >= this.points.length - 1) return 0;
+    
+    const p1 = this.points[index];
+    const p2 = this.points[index + 1];
+    const t = (z - p1.z) / (p2.z - p1.z);
+    return THREE.MathUtils.lerp(p1.x, p2.x, THREE.MathUtils.clamp(t, 0, 1));
   }
 
   public update(playerZ: number) {

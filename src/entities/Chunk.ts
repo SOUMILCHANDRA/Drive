@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Noise } from '../utils/Noise';
+import { BiomeManager } from '../core/BiomeManager';
 
 export class Chunk {
   public mesh: THREE.Mesh;
@@ -7,7 +8,7 @@ export class Chunk {
   public x: number;
   public z: number;
 
-  constructor(x: number, z: number, size: number, noise: Noise) {
+  constructor(x: number, z: number, size: number, noise: Noise, getRoadX?: (z: number) => number) {
     this.x = x;
     this.z = z;
     this.size = size;
@@ -22,12 +23,26 @@ export class Chunk {
       const vx = vertices[i] + x + size / 2;
       const vz = -vertices[i + 1] + z - size / 2;
       
-      const h = noise.get(vx, vz, 4, 0.5, 0.005) * 50;
+      const params = BiomeManager.getParams(vz);
+      const noiseH = noise.get(vx, vz, 4, 0.5, 0.005) * params.ELEVATION_SCALE;
+      
+      // Road Carving Logic
+      const roadX = getRoadX ? getRoadX(vz) : 0;
+      const distToRoad = Math.abs(vx - roadX);
+      const roadWidth = 12; // Matches CONFIG.ROAD.WIDTH
+      const carveRadius = 25;
+      
+      // Smoothly flatten terrain near road
+      const carveFactor = 1.0 - Math.min(Math.max((distToRoad - roadWidth / 2) / carveRadius, 0), 1);
+      const h = THREE.MathUtils.lerp(noiseH, noise.get(roadX, vz, 4, 0.5, 0.005) * params.ELEVATION_SCALE, carveFactor);
+
       vertices[i + 2] = h;
 
       // Color mapping
       const color = new THREE.Color();
-      if (h > 35) {
+      if (carveFactor > 0.8) {
+        color.setHSL(0.6, 0.2, 0.1); // Road shoulder (darker)
+      } else if (h > 35) {
         color.setHSL(0.8, 1, 0.2); // Mountains
       } else if (h > 15) {
         color.setHSL(0.5, 0.8, 0.1); 

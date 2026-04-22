@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { Chunk } from '../entities/Chunk';
 import { Noise } from '../utils/Noise';
+import { BiomeManager } from './BiomeManager';
+import { CityGenerator } from './CityGenerator';
+import { StructureLibrary } from '../entities/StructureLibrary';
 
 export class WorldManager {
   private chunks: Map<string, Chunk> = new Map();
@@ -18,7 +21,7 @@ export class WorldManager {
     return this.noise;
   }
 
-  public update(playerPosition: THREE.Vector3) {
+  public update(playerPosition: THREE.Vector3, getRoadX?: (z: number) => number) {
     const pX = Math.floor(playerPosition.x / this.chunkSize);
     const pZ = Math.floor(playerPosition.z / this.chunkSize);
 
@@ -33,9 +36,23 @@ export class WorldManager {
         activeCoords.add(key);
 
         if (!this.chunks.has(key)) {
-          const chunk = new Chunk(cX, cZ, this.chunkSize, this.noise);
+          const chunk = new Chunk(cX, cZ, this.chunkSize, this.noise, getRoadX);
           this.chunks.set(key, chunk);
           this.scene.add(chunk.mesh);
+
+          // Spawn City Buildings if in Lowlands
+          if (BiomeManager.getBiome(cZ) === 'LOWLANDS' && getRoadX) {
+              CityGenerator.spawnCityRow(chunk.mesh as any, cZ - this.chunkSize/2, cZ + this.chunkSize/2, getRoadX);
+          }
+
+          // Random POIs
+          if (Math.random() > 0.98 && getRoadX) {
+              const roadX = getRoadX(cZ);
+              const gas = StructureLibrary.createGasStation();
+              gas.position.set(roadX + 25, 0, cZ);
+              gas.rotation.y = Math.PI / 2;
+              this.scene.add(gas);
+          }
         }
       }
     }
