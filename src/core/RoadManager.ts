@@ -249,13 +249,13 @@ export class RoadManager {
     geometry.computeVertexNormals();
 
     const roadMat = new THREE.MeshPhysicalMaterial({
-        color: 0x020205, 
-        roughness: 0.2, // Balanced for streaks
-        metalness: 0.7, // High sheen for 'Afterglow' streaks
-        clearcoat: 0.8,
-        reflectivity: 0.5,
-        emissive: 0x010103,
-        emissiveIntensity: 1.0,
+        color: 0x020205, // Deep desaturated indigo
+        roughness: 0.15, // Sharp reflections for 'Wet Asphalt' streaks
+        metalness: 0.8,  // High sheen for Halogen catch
+        clearcoat: 1.0,  // Maximum wetness
+        reflectivity: 1.0,
+        emissive: 0x000000,
+        emissiveIntensity: 0.0,
         polygonOffset: true,
         polygonOffsetFactor: -1,
         transparent: true,

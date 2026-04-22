@@ -15,7 +15,8 @@ export class Engine {
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050508);
-    this.scene.fog = new THREE.Fog(0x0a0a0f, 20, 120); 
+    // VOLUMETRIC DENSITY: Indigo-Black Haze
+    this.scene.fog = new THREE.FogExp2(0x050508, 0.015); 
     
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
     
@@ -48,7 +49,7 @@ export class Engine {
     const ambient = new THREE.AmbientLight(0x0d0d2b, 0.05);
     this.scene.add(ambient);
 
-    // CINEMATIC FILL: Hemisphere light for silhouette definition
+    // CINEMATIC FILL: Blue Hour 'Cheat' (Indigo Rim)
     const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.1);
     this.scene.add(hemi);
 
@@ -70,12 +71,12 @@ export class Engine {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-    // 1. SELECTIVE BLOOM
+    // 1. SELECTIVE BLOOM: High threshold for Halogen/Tail-light bleed
     const bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        1.2, 0.5, 0.9 // Tightened for housing glow
+        1.2, 0.5, 0.8 // Calibrated for Fog bleed
     );
-    bloomPass.threshold = 0.2; 
+    bloomPass.threshold = 0.8; 
     this.composer.addPass(bloomPass);
 
     // 2. ORANGE & TEAL COLOR GRADE
