@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+
+RectAreaLightUniformsLib.init();
 
 export class Car {
   public mesh: THREE.Group;
@@ -26,6 +29,8 @@ export class Car {
   // Anti-Gravity
   public isAntiGravity: boolean = false;
   private gravityDir: number = 1;
+  
+  private headlightTargets: THREE.Object3D[] = [];
 
   constructor() {
     this.mesh = new THREE.Group();
@@ -60,36 +65,56 @@ export class Car {
     cab.position.set(0, 1.1, -0.4);
     this.mesh.add(cab);
 
-    // Halogen Headlights (Cinematic SpotLights)
+    // Halogen Headlights (Cinematic SpotLights with Spread)
     const headlightColor = CONFIG.CAR.HEADLIGHT_COLOR;
-    const createHeadlight = (x: number) => {
+    const createHeadlightGroup = (x: number) => {
+      const container = new THREE.Group();
+      container.position.set(x, 0.6, 2.1);
+
+      // Primary Beam
       const spot = new THREE.SpotLight(headlightColor, CONFIG.LIGHTING.HEADLIGHT_INTENSITY);
       spot.angle = CONFIG.LIGHTING.HEADLIGHT_ANGLE;
+      spot.distance = CONFIG.LIGHTING.HEADLIGHT_DISTANCE;
       spot.penumbra = CONFIG.LIGHTING.HEADLIGHT_PENUMBRA;
       spot.decay = 2;
-      spot.distance = 150;
       spot.castShadow = true;
-      spot.shadow.bias = -0.0001;
       
       const target = new THREE.Object3D();
-      target.position.set(x, 0, 50);
+      target.position.set(x, 0, 80);
       spot.target = target;
+      this.headlightTargets.push(target);
+
+      // Outer Spread Beam (weaker)
+      const outerSpot = new THREE.SpotLight(headlightColor, CONFIG.LIGHTING.HEADLIGHT_INTENSITY * 0.4);
+      outerSpot.angle = CONFIG.LIGHTING.HEADLIGHT_ANGLE + 0.12;
+      outerSpot.distance = 40; 
+      outerSpot.penumbra = 0.8;
+      
+      const outerTarget = new THREE.Object3D();
+      outerTarget.position.set(x > 0 ? 10 : -10, -2, 40);
+      outerSpot.target = outerTarget;
       
       const bulb = new THREE.Mesh(
         new THREE.SphereGeometry(0.15, 16, 16),
         new THREE.MeshBasicMaterial({ color: headlightColor })
       );
       
-      const container = new THREE.Group();
-      container.position.set(x, 0.6, 2.1);
       container.add(spot);
+      container.add(outerSpot);
       container.add(target);
+      container.add(outerTarget);
       container.add(bulb);
       return container;
     };
 
-    this.mesh.add(createHeadlight(0.7));
-    this.mesh.add(createHeadlight(-0.7));
+    this.mesh.add(createHeadlightGroup(0.7));
+    this.mesh.add(createHeadlightGroup(-0.7));
+
+    // Underglow (Chassis silhouette)
+    const underglow = new THREE.RectAreaLight(0x002233, 2, 2, 0.5);
+    underglow.position.set(0, -0.4, 0);
+    underglow.rotation.x = -Math.PI / 2;
+    this.mesh.add(underglow);
 
     // Brake Lights (Subtle Red Emissive)
     const brakeGeo = new THREE.BoxGeometry(0.5, 0.15, 0.1);
@@ -165,6 +190,11 @@ export class Car {
     
     this.mesh.position.x += moveX;
     this.mesh.position.z += moveZ;
+
+    // Update headlight targets to 80m ahead
+    this.headlightTargets.forEach(target => {
+        target.position.set(0, -0.6, 80);
+    });
 
     this.gravityDir = THREE.MathUtils.lerp(this.gravityDir, this.isAntiGravity ? -1 : 1, 0.1);
     const height = getHeight(this.mesh.position.x, this.mesh.position.z);
