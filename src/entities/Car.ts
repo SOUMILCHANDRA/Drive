@@ -14,29 +14,27 @@ export class Car {
   public angle: number = 0;
 
   private keys: Record<string, boolean> = {};
-
-  public driftFactor: number = 1.0;
-  public isDrifting: boolean = false;
-  public barrelRollAngle: number = 0;
-
-  private wheels: THREE.Object3D[] = [];
   private brakeLights: THREE.Mesh[] = [];
+
+  private raycaster: THREE.Raycaster = new THREE.Raycaster();
+  private normal: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
 
   constructor() {
     this.mesh = new THREE.Group();
     this.setupInput();
+    this.raycaster.far = 10;
   }
 
   public async init() {
-    // DEBUG: Force procedural car immediately to fix black screen hang
     this.createProceduralModel();
-    console.log("Drive: Procedural Car Forced");
+    console.log("Drive: Grounded Car Initialized");
   }
 
   private createProceduralModel() {
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0, roughness: 1 });
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.5 });
     const body = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 4.5), mat);
     body.position.y = 0.5;
+    body.castShadow = true;
     this.mesh.add(body);
     this.attachLights();
   }
@@ -44,7 +42,6 @@ export class Car {
   private attachLights() {
     const headlightColor = 0xFFD700; // Drive 2011 Warm Amber
     const createHeadlight = (x: number) => {
-      // Shift forward 2 units (z=4.1) to decouple from body
       const spot = new THREE.SpotLight(headlightColor, 2000, 200, 0.6, 0.8, 1.0);
       spot.position.set(x, 0.6, 4.1);
       spot.castShadow = true;
@@ -85,7 +82,7 @@ export class Car {
     return this.velocity.z;
   }
 
-  public update(delta: number, getHeight: (x: number, z: number) => number) {
+  public update(delta: number, roadMeshes: THREE.Object3D[]) {
     const isBraking = this.keys['s'] || this.keys['arrowdown'];
     this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 5 : 1.5);
 
@@ -98,38 +95,51 @@ export class Car {
     }
 
     this.velocity.z *= this.deceleration;
-    this.mesh.rotation.y = this.angle;
+    
+    // Position Update
     this.mesh.position.x += Math.sin(this.angle) * this.velocity.z * delta;
     this.mesh.position.z += Math.cos(this.angle) * this.velocity.z * delta;
 
-    // Suspension & Raycasting Fix: Height Offset (0.5m) + Soft Bobbing
-    const time = Date.now() * 0.003;
-    const bobbing = Math.sin(time) * 0.05;
-    const roadHeight = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.5 + bobbing, 0.3);
+    // PHYSICAL RAYCASTING: Stick to road
+    this.raycaster.set(this.mesh.position.clone().add(new THREE.Vector3(0, 5, 0)), new THREE.Vector3(0, -1, 0));
+    const intersects = this.raycaster.intersectObjects(roadMeshes, true);
     
-    if (this.wheels.length > 0) {
-      this.wheels.forEach(w => w.rotation.x += (this.velocity.z * delta) / 0.5);
+    if (intersects.length > 0) {
+      const hit = intersects[0];
+      const roadHeight = hit.point.y;
+      
+      // Suspension Bobbing
+      const time = Date.now() * 0.003;
+      const bobbing = Math.sin(time) * 0.05;
+      
+      // Settling Lerp (Heavy Suspension)
+      this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.5 + bobbing, 0.2);
+      
+      // SURFACE ALIGNMENT: Tilt car to match road normal
+      if (hit.face) {
+        const targetNormal = hit.face.normal.clone().applyQuaternion(hit.object.quaternion);
+        this.normal.lerp(targetNormal, 0.1);
+        
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.normal);
+        const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.angle);
+        this.mesh.quaternion.slerp(quaternion.multiply(yaw), 0.1);
+      }
+    } else {
+      this.mesh.position.y -= 9.8 * delta; // Gravity if airborne
+      this.mesh.rotation.y = this.angle;
     }
   }
 
-  public autopilot(targetX: number, targetZ: number, targetAngle: number, targetY: number) {
-    const time = Date.now() * 0.003;
-    const bobbing = Math.sin(time) * 0.05;
-    
+  public autopilot(targetX: number, targetZ: number, targetAngle: number, roadMeshes: THREE.Object3D[]) {
     this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, targetX, 0.1);
     this.mesh.position.z = targetZ;
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY + 0.5 + bobbing, 0.3);
-    
     this.angle = THREE.MathUtils.lerp(this.angle, targetAngle, 0.1);
-    this.mesh.rotation.y = this.angle;
-    
-    this.velocity.z = 25; 
-    this.wheels.forEach(w => w.rotation.x += (this.velocity.z * 0.016) / 0.5);
+    this.velocity.z = 25;
+    this.update(0.016, roadMeshes);
   }
 
   public getCameraTransform() {
-    // Focused Chase Camera: 7m behind, 2.5m above
+    // Focused Chase Camera
     const time = Date.now() * 0.01;
     const shake = new THREE.Vector3(
         Math.sin(time * 0.7) * 0.02,
@@ -137,16 +147,19 @@ export class Car {
         0
     );
 
-    const offset = new THREE.Vector3(
-        Math.sin(this.angle) * -7, 
-        2.5, 
-        Math.cos(this.angle) * -7
-    ).add(shake);
-
-    const lookTarget = this.mesh.position.clone().add(
-        new THREE.Vector3(Math.sin(this.angle) * 20, 1.0, Math.cos(this.angle) * 20)
-    );
+    // Dynamic offset based on car rotation
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.mesh.quaternion);
     
-    return { position: this.mesh.position.clone().add(offset), lookTarget };
+    const camPos = this.mesh.position.clone()
+        .add(forward.clone().multiplyScalar(-7))
+        .add(up.clone().multiplyScalar(2.5))
+        .add(shake);
+
+    const lookTarget = this.mesh.position.clone()
+        .add(forward.clone().multiplyScalar(20))
+        .add(up.clone().multiplyScalar(1.0));
+    
+    return { position: camPos, lookTarget };
   }
 }

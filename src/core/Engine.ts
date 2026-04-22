@@ -36,6 +36,10 @@ export class Engine {
     moonlight.position.set(0, 100, -200);
     this.scene.add(moonlight);
 
+    // MOUNTAIN PRESENCE: Deep Purple Ambient (0.02)
+    const ambient = new THREE.AmbientLight(0x1a0a2e, 0.02);
+    this.scene.add(ambient);
+
     const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.03);
     rimLight.position.set(100, 10, -100);
     this.scene.add(rimLight);

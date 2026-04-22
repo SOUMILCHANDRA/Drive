@@ -279,6 +279,7 @@ export class RoadManager {
     const roadMesh = new THREE.Mesh(geometry, roadMat);
     roadMesh.frustumCulled = false;
     roadMesh.receiveShadow = true;
+    roadMesh.name = "road";
     
     const chunkGroup = new THREE.Group();
     chunkGroup.add(roadMesh);
@@ -301,17 +302,36 @@ export class RoadManager {
         chunkGroup.add(mRight);
     }
 
-    if (index % 10 === 0) { 
+    // 3. RHYTHMIC STREETLIGHTS: Sodium Orange (#FF9500) every 50m
+    if (index % 5 === 0) { 
         const lightPos = curve.getPoint(0.5);
-        const light = new THREE.PointLight(0xFFB347, 5.0, 100, 1.5);
-        light.position.set(lightPos.x + 12, lightPos.y + 12, lightPos.z);
-        chunkGroup.add(light);
-    }
+        const tangent = curve.getTangent(0.5).normalize();
+        const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-    // Removed flat terrain plane to prevent clipping with WorldManager procedural terrain
+        const sodiumColor = 0xFF9500;
+        const streetLight = new THREE.PointLight(sodiumColor, 20, 100, 2);
+        streetLight.position.copy(lightPos).add(normal.clone().multiplyScalar(12)).add(new THREE.Vector3(0, 15, 0));
+        streetLight.castShadow = true;
+        chunkGroup.add(streetLight);
+
+        // Visual Pole
+        const pole = new THREE.Mesh(new THREE.BoxGeometry(0.5, 15, 0.5), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+        pole.position.copy(streetLight.position).sub(new THREE.Vector3(0, 7.5, 0));
+        chunkGroup.add(pole);
+    }
 
     this.roadGroup.add(chunkGroup);
     this.chunks.set(index, chunkGroup);
+  }
+
+  public getCollisionMeshes(): THREE.Object3D[] {
+    const meshes: THREE.Object3D[] = [];
+    this.chunks.forEach(chunk => {
+        chunk.children.forEach(child => {
+            if (child.name === "road") meshes.push(child);
+        });
+    });
+    return meshes;
   }
 
   public isInTunnel() { return false; }

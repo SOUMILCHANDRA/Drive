@@ -24,13 +24,13 @@ async function bootstrap() {
         road.update(car.mesh.position.z);
 
         // Physics
+        const roadMeshes = road.getCollisionMeshes();
         if (autopilot) {
-            // Hard snap car to road spline to prevent drifting
             const targetZ = car.mesh.position.z + car.velocityValue * delta;
             const target = road.getAutopilotTarget(targetZ);
-            car.autopilot(target.x, target.z, target.angle, target.y);
+            car.autopilot(target.x, target.z, target.angle, roadMeshes);
         } else {
-            car.update(delta, (x, z) => road.getRoadHeight(x, z));
+            car.update(delta, roadMeshes);
         }
 
         // HUD Updates
