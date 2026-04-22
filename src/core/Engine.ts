@@ -34,6 +34,7 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMappingExposure = 1.0; 
 
     const container = document.getElementById('app');
     if (container) {
@@ -58,9 +59,9 @@ export class Engine {
     vignettePass.uniforms['darkness'].value = 1.6;
 
     const rgbShiftPass = new ShaderPass(RGBShiftShader);
-    rgbShiftPass.uniforms['amount'].value = 0.0008;
+    rgbShiftPass.uniforms['amount'].value = 0.0006;
 
-    // Custom Color Grading Shader
+    // Custom Color Grading Shader (Balanced)
     const colorGradeShader = {
       uniforms: {
         "tDiffuse": { value: null },
@@ -82,9 +83,9 @@ export class Engine {
         void main() {
           vec4 color = texture2D(tDiffuse, vUv);
           float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-          vec3 shadows = mix(uShadows, color.rgb, gray);
+          vec3 shadows = mix(uShadows * 0.3, color.rgb, gray);
           vec3 highlights = mix(color.rgb, uHighlights, gray);
-          color.rgb = mix(shadows, highlights, gray);
+          color.rgb = mix(shadows, highlights, gray * 0.5 + 0.5);
           gl_FragColor = color;
         }
       `
@@ -101,7 +102,7 @@ export class Engine {
 
     this.setupLights();
     this.setupResize();
-    this.scene.background = new THREE.Color(0x000005);
+    this.scene.background = new THREE.Color(CONFIG.VISUALS.BACKGROUND_COLOR);
 
     // Default camera position
     this.camera.position.set(0, 5, 10);
@@ -109,12 +110,20 @@ export class Engine {
   }
 
   private setupLights() {
-    // Dim Cold Blue Ambient
+    // Ambient Visibility
     const ambientLight = new THREE.AmbientLight(CONFIG.LIGHTING.AMBIENT_COLOR, CONFIG.LIGHTING.AMBIENT_INTENSITY);
     this.scene.add(ambientLight);
 
+    // Atmosphere Tint
+    const hemiLight = new THREE.HemisphereLight(
+      CONFIG.LIGHTING.HEMI_SKY_COLOR,
+      CONFIG.LIGHTING.HEMI_GROUND_COLOR,
+      0.4
+    );
+    this.scene.add(hemiLight);
+
     // Rim/Key Light from behind-above
-    const rimLight = new THREE.DirectionalLight(CONFIG.LIGHTING.RIM_COLOR, CONFIG.LIGHTING.RIM_INTENSITY);
+    const rimLight = new THREE.DirectionalLight(0x1a2a3a, 0.4);
     rimLight.position.set(0, 10, -20);
     this.scene.add(rimLight);
   }
