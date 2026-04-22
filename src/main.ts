@@ -7,6 +7,8 @@ import { Stars } from './entities/Stars';
 import { SpeedParticles } from './entities/SpeedParticles';
 import * as THREE from 'three';
 
+console.log("Drive: Initializing...");
+
 const engine = new Engine();
 const car = new Car();
 const world = new WorldManager(engine.scene);
@@ -23,7 +25,6 @@ engine.renderer.setClearColor(0x0a0a0a);
 // Initial Car Placement
 car.mesh.position.set(0, 0.5, 0);
 
-// HUD & Splash Elements
 const splashElem = document.getElementById('splash');
 const hudElem = document.getElementById('hud');
 const speedElem = document.getElementById('speed-val');
@@ -33,7 +34,6 @@ const elevElem = document.getElementById('elev-val');
 let totalDistance = 0;
 let gameStarted = false;
 
-// Handle Splash Transition
 splashElem?.addEventListener('click', () => {
     gameStarted = true;
     splashElem.classList.add('hidden');
@@ -44,47 +44,38 @@ splashElem?.addEventListener('click', () => {
 });
 
 engine.render((delta) => {
-  // Always update world and road for visual background even if not started
-  world.update(car.mesh.position);
-  road.update(car.mesh.position.z);
-  stars.update(car.mesh.position);
+    // Background updates
+    world.update(car.mesh.position);
+    road.update(car.mesh.position.z);
+    stars.update(car.mesh.position);
 
-  if (gameStarted) {
-    // Update Particles
-    particles.update(car.mesh.position, car.velocity.z);
+    if (gameStarted) {
+        particles.update(car.mesh.position, car.velocity.z);
+        car.update(delta, (x, z) => road.getRoadHeight(x, z));
 
-    // Update Car
-    car.update(delta, (x, z) => {
-      // Check if car is on road (approx)
-      // For now just return terrain height
-      return road.getRoadHeight(x, z);
-    });
+        const currentSpeed = Math.abs(car.velocity.z);
+        if (speedElem) speedElem.innerText = Math.round(currentSpeed * 3.6).toString();
+        
+        totalDistance += currentSpeed * delta;
+        if (distElem) distElem.innerText = Math.round(totalDistance).toString();
+        if (elevElem) elevElem.innerText = Math.round(car.mesh.position.y).toString();
+        
+        engine.camera.fov = 75 + (currentSpeed / car.maxSpeed) * 20;
+        engine.camera.updateProjectionMatrix();
+    }
 
-    // Update HUD
-    const currentSpeed = Math.abs(car.velocity.z);
-    if (speedElem) speedElem.innerText = Math.round(currentSpeed * 3.6).toString();
+    // Camera
+    const speed = gameStarted ? Math.abs(car.velocity.z) : 0;
+    const offset = new THREE.Vector3(
+        Math.sin(car.angle) * -15, 
+        6 + (speed / 20), 
+        Math.cos(car.angle) * -15
+    );
+    const targetCamPos = car.mesh.position.clone().add(offset);
+    engine.camera.position.lerp(targetCamPos, gameStarted ? 0.05 : 1.0);
     
-    totalDistance += currentSpeed * delta;
-    if (distElem) distElem.innerText = Math.round(totalDistance).toString();
-    if (elevElem) elevElem.innerText = Math.round(car.mesh.position.y).toString();
-    
-    // Dynamic Camera FOV
-    engine.camera.fov = 75 + (currentSpeed / car.maxSpeed) * 20;
-    engine.camera.updateProjectionMatrix();
-  }
-
-  // Camera Follow (Calculated even if stopped to keep framing)
-  const speed = gameStarted ? Math.abs(car.velocity.z) : 0;
-  const offset = new THREE.Vector3(
-    Math.sin(car.angle) * -15, 
-    6 + (speed / 20), 
-    Math.cos(car.angle) * -15
-  );
-  const targetCamPos = car.mesh.position.clone().add(offset);
-  engine.camera.position.lerp(targetCamPos, gameStarted ? 0.1 : 1.0);
-  
-  const lookTarget = car.mesh.position.clone().add(
-      new THREE.Vector3(Math.sin(car.angle) * 10, 2, Math.cos(car.angle) * 10)
-  );
-  engine.camera.lookAt(lookTarget);
+    const lookTarget = car.mesh.position.clone().add(
+        new THREE.Vector3(Math.sin(car.angle) * 10, 2, Math.cos(car.angle) * 10)
+    );
+    engine.camera.lookAt(lookTarget);
 });

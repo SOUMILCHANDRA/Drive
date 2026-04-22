@@ -4,6 +4,7 @@ import { Noise } from '../utils/Noise';
 export class RoadManager {
   private roadGroup: THREE.Group;
   private scene: THREE.Scene;
+  private noise: Noise;
   private roadSegments: Map<number, THREE.Mesh> = new Map();
   private segmentLength: number = 20;
   private roadWidth: number = 8;
@@ -15,6 +16,7 @@ export class RoadManager {
 
   constructor(scene: THREE.Scene, noise: Noise) {
     this.scene = scene;
+    this.noise = noise;
     this.roadGroup = new THREE.Group();
     this.scene.add(this.roadGroup);
 

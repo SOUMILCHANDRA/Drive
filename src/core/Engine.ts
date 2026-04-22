@@ -39,9 +39,9 @@ export class Engine {
     const renderScene = new RenderPass(this.scene, this.camera);
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.5, // Lower strength
-      0.4,
-      0.5  // Lower threshold
+      1.2, // strength
+      0.4, // radius
+      0.1  // threshold
     );
 
     this.composer = new EffectComposer(this.renderer);
@@ -75,6 +75,7 @@ export class Engine {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.composer.setSize(window.innerWidth, window.innerHeight);
     });
   }
 
