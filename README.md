@@ -13,14 +13,12 @@ This project prioritizes **Atmosphere over Mechanics**. It captures the isolatio
 - **Isolated Pools of Light**: Sparse sodium-orange streetlights creating islands of safety in the void.
 - **Zen Driving**: No timers, no crashes, no traffic. Just you and the infinite path.
 
-## ⚙️ Technical Features
-- **Procedural Spline Generation**: High-performance CatmullRom splines create a smooth, infinite roadway that maps to a "Wet Look" asphalt material.
-- **Dynamic Post-Processing Stack**:
-  - **ACESFilmic Tone Mapping**: Industry-standard color grading for consistent exposure.
-  - **UnrealBloom**: Calibrated to catch only high-intensity specular highlights (headlights/brake lights).
-  - **Color Grading**: Cold shadow hues and warm highlight shifts for the LA night-film look.
-- **Handheld Camera Logic**: A soft, "breathing" camera follow-system that simulates a handheld rig on the chase vehicle.
-- **Advanced Headlight Optics**: Dual-stage SpotLights with inner/outer cones for realistic road-surface illumination spread.
+## ⚙️ Technical Architecture
+- **Scout Generation Engine**: A heuristic path-planner that sampling terrain gradients to ensure natural, drivable road curvature.
+- **Planetary fBM Noise**: Layered Fractal Brownian Motion with deterministic parameters for **Earth, Mars, and Moon** geologies.
+- **Conforming Terrain System**: A master-spline link that physically deforms mountain geometry to meet the road via **Smoothstep Carving**.
+- **Deterministic Seed (Alea)**: High-performance PRNG ensuring every world is reproducible from a single seed.
+- **Treadmill LOD System**: High-detail near-player chunks with large-scale low-detail far grids for infinite visibility.
 
 ## 🕹️ Controls
 - **WASD / ARROWS**: Drive & Steering
