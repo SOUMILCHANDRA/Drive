@@ -21,10 +21,10 @@ This project prioritizes **Atmosphere over Mechanics**. It captures the isolatio
 - **Treadmill LOD System**: High-detail near-player chunks with large-scale low-detail far grids for infinite visibility.
 
 ## 🕹️ Controls
-- **WASD / ARROWS**: Drive & Steering
-- **SPACE**: Drift (Cuts grip and adds lateral slide)
-- **DOUBLE TAP A/D**: Trigger a cinematic Barrel Roll
-- **CLICK SPLASH**: Initialize Cinematic Audio & Engine
+- **WASD / ARROWS**: Manual Drive & Steering
+- **'A' KEY**: Toggle **Cinematic Autopilot** (Rail-Lock Spline Tracking)
+- **CLICK TO START**: Initialize Cinematic Engine & Physics
+- **ESC**: Pause / Reset View
 
 ## 🛠️ Tech Stack
 - **Engine**: Three.js (WebGL)
