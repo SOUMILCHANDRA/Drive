@@ -49,10 +49,17 @@ async function bootstrap() {
 
     const splash = document.getElementById('splash');
     const hud = document.getElementById('hud');
+    const bgm = new Audio('/bgm.webm');
+    bgm.loop = true;
+    bgm.volume = 0.6;
+
     if (splash) {
         splash.addEventListener('click', () => {
             splash.classList.add('hidden');
             if (hud) hud.style.display = 'block';
+            
+            // Start BGM on user interaction
+            bgm.play().catch(e => console.error("BGM Play Failed:", e));
         });
     }
 
