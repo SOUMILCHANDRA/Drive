@@ -205,10 +205,10 @@ export class RoadManager {
 
     const roadMat = new THREE.MeshPhysicalMaterial({
         color: 0x020205, 
-        roughness: 0.1, 
-        metalness: 0.2,
-        clearcoat: 0.8, // High-gloss clearcoat for "Wet" look
-        reflectivity: 0.3, // Lower base reflectivity for sharper streaks
+        roughness: 0.2, 
+        metalness: 0.7, // High sheen for streaks
+        clearcoat: 0.8,
+        reflectivity: 0.3,
         emissive: 0x010103,
         emissiveIntensity: 1.0,
         polygonOffset: true,
@@ -253,12 +253,12 @@ export class RoadManager {
             `
             #include <emissivemap_fragment>
             
-            // 1. Wet Look Specular Streaks (High-Freq Roughness Noise)
+            // 1. Wet Look Specular Streaks (Sodium Orange/Teal Mix)
             float roughnessNoise = noise(vUv * 500.0);
-            float spec = pow(noise(vUv * vec2(1.0, 400.0)) * 0.5 + 0.5, 8.0); // Streaks
-            diffuseColor.rgb += vec3(0.0, 0.6, 0.6) * spec * roughnessNoise;
+            float spec = pow(noise(vUv * vec2(1.0, 400.0)) * 0.5 + 0.5, 8.0);
+            diffuseColor.rgb += vec3(0.0, 0.4, 0.4) * spec * roughnessNoise;
 
-            // 2. Center Dash Lines (Amber Glow)
+            // 2. Center Dash Lines
             float dash = step(0.7, fract(vUv.x * 0.1));
             float center = 1.0 - step(0.015, abs(vUv.y - 0.5));
             totalEmissiveRadiance += vec3(1.0, 0.84, 0.0) * dash * center * 4.0;
@@ -267,7 +267,7 @@ export class RoadManager {
             float edgeMask = smoothstep(0.5, 0.45, abs(vUv.y - 0.5));
             diffuseColor.a *= edgeMask;
 
-            // 4. Exponential Fog + Magenta Horizon
+            // 4. Fog + Horizon
             float dist = length(vWorldPosition - cameraPosition);
             float fogFactor = 1.0 - exp(-dist * 0.003);
             vec3 fogColor = mix(vec3(0.04, 0.04, 0.06), vec3(0.5, 0.0, 0.5), clamp((dist-800.0)/1200.0, 0.0, 1.0));
@@ -284,10 +284,10 @@ export class RoadManager {
     const chunkGroup = new THREE.Group();
     chunkGroup.add(roadMesh);
 
-    // 2. CAT'S EYES: Self-illuminated guides every 20m
+    // 2. CAT'S EYES
     const markerGeo = new THREE.BoxGeometry(0.1, 0.05, 0.3);
     const markerMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-    for (let i = 0; i <= segments; i += 4) { // Roughly 20m steps
+    for (let i = 0; i <= segments; i += 4) {
         const t = 1/3 + (i / segments) * (1/3);
         const pos = curve.getPoint(t);
         const tangent = curve.getTangent(t).normalize();
@@ -302,20 +302,33 @@ export class RoadManager {
         chunkGroup.add(mRight);
     }
 
-    // 3. RHYTHMIC STREETLIGHTS: Sodium Orange (#FF9500) every 50m
+    // 3. VOLUMETRIC STREETLIGHTS
     if (index % 5 === 0) { 
         const lightPos = curve.getPoint(0.5);
         const tangent = curve.getTangent(0.5).normalize();
         const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
         const sodiumColor = 0xFF9500;
-        const streetLight = new THREE.PointLight(sodiumColor, 20, 100, 2);
+        const streetLight = new THREE.PointLight(sodiumColor, 15, 80, 2);
         streetLight.position.copy(lightPos).add(normal.clone().multiplyScalar(12)).add(new THREE.Vector3(0, 15, 0));
         streetLight.castShadow = true;
         chunkGroup.add(streetLight);
 
-        // Visual Pole
-        const pole = new THREE.Mesh(new THREE.BoxGeometry(0.5, 15, 0.5), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+        // Indigo Rim Light (Mountain silhouette)
+        const indigoLight = new THREE.PointLight(0x4444ff, 2, 60, 2);
+        indigoLight.position.copy(streetLight.position).add(new THREE.Vector3(0, 2, 0));
+        chunkGroup.add(indigoLight);
+
+        // Pole with Gradient
+        const poleGeo = new THREE.BoxGeometry(0.4, 15, 0.4);
+        const poleColors = [];
+        for (let i = 0; i < poleGeo.attributes.position.count; i++) {
+            const y = poleGeo.attributes.position.getY(i);
+            const t = (y + 7.5) / 15; // 0 at bottom, 1 at top
+            poleColors.push(t * 1.0, t * 0.5, 0); // Orange to Black
+        }
+        poleGeo.setAttribute('color', new THREE.Float32BufferAttribute(poleColors, 3));
+        const pole = new THREE.Mesh(poleGeo, new THREE.MeshStandardMaterial({ vertexColors: true }));
         pole.position.copy(streetLight.position).sub(new THREE.Vector3(0, 7.5, 0));
         chunkGroup.add(pole);
     }

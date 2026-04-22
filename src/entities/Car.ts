@@ -127,26 +127,26 @@ export class Car {
   }
 
   public getCameraTransform() {
-    // Focused Chase Camera
+    // Cinematic Cockpit Camera: Closer and lower for streetlight strobe effect
     const time = Date.now() * 0.01;
     const shake = new THREE.Vector3(
-        Math.sin(time * 0.7) * 0.02,
-        Math.cos(time * 0.8) * 0.02,
+        Math.sin(time * 0.7) * 0.015,
+        Math.cos(time * 0.8) * 0.015,
         0
     );
 
-    // Dynamic offset based on car rotation
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.mesh.quaternion);
     
+    // Closer (4.5m) and Lower (1.8m)
     const camPos = this.mesh.position.clone()
-        .add(forward.clone().multiplyScalar(-7))
-        .add(up.clone().multiplyScalar(2.5))
+        .add(forward.clone().multiplyScalar(-4.5))
+        .add(up.clone().multiplyScalar(1.8))
         .add(shake);
 
     const lookTarget = this.mesh.position.clone()
-        .add(forward.clone().multiplyScalar(20))
-        .add(up.clone().multiplyScalar(1.0));
+        .add(forward.clone().multiplyScalar(15))
+        .add(up.clone().multiplyScalar(0.8));
     
     return { position: camPos, lookTarget };
   }
