@@ -71,7 +71,6 @@ export class Car {
     }
 
     // Steering
-    const speedFactor = this.velocity.z / this.maxSpeed;
     if (Math.abs(this.velocity.z) > 0.1) {
       if (this.keys['a'] || this.keys['arrowleft']) {
         this.angle += this.steeringAmount * Math.sign(this.velocity.z);

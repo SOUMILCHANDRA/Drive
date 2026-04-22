@@ -7,7 +7,7 @@ import { Stars } from './entities/Stars';
 import { SpeedParticles } from './entities/SpeedParticles';
 import * as THREE from 'three';
 
-console.log("Drive: Initializing...");
+console.log("Drive: Initializing Core...");
 
 const engine = new Engine();
 const car = new Car();
@@ -35,6 +35,7 @@ let totalDistance = 0;
 let gameStarted = false;
 
 splashElem?.addEventListener('click', () => {
+    console.log("Drive: Starting Session...");
     gameStarted = true;
     splashElem.classList.add('hidden');
     if (hudElem) {
@@ -44,15 +45,23 @@ splashElem?.addEventListener('click', () => {
 });
 
 engine.render((delta) => {
-    // Background updates
+    // 1. Update World Chunks based on car position
     world.update(car.mesh.position);
+    
+    // 2. Update Procedural Road Chaining (Pass world height for road matching)
     road.update(car.mesh.position.z, (x, z) => world.getHeight(x, z));
+    
+    // 3. Update Visual FX
     stars.update(car.mesh.position);
 
     if (gameStarted) {
+        // 4. Update Particle effects
         particles.update(car.mesh.position, car.velocity.z);
+        
+        // 5. Update Car Physics (Use Road Height for grounding)
         car.update(delta, (x, z) => road.getRoadHeight(x, z));
 
+        // 6. Update HUD
         const currentSpeed = Math.abs(car.velocity.z);
         if (speedElem) speedElem.innerText = Math.round(currentSpeed * 3.6).toString();
         
@@ -60,11 +69,12 @@ engine.render((delta) => {
         if (distElem) distElem.innerText = Math.round(totalDistance).toString();
         if (elevElem) elevElem.innerText = Math.round(car.mesh.position.y).toString();
         
+        // 7. Dynamic Camera Settings
         engine.camera.fov = 75 + (currentSpeed / car.maxSpeed) * 20;
         engine.camera.updateProjectionMatrix();
     }
 
-    // Camera
+    // 8. Static/Cinematic Camera Follow
     const speed = gameStarted ? Math.abs(car.velocity.z) : 0;
     const offset = new THREE.Vector3(
         Math.sin(car.angle) * -15, 
