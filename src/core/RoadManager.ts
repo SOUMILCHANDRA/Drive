@@ -258,9 +258,9 @@ export class RoadManager {
     geometry.computeVertexNormals();
 
     const roadMat = new THREE.MeshStandardMaterial({
-        color: 0x050508,
-        roughness: 0.25,
-        metalness: 0.6,
+        color: 0x0a0a0f,
+        roughness: 0.2,
+        metalness: 0.5,
         transparent: true,
         polygonOffset: true,
         polygonOffsetFactor: -1

@@ -16,15 +16,20 @@ export class Engine {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050508);
     // STABLE ATMOSPHERE: High-Density Haze
-    this.scene.fog = new THREE.FogExp2(0x050508, 0.02); 
+    this.scene.fog = new THREE.FogExp2(0x050508, 0.015); 
     
     this.camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 2000);
     
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    // CRITICAL: Physically correct lighting
+    (this.renderer as any).physicallyCorrectLights = true; // For older Three.js versions
+    (this.renderer as any).useLegacyLights = false; // For newer Three.js versions
+    
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1;
+    this.renderer.toneMappingExposure = 1.2; // increase from default to fix underexposure
     this.renderer.outputColorSpace = THREE.SRGBColorSpace; 
     this.renderer.shadowMap.enabled = true; 
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -51,7 +56,7 @@ export class Engine {
     this.scene.add(ambient);
 
     // SOFT GLOBAL VISIBILITY: Blue Hour Fill
-    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.25);
+    const hemi = new THREE.HemisphereLight(0x111133, 0x000000, 0.2);
     this.scene.add(hemi);
   }
 

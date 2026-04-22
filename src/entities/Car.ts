@@ -64,9 +64,9 @@ export class Car {
             if (child instanceof THREE.Mesh) {
                 child.geometry.computeVertexNormals(); 
                 child.material = new THREE.MeshStandardMaterial({
-                    color: 0xaaaaaa,
-                    roughness: 0.4,
-                    metalness: 0.6
+                    color: 0x999999,
+                    roughness: 0.35,
+                    metalness: 0.7
                 });
                 child.castShadow = true;
                 child.receiveShadow = true;
@@ -84,16 +84,20 @@ export class Car {
   }
 
   private attachLights() {
-    const headlightLeft = new THREE.SpotLight(0xffd27f, 15, 80, Math.PI / 5, 0.6);
-    headlightLeft.position.set(-0.6, 0.3, 1.8);
+    const headlightLeft = new THREE.SpotLight(0xffe6b0, 40, 120, Math.PI / 6, 0.5);
+    headlightLeft.position.set(-0.6, 0.3, 1.5);
+    headlightLeft.target.position.set(-0.6, 0.2, 10);
     headlightLeft.castShadow = true;
 
     const headlightRight = headlightLeft.clone();
-    headlightRight.position.set(0.6, 0.3, 1.8);
+    headlightRight.position.set(0.6, 0.3, 1.5);
+    headlightRight.target.position.set(0.6, 0.2, 10);
     headlightRight.castShadow = true;
 
     this.mesh.add(headlightLeft);
     this.mesh.add(headlightRight);
+    this.mesh.add(headlightLeft.target);
+    this.mesh.add(headlightRight.target);
 
     // GROUNDING SHADOW: Final Lock Physical Anchor
     const shadowGeo = new THREE.CircleGeometry(1.5, 32);
