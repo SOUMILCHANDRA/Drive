@@ -90,7 +90,7 @@ export class Car {
     this.mesh.position.z += Math.cos(this.angle) * this.velocity.z * delta;
 
     const height = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
-    this.mesh.position.y = height + 5.0; // DEBUG: Force hover
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, height + 0.1, 0.4);
     
     if (this.wheels.length > 0) {
       this.wheels.forEach(w => w.rotation.x += (this.velocity.z * delta) / 0.5);
