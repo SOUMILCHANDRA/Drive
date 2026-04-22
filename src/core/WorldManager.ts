@@ -39,29 +39,6 @@ export class WorldManager {
           this.chunks.set(key, chunk);
           this.scene.add(chunk.mesh);
 
-          // FIX: override chunk terrain material after creation
-          // Chunk.ts may be setting random/bright colors — force it dark here
-          chunk.mesh.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              const mesh = child as THREE.Mesh;
-              // Only override if it looks like terrain (not a road marking or structure)
-              const mat = mesh.material as THREE.MeshStandardMaterial;
-              if (mat && mat.isMeshStandardMaterial) {
-                const col = mat.color;
-                // If the material is brighter than expected for night terrain, darken it
-                const brightness = col.r + col.g + col.b;
-                if (brightness > 1.0) {
-                  // This is a suspiciously bright material — it's causing your colored blocks
-                  mat.color.set(0x1a2030);
-                  mat.roughness = 0.95;
-                  mat.metalness = 0.0;
-                  mat.emissive.set(0x000000);
-                  mat.emissiveIntensity = 0;
-                }
-              }
-            }
-          });
-
           if (BiomeManager.getBiome(cZ) === 'LOWLANDS' && getRoadX) {
             CityGenerator.spawnCityRow(chunk.mesh as THREE.Group, cZ - this.chunkSize / 2, cZ + this.chunkSize / 2, getRoadX);
           }

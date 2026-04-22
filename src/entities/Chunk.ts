@@ -15,8 +15,7 @@ export class Chunk {
     this.size = size;
     this.mesh = new THREE.Group();
 
-    const segments = 32;
-    // Create geometry on the XZ plane instead of XY
+    const segments = 40;
     const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
     geometry.rotateX(-Math.PI / 2);
     
@@ -31,26 +30,22 @@ export class Chunk {
       
       const roadX = getRoadX ? getRoadX(vz) : 0;
       const distToRoad = Math.abs(vx - roadX);
-      const roadWidth = 12;
-      const carveRadius = 25;
+      const roadWidth = 14;
+      const carveRadius = 30;
       
       const carveFactor = 1.0 - Math.min(Math.max((distToRoad - roadWidth / 2) / carveRadius, 0), 1);
       const h = THREE.MathUtils.lerp(noiseH, noise.get(roadX, vz, 4, 0.5, 0.005) * params.ELEVATION_SCALE, carveFactor);
 
-      // Set Y height (index 1 for XZ plane geometry)
       vertices[i + 1] = h;
 
+      // FIX: Deep Nocturnal Palette (No bright colors)
       const color = new THREE.Color();
       if (carveFactor > 0.8) {
-        color.setHSL(0.6, 0.2, 0.08); // Asphalt shoulder
+        color.setRGB(0.02, 0.02, 0.03); // Deep black asphalt
       } else if (h > 45) {
-        color.setHSL(0.0, 0.0, 0.95); // Snow caps on peaks
-      } else if (h > 35) {
-        color.setHSL(0.8, 0.3, 0.15); // Deep mountain purple
-      } else if (h > 15) {
-        color.setHSL(0.5, 0.5, 0.1); // Rolling hills
+        color.setRGB(0.15, 0.15, 0.2); // Faint mountain rim
       } else {
-        color.setHSL(0.9, 0.2, 0.05); // City basin
+        color.setRGB(0.05, 0.06, 0.08); // Dark midnight terrain
       }
       colors[i] = color.r;
       colors[i + 1] = color.g;
@@ -62,8 +57,8 @@ export class Chunk {
 
     const material = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.8,
-      metalness: 0.2,
+      roughness: 0.9,
+      metalness: 0.1,
       flatShading: true,
     });
 
