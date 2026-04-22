@@ -1,12 +1,13 @@
 import * as THREE from 'three';
+import { CONFIG } from '../config';
 
 export class Car {
   public mesh: THREE.Group;
   public velocity: THREE.Vector3 = new THREE.Vector3();
-  public acceleration: number = 20;
+  public acceleration: number = CONFIG.CAR.ACCELERATION;
   public deceleration: number = 0.98;
-  public maxSpeed: number = 60;
-  public steeringAmount: number = 0.05;
+  public maxSpeed: number = CONFIG.CAR.MAX_SPEED;
+  public steeringAmount: number = CONFIG.CAR.STEERING;
   public angle: number = 0;
 
   private keys: Record<string, boolean> = {};
@@ -102,7 +103,7 @@ export class Car {
   public update(delta: number, getHeight: (x: number, z: number) => number) {
     // Drifting
     this.isDrifting = this.keys[' '] && Math.abs(this.velocity.z) > 10;
-    this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, this.isDrifting ? 0.95 : 1.0, 0.1);
+    this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, this.isDrifting ? CONFIG.CAR.DRIFT_SLIP : 1.0, 0.1);
 
     // Acceleration
     if (this.keys['w'] || this.keys['arrowup']) {
