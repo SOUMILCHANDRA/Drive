@@ -15,22 +15,43 @@ async function bootstrap() {
     await car.init();
     engine.scene.add(car.mesh);
 
+    let distance = 0;
+    let autopilot = true;
+
     engine.render((delta) => {
         // Core Logic
         world.update(car.mesh.position, (z) => road.getRoadX(z), (x, z) => road.getRoadHeight(x, z));
         road.update(car.mesh.position.z);
 
         // Physics
-        car.update(delta, (x, z) => road.getRoadHeight(x, z));
+        if (autopilot) {
+            car.autopilot(road.getRoadX(car.mesh.position.z));
+        } else {
+            car.update(delta, (x, z) => road.getRoadHeight(x, z));
+        }
+
+        // HUD Updates
+        const speedKmh = Math.floor(car.velocityValue * 3.6);
+        distance += car.velocityValue * delta;
+        const speedVal = document.getElementById('speed-val');
+        const distVal = document.getElementById('dist-val');
+        if (speedVal) speedVal.innerText = speedKmh.toString();
+        if (distVal) distVal.innerText = Math.floor(distance).toString();
 
         // Camera
         const cameraTarget = car.getCameraTransform();
-        engine.camera.position.lerp(cameraTarget.position, 0.1);
+        engine.camera.position.lerp(cameraTarget.position, 0.05); // Smoother lag
         engine.camera.lookAt(cameraTarget.lookTarget);
     });
 
     const splash = document.getElementById('splash');
-    if (splash) splash.style.display = 'none';
+    const hud = document.getElementById('hud');
+    if (splash) {
+        splash.addEventListener('click', () => {
+            splash.classList.add('hidden');
+            if (hud) hud.style.display = 'block';
+        });
+    }
 }
 
 bootstrap();
