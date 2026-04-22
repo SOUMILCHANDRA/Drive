@@ -241,7 +241,7 @@ export class Car {
 
     this.gravityDir = THREE.MathUtils.lerp(this.gravityDir, this.isAntiGravity ? -1 : 1, 0.1);
     const height = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0); // clamp to 0 if under terrain
-    const targetY = this.isAntiGravity ? height + 10 : height + 0.5;
+    const targetY = this.isAntiGravity ? height + 10 : height + 0.2;
     this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY, 0.1);
 
     let targetTilt = -(this.keys['a'] ? 0.08 : 0) + (this.keys['d'] ? 0.08 : 0);

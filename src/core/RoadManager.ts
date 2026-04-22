@@ -9,9 +9,9 @@ export class RoadManager {
   
   private points: THREE.Vector3[] = [];
   private chunks: Map<number, THREE.Group> = new Map();
-  private chunkSize: number = 20;
+  private chunkSize: number = 10;
   private roadWidth: number = CONFIG.ROAD.WIDTH;
-  private renderDistance: number = 15;
+  private renderDistance: number = 30;
   
   private spline: THREE.CatmullRomCurve3 | null = null;
   private roadMaterial: THREE.MeshStandardMaterial;
@@ -36,11 +36,11 @@ export class RoadManager {
       metalness: 0
     });
 
-    this.points.push(new THREE.Vector3(0, this.noise.get(0, -20, 4, 0.5, 0.005) * 50, -20));
+    this.points.push(new THREE.Vector3(0, this.noise.get(0, -10, 4, 0.5, 0.005) * 50, -10));
     this.points.push(new THREE.Vector3(0, this.noise.get(0, 0, 4, 0.5, 0.005) * 50, 0));
-    this.points.push(new THREE.Vector3(0, this.noise.get(0, 20, 4, 0.5, 0.005) * 50, 20));
+    this.points.push(new THREE.Vector3(0, this.noise.get(0, 10, 4, 0.5, 0.005) * 50, 10));
     
-    this.generateMorePoints(50);
+    this.generateMorePoints(100);
   }
 
   private generateMorePoints(count: number) {

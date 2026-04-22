@@ -19,8 +19,8 @@ export class Chunk {
     const vertices = geometry.attributes.position.array;
     const colors = new Float32Array(vertices.length);
     for (let i = 0; i < vertices.length; i += 3) {
-      const vx = vertices[i] + x;
-      const vz = vertices[i + 1] + z;
+      const vx = vertices[i] + x + size / 2;
+      const vz = vertices[i + 1] + z - size / 2;
       
       const h = noise.get(vx, vz, 4, 0.5, 0.005) * 50;
       vertices[i + 2] = h;
