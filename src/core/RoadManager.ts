@@ -12,7 +12,7 @@ export class RoadManager {
   private chunks: Map<number, THREE.Group> = new Map();
   private chunkSize: number = 10;
   private roadWidth: number = CONFIG.ROAD.WIDTH;
-  private renderDistance: number = 30;
+  private renderDistance: number = 60;
   
   private roadMaterial: THREE.MeshStandardMaterial;
 
