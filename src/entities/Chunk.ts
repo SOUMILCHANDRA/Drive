@@ -44,11 +44,11 @@ export class Chunk {
 
       vertices[i + 1] = h;
 
-      // Vertex Coloring based on height and biome
-      let color = new THREE.Color(0x0a0c1a); // Deep blue base
-      if (h > 40) color.set(0xffffff); // Snow
-      else if (h > 20) color.set(0x444444); // Rock
-      else if (h > 5) color.set(0x1a331a);  // Forest green
+      // Drive 2011 Aesthetic: Deep Blue/Purple shadows
+      let color = new THREE.Color(0x0a0a0f); 
+      if (h > 40) color.set(0x333333); // Dark Grey Peaks
+      else if (h > 20) color.set(0x1a1a2e); // Deep Purple/Blue
+      else if (h > 5) color.set(0x0f0f1a);  // Near-Black Indigo
       
       colors[i] = color.r;
       colors[i + 1] = color.g;
@@ -59,10 +59,7 @@ export class Chunk {
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0x111111,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.3,
+      vertexColors: true,
       roughness: 0.9,
       metalness: 0.1,
       flatShading: true,
