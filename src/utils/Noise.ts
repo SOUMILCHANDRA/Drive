@@ -1,5 +1,9 @@
 import { Alea } from './Alea';
 
+/**
+ * Procedural Noise generator implementing Perlin Noise and Fractal Brownian Motion (fBM).
+ * Uses a deterministic Alea PRNG for reproducible world generation.
+ */
 export class Noise {
   private alea: Alea;
   private p: Uint8Array;
