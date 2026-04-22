@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
   </head>
   <body>
+    <div id="flash" class="screen-flash"></div>
     <div id="app">
       <!-- Splash Screen -->
       <div id="splash" class="splash-screen">
@@ -30,9 +31,24 @@
           </div>
         </div>
         <div class="hud-bottom">
-          <div class="speedometer">
-            <span id="speed-val" class="speed-value">0</span>
-            <span class="speed-unit">km/h</span>
+          <div id="antigrav-warn" class="antigrav-indicator" style="display: none;">ANTI-GRAVITY</div>
+          
+          <div class="gauge-container">
+            <svg class="speed-gauge" viewBox="0 0 200 100">
+               <path class="gauge-bg" d="M 20 90 A 80 80 0 0 1 180 90" fill="none" stroke="#1a1a1a" stroke-width="10" />
+               <path id="gauge-fill" class="gauge-fill" d="M 20 90 A 80 80 0 0 1 180 90" fill="none" stroke="#00f3ff" stroke-width="10" stroke-dasharray="251" stroke-dashoffset="251" />
+            </svg>
+            <div class="speedometer">
+              <span id="speed-val" class="speed-value">0</span>
+              <span class="speed-unit">km/h</span>
+            </div>
+          </div>
+
+          <div class="boost-container">
+            <div class="boost-label">BOOST</div>
+            <div class="boost-bar-bg">
+              <div id="boost-fill" class="boost-bar-fill"></div>
+            </div>
           </div>
         </div>
       </div>

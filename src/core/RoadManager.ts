@@ -1,161 +1,184 @@
 import * as THREE from 'three';
 import { Noise } from '../utils/Noise';
+import { PropManager } from './PropManager';
+import { createRoadMaterial } from '../utils/RoadMaterial';
 
 export class RoadManager {
   private roadGroup: THREE.Group;
   private scene: THREE.Scene;
   private noise: Noise;
-  private roadSegments: Map<number, THREE.Mesh> = new Map();
-  private segmentLength: number = 20;
-  private roadWidth: number = 8;
-  private renderDistance: number = 40; 
-
-  private segmentStarts: Map<number, THREE.Vector3> = new Map();
-  private segmentEnds: Map<number, THREE.Vector3> = new Map();
-  private segmentDirections: Map<number, THREE.Vector3> = new Map();
-
-  private lastGeneratedIndex: number = -1;
+  
+  private points: THREE.Vector3[] = [];
+  private tunnelChunks: Set<number> = new Set();
+  private chunks: Map<number, THREE.Mesh> = new Map();
+  private chunkSize: number = 100; // units
+  private roadWidth: number = 10;
+  private renderDistance: number = 5; // chunks
+  
+  private spline: THREE.CatmullRomCurve3 | null = null;
+  private propManager: PropManager;
+  private roadOffset: number = 0;
 
   constructor(scene: THREE.Scene, noise: Noise) {
     this.scene = scene;
     this.noise = noise;
     this.roadGroup = new THREE.Group();
     this.scene.add(this.roadGroup);
+    this.propManager = new PropManager(this.scene);
 
-    // Prepare seeding (will be finalized in first update)
-    const start = new THREE.Vector3(0, 0, 0);
-    const dir = new THREE.Vector3(0, 0, 1);
-    const end = start.clone().add(dir.clone().multiplyScalar(this.segmentLength));
+    // Initial points
+    this.points.push(new THREE.Vector3(0, 0, -20));
+    this.points.push(new THREE.Vector3(0, 0, 0));
+    this.points.push(new THREE.Vector3(0, 0, 50));
     
-    this.segmentStarts.set(0, start);
-    this.segmentDirections.set(0, dir);
-    this.segmentEnds.set(0, end);
-    this.lastGeneratedIndex = 0;
+    this.generateMorePoints(10);
+    this.updateSpline();
+  }
+
+  private generateMorePoints(count: number) {
+    let lastPoint = this.points[this.points.length - 1];
+    let lastDir = new THREE.Vector3().subVectors(lastPoint, this.points[this.points.length - 2]).normalize();
+
+    for (let i = 0; i < count; i++) {
+      const index = this.points.length;
+      const angleNoise = this.noise.get(index * 10, 0, 1, 0.5, 1);
+      const angle = (angleNoise - 0.5) * 0.8;
+      
+      const pitchNoise = this.noise.get(0, index * 10, 1, 0.5, 1);
+      const pitch = (pitchNoise - 0.5) * 0.4;
+
+      const newDir = lastDir.clone()
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
+        .applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch)
+        .normalize();
+
+      const newPoint = lastPoint.clone().add(newDir.multiplyScalar(50));
+      this.points.push(newPoint);
+      lastPoint = newPoint;
+      lastDir = newDir;
+    }
+  }
+
+  private updateSpline() {
+    this.spline = new THREE.CatmullRomCurve3(this.points);
   }
 
   public getRoadHeight(_x: number, z: number): number {
-    const index = Math.floor(z / this.segmentLength);
-    const start = this.segmentStarts.get(index);
-    const end = this.segmentEnds.get(index);
-    if (!start || !end) return 0;
-
-    // Linear interpolation based on Z
-    const t = (z - start.z) / (end.z - start.z);
-    return THREE.MathUtils.lerp(start.y, end.y, THREE.MathUtils.clamp(t, 0, 1)) + 0.15;
+    if (!this.spline) return 0;
+    const t = THREE.MathUtils.clamp((z + 20) / (this.points.length * 50), 0, 1);
+    const p = this.spline.getPointAt(t);
+    return p.y;
   }
 
-  public update(playerZ: number, getHeight: (x: number, z: number) => number) {
-    const currentSegmentIndex = Math.max(0, Math.floor(playerZ / this.segmentLength));
+  public getPoints() {
+    return this.points;
+  }
+
+  public getRoadData(z: number): { position: THREE.Vector3, tangent: THREE.Vector3 } {
+    if (!this.spline) return { position: new THREE.Vector3(0, 0, z), tangent: new THREE.Vector3(0, 0, 1) };
     
-    // Seed the first segment height if not done
-    if (this.lastGeneratedIndex === 0 && this.segmentStarts.get(0)!.y === 0) {
-        const s0 = this.segmentStarts.get(0)!;
-        const e0 = this.segmentEnds.get(0)!;
-        s0.y = getHeight(s0.x, s0.z);
-        e0.y = getHeight(e0.x, e0.z);
-    }
+    // Find approximately where we are on the spline based on Z
+    // This is an approximation for an infinite spline
+    // For now, let's use a very simple lookup
+    const t = THREE.MathUtils.clamp((z + 20) / (this.points.length * 50), 0, 1);
+    return {
+      position: this.spline.getPointAt(t),
+      tangent: this.spline.getTangentAt(t)
+    };
+  }
 
-    // Generate upcoming segments forward-chained
-    const targetIndex = currentSegmentIndex + this.renderDistance;
-    while (this.lastGeneratedIndex < targetIndex) {
-        this.generateNextSegment(this.lastGeneratedIndex + 1, getHeight);
-    }
-
-    const activeSegments = new Set<number>();
-    for (let i = -5; i < this.renderDistance; i++) {
-        const index = currentSegmentIndex + i;
+  public update(playerZ: number, speed: number) {
+    this.roadOffset += speed * 0.01;
+    const currentChunkIndex = Math.floor(playerZ / this.chunkSize);
+    
+    // Update shader offsets
+    this.chunks.forEach((mesh) => {
+        if (mesh.material instanceof THREE.ShaderMaterial) {
+            mesh.material.uniforms.uOffset.value = this.roadOffset;
+        }
+    });
+    
+    // Generate new chunks
+    for (let i = 0; i < this.renderDistance; i++) {
+        const index = currentChunkIndex + i;
         if (index < 0) continue;
-        activeSegments.add(index);
-        if (!this.roadSegments.has(index)) {
-            this.createSegmentMesh(index);
+        if (!this.chunks.has(index)) {
+            this.createChunkMesh(index);
         }
     }
 
-    // Cleanup
-    for (const [index, mesh] of this.roadSegments.entries()) {
-      if (!activeSegments.has(index)) {
+    // Cleanup old chunks
+    for (const [index, mesh] of this.chunks.entries()) {
+      if (index < currentChunkIndex - 2 || index > currentChunkIndex + this.renderDistance) {
         this.roadGroup.remove(mesh);
         mesh.geometry.dispose();
         if (mesh.material instanceof THREE.Material) mesh.material.dispose();
-        this.roadSegments.delete(index);
+        this.chunks.delete(index);
       }
+    }
+
+    // Generate more points if needed
+    if (playerZ > (this.points.length - 10) * 50) {
+        this.generateMorePoints(10);
+        this.updateSpline();
     }
   }
 
-  private generateNextSegment(index: number, getHeight: (x: number, z: number) => number) {
-    const prevEnd = this.segmentEnds.get(index - 1)!.clone();
-    const prevDir = this.segmentDirections.get(index - 1)!.clone();
+  private createChunkMesh(index: number) {
+    const isTunnel = index % 10 === 0 && index !== 0; // Every 1km (10 chunks)
+    if (isTunnel) this.tunnelChunks.add(index);
 
-    // 1. Horizontal direction rotation
-    const angleNoise = this.noise.get(index * 10, 0, 1, 0.5, 1);
-    const angle = (angleNoise - 0.5) * 0.4;
-    const horizontalDir = new THREE.Vector3(prevDir.x, 0, prevDir.z).normalize();
-    const nextDir = horizontalDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+    const startT = (index * this.chunkSize) / (this.points.length * 50);
+    const endT = ((index + 1) * this.chunkSize) / (this.points.length * 50);
     
-    // 2. Exact chaining of points
-    const start = prevEnd.clone(); // MUST touch previous end
-    const nextPos2D = start.clone().add(nextDir.multiplyScalar(this.segmentLength));
-    const end = nextPos2D.clone();
-    end.y = getHeight(end.x, end.z);
+    const segmentPoints: THREE.Vector3[] = [];
+    const div = 15;
+    for (let i = 0; i <= div; i++) {
+        segmentPoints.push(this.spline!.getPointAt(startT + (endT - startT) * (i / div)));
+    }
 
-    // 3. Normalized actual direction
-    const finalDir = new THREE.Vector3().subVectors(end, start).normalize();
+    const curve = new THREE.CatmullRomCurve3(segmentPoints);
+    
+    let geometry: THREE.BufferGeometry;
+    let material: THREE.Material;
 
-    this.segmentStarts.set(index, start);
-    this.segmentDirections.set(index, finalDir);
-    this.segmentEnds.set(index, end);
-    this.lastGeneratedIndex = index;
-  }
-
-  private createSegmentMesh(index: number) {
-    const start = this.segmentStarts.get(index)!;
-    const end = this.segmentEnds.get(index)!;
-    const dir = new THREE.Vector3().subVectors(end, start);
-    const length = dir.length();
-
-    const geometry = new THREE.PlaneGeometry(this.roadWidth, length);
-    const material = new THREE.MeshStandardMaterial({ 
-      color: 0x111111,
-      roughness: 0.2,
-      metalness: 0.8,
-      emissive: 0x00f3ff,
-      emissiveIntensity: 0.1
-    });
+    if (isTunnel) {
+        // Hexagonal Tube
+        geometry = new THREE.TubeGeometry(curve, 20, this.roadWidth * 1.5, 6, false);
+        material = new THREE.MeshStandardMaterial({
+          color: 0x050505,
+          side: THREE.BackSide,
+          emissive: 0x00f3ff,
+          emissiveIntensity: 0.3,
+          wireframe: true
+        });
+    } else {
+        // Flat Ribbon Road
+        geometry = new THREE.TubeGeometry(curve, 10, this.roadWidth / 2, 2, false);
+        material = createRoadMaterial();
+    }
 
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
-    
-    // CORRECT LOCAL ALIGNMENT
-    mesh.lookAt(end);
-    mesh.rotateX(-Math.PI / 2);
-
+    if (!isTunnel) mesh.scale.y = 0.1; // Flatten into a ribbon
     mesh.receiveShadow = true;
     this.roadGroup.add(mesh);
-    this.roadSegments.set(index, mesh);
+    this.chunks.set(index, mesh);
 
-    this.addSidelines(mesh, length);
-    this.addDebugPoint(start);
+    // Spawn Ring in middle of chunk (rarely)
+    if (index % 3 === 0 && !isTunnel) {
+        const midT = (startT + endT) / 2;
+        const pos = this.spline!.getPointAt(midT);
+        const tan = this.spline!.getTangentAt(midT);
+        this.propManager.spawnRing(pos.add(new THREE.Vector3(0, 2, 0)), tan);
+    }
   }
 
-  private addSidelines(parent: THREE.Mesh, length: number) {
-    const lineGeo = new THREE.BoxGeometry(0.15, length, 0.1);
-    const lineMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
-    
-    const l1 = new THREE.Mesh(lineGeo, lineMat);
-    l1.position.set(this.roadWidth / 2, 0.05, 0); 
-    parent.add(l1);
-
-    const l2 = l1.clone();
-    l2.position.set(-this.roadWidth / 2, 0.05, 0);
-    parent.add(l2);
+  public updateProps(carPos: THREE.Vector3, onCollect: () => void) {
+    this.propManager.update(carPos, onCollect);
   }
 
-  private addDebugPoint(pos: THREE.Vector3) {
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.3),
-      new THREE.MeshBasicMaterial({ color: 0xff0000 })
-    );
-    sphere.position.copy(pos);
-    this.roadGroup.add(sphere);
+  public isInTunnel(z: number): boolean {
+    const chunkIndex = Math.floor(z / this.chunkSize);
+    return this.tunnelChunks.has(chunkIndex);
   }
 }

@@ -4,25 +4,30 @@ import { Car } from './entities/Car';
 import { WorldManager } from './core/WorldManager';
 import { RoadManager } from './core/RoadManager';
 import { Stars } from './entities/Stars';
-import { SpeedParticles } from './entities/SpeedParticles';
+import { SpeedLines } from './entities/SpeedLines';
+import { CarTrail } from './entities/CarTrail';
+import { AudioEngine } from './core/AudioEngine';
+import { Minimap } from './utils/Minimap';
 import * as THREE from 'three';
 
-console.log("Drive: Initializing Core...");
+console.log("Neon Drive: Initializing Next-Gen Engine...");
 
 const engine = new Engine();
 const car = new Car();
 const world = new WorldManager(engine.scene);
 const road = new RoadManager(engine.scene, world.getNoise());
 const stars = new Stars(engine.scene);
-const particles = new SpeedParticles(engine.scene);
+const speedLines = new SpeedLines(engine.scene);
+const carTrail = new CarTrail(engine.scene);
+const audio = new AudioEngine();
+const minimap = new Minimap();
 
 engine.scene.add(car.mesh);
 
 // ATMOSPHERE
-engine.scene.fog = new THREE.FogExp2(0x050505, 0.005);
-engine.renderer.setClearColor(0x0a0a0a);
+engine.scene.fog = new THREE.FogExp2(0x050505, 0.002);
 
-// Initial Car Placement
+// Initial Placement
 car.mesh.position.set(0, 0.5, 0);
 
 const splashElem = document.getElementById('splash');
@@ -30,62 +35,119 @@ const hudElem = document.getElementById('hud');
 const speedElem = document.getElementById('speed-val');
 const distElem = document.getElementById('dist-val');
 const elevElem = document.getElementById('elev-val');
+const gaugeFill = document.getElementById('gauge-fill');
+const boostFill = document.getElementById('boost-fill');
+const antiGravWarn = document.getElementById('antigrav-warn');
+const flashElem = document.getElementById('flash');
 
 let totalDistance = 0;
 let gameStarted = false;
+let cinematicIntro = false;
+let introTimer = 0;
+let boostAmount = 100;
 
 splashElem?.addEventListener('click', () => {
-    console.log("Drive: Starting Session...");
-    gameStarted = true;
+    cinematicIntro = true;
+    audio.init();
     splashElem.classList.add('hidden');
-    if (hudElem) {
-        hudElem.style.display = 'flex';
-        setTimeout(() => hudElem.classList.add('visible'), 100);
-    }
 });
 
 engine.render((delta) => {
-    // 1. Update World Chunks based on car position
+    const speed = Math.abs(car.velocity.z);
+
+    // 1. Core World Updates
     world.update(car.mesh.position);
-    
-    // 2. Update Procedural Road Chaining (Pass world height for road matching)
-    road.update(car.mesh.position.z, (x, z) => world.getHeight(x, z));
-    
-    // 3. Update Visual FX
+    road.update(car.mesh.position.z, speed);
     stars.update(car.mesh.position);
 
     if (gameStarted) {
-        // 4. Update Particle effects
-        particles.update(car.mesh.position, car.velocity.z);
+        // 2. Physics & FX
+        car.isAntiGravity = road.isInTunnel(car.mesh.position.z);
         
-        // 5. Update Car Physics (Use Road Height for grounding)
-        car.update(delta, (x, z) => road.getRoadHeight(x, z));
+        if (antiGravWarn) {
+            antiGravWarn.style.display = car.isAntiGravity ? 'block' : 'none';
+        }
 
-        // 6. Update HUD
-        const currentSpeed = Math.abs(car.velocity.z);
-        if (speedElem) speedElem.innerText = Math.round(currentSpeed * 3.6).toString();
+        car.update(delta, (x, z) => road.getRoadHeight(x, z));
+        minimap.update(car.mesh.position, car.angle, road.getPoints());
         
-        totalDistance += currentSpeed * delta;
+        road.updateProps(car.mesh.position, () => {
+            car.velocity.z += 15; // 15 m/s burst
+            audio.playBoost();
+            if (flashElem) flashElem.style.opacity = '1';
+        });
+
+        audio.update(speed);
+
+        // Fade flash
+        if (flashElem) {
+            const currentOp = parseFloat(flashElem.style.opacity || '0');
+            flashElem.style.opacity = (currentOp * 0.9).toString();
+        }
+
+        speedLines.update(car.mesh.position, speed);
+        carTrail.update(car.mesh.position, car.trailColor);
+
+        // 3. HUD Updates
+        if (speedElem) speedElem.innerText = Math.round(speed * 3.6).toString();
+        
+        // Gauge Arc Animation (stroke-dashoffset from 251 to 0)
+        if (gaugeFill) {
+            const progress = THREE.MathUtils.clamp(speed / car.maxSpeed, 0, 1);
+            const offset = 251 - (progress * 251);
+            gaugeFill.setAttribute('stroke-dashoffset', offset.toString());
+        }
+
+        // Boost logic
+        if (boostFill) {
+            boostFill.style.width = `${boostAmount}%`;
+        }
+
+        totalDistance += speed * delta;
         if (distElem) distElem.innerText = Math.round(totalDistance).toString();
         if (elevElem) elevElem.innerText = Math.round(car.mesh.position.y).toString();
+
+        // 4. Camera Dynamics (FOV & Shake)
+        const targetFov = 75 + (speed / car.maxSpeed) * 20;
+        engine.camera.fov = THREE.MathUtils.lerp(engine.camera.fov, targetFov, 0.1);
         
-        // 7. Dynamic Camera Settings
-        engine.camera.fov = 75 + (currentSpeed / car.maxSpeed) * 20;
+        // Horizontal shake at high speed
+        if (speed > 50) {
+            engine.camera.position.x += (Math.random() - 0.5) * 0.1;
+            engine.camera.position.y += (Math.random() - 0.5) * 0.1;
+        }
         engine.camera.updateProjectionMatrix();
     }
-
-    // 8. Static/Cinematic Camera Follow
-    const speed = gameStarted ? Math.abs(car.velocity.z) : 0;
-    const offset = new THREE.Vector3(
-        Math.sin(car.angle) * -15, 
-        6 + (speed / 20), 
-        Math.cos(car.angle) * -15
-    );
-    const targetCamPos = car.mesh.position.clone().add(offset);
-    engine.camera.position.lerp(targetCamPos, gameStarted ? 0.05 : 1.0);
     
-    const lookTarget = car.mesh.position.clone().add(
-        new THREE.Vector3(Math.sin(car.angle) * 10, 2, Math.cos(car.angle) * 10)
-    );
-    engine.camera.lookAt(lookTarget);
+    // 5. Cinematic Intro (Orbital) or Soft Follow
+    if (cinematicIntro) {
+        introTimer += delta;
+        const orbitSpeed = 1.0;
+        const radius = 15;
+        engine.camera.position.set(
+            car.mesh.position.x + Math.sin(introTimer * orbitSpeed) * radius,
+            car.mesh.position.y + 5,
+            car.mesh.position.z + Math.cos(introTimer * orbitSpeed) * radius
+        );
+        engine.camera.lookAt(car.mesh.position);
+
+        if (introTimer > 2.0) {
+            cinematicIntro = false;
+            gameStarted = true;
+            if (hudElem) {
+                hudElem.style.display = 'flex';
+                setTimeout(() => hudElem.classList.add('visible'), 100);
+            }
+        }
+    } else {
+        const cameraTarget = car.getCameraTransform();
+        engine.camera.position.lerp(cameraTarget.position, gameStarted ? 0.05 : 1.0);
+        engine.camera.lookAt(cameraTarget.lookTarget);
+
+        // Subtile high-speed camera shake
+        if (speed > 50) {
+            engine.camera.position.x += (Math.random() - 0.5) * 0.1;
+            engine.camera.position.y += (Math.random() - 0.5) * 0.1;
+        }
+    }
 });

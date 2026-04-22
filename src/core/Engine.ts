@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { RGBShiftShader } from 'three/examples/jsm/shaders/RGBShiftShader.js';
 
 export class Engine {
   public scene: THREE.Scene;
@@ -20,8 +22,9 @@ export class Engine {
     );
 
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: false, // Antialiasing is handled by post-processing or skipped for performance
       alpha: true,
+      powerPreference: 'high-performance'
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -39,14 +42,18 @@ export class Engine {
     const renderScene = new RenderPass(this.scene, this.camera);
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      1.2, // strength
-      0.4, // radius
+      1.5, // strength
+      0.8, // radius
       0.1  // threshold
     );
+
+    const rgbShiftPass = new ShaderPass(RGBShiftShader);
+    rgbShiftPass.uniforms['amount'].value = 0.0015;
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(renderScene);
     this.composer.addPass(bloomPass);
+    this.composer.addPass(rgbShiftPass);
 
     this.setupLights();
     this.setupResize();
