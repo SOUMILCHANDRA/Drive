@@ -31,10 +31,14 @@ async function bootstrap() {
         
         while (fixedTimeAccumulator >= fixedDelta) {
             // FIXED PHYSICS UPDATE (60Hz)
+            const roadX = road.getRoadX(distance);
+            const roadY = road.getRoadHeight(roadX, distance);
+            const roadTangent = road.getTangent(distance);
+
             if (autopilot) {
-                car.autopilot();
+                car.autopilot(roadX, roadY, roadTangent);
             } else {
-                car.update(fixedDelta);
+                car.update(fixedDelta, roadX, roadY, roadTangent);
             }
             
             distance += car.velocityValue * fixedDelta;

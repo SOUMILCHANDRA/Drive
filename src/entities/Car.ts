@@ -129,7 +129,7 @@ export class Car {
   /**
    * Main update loop for visual driving.
    */
-  public update(delta: number) {
+  public update(delta: number, roadX: number, roadY: number, roadTangent: THREE.Vector3) {
     const isBraking = this.keys['s'] || this.keys['arrowdown'];
     this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 10 : 3);
 
@@ -155,26 +155,43 @@ export class Car {
     
     this.inputX = THREE.MathUtils.clamp(this.inputX, -2, 2);
 
-    // PURE VISUAL LERP: Car stays at Z=0.
-    this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, this.inputX * 5, 0.1);
-    this.mesh.rotation.z = -this.mesh.position.x * 0.05; // Fake tilt
-    this.mesh.rotation.y = this.inputX * 0.2; // Fake steering visually
+    // SPLINE TRACKING LERP: Car shifts to stay on road
+    const targetX = roadX + (this.inputX * 5);
+    this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, targetX, 0.1);
     
-    // Fixed height offset (-0.6)
+    // Fixed height offset relative to procedural elevation (-0.6)
     const time = Date.now() * 0.003;
     const bobbing = Math.sin(time) * 0.01; 
-    this.mesh.position.y = -0.6 + bobbing;
+    this.mesh.position.y = roadY - 0.6 + bobbing;
+
+    // ROTATION: Combine spline tangent with visual steering
+    const targetRot = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      roadTangent.clone().normalize()
+    );
+    
+    // Add visual tilt and steering
+    const visualSteering = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.inputX * 0.2, -this.inputX * 0.1));
+    targetRot.multiply(visualSteering);
+    
+    this.mesh.quaternion.slerp(targetRot, 0.1);
   }
 
   /**
    * Logic for autonomous spline following.
    */
-  public autopilot() {
+  public autopilot(roadX: number, roadY: number, roadTangent: THREE.Vector3) {
     this.currentSpeed = 100;
-    this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, 0, 0.1);
-    this.mesh.position.y = -0.6;
-    this.mesh.rotation.z = 0;
-    this.mesh.rotation.y = 0;
+    this.inputX = THREE.MathUtils.lerp(this.inputX, 0, 0.1);
+    
+    this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, roadX, 0.1);
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadY - 0.6, 0.2);
+    
+    const targetRot = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      roadTangent.clone().normalize()
+    );
+    this.mesh.quaternion.slerp(targetRot, 0.1);
   }
 
   public getCameraTransform() {
