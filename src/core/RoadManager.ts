@@ -4,6 +4,7 @@ import { Noise } from '../utils/Noise';
 export class RoadManager {
   private roadGroup: THREE.Group;
   private scene: THREE.Scene;
+  private noise: Noise;
   private roadSegments: Map<number, THREE.Mesh> = new Map();
   private segmentLength: number = 20;
   private roadWidth: number = 8;
@@ -13,13 +14,13 @@ export class RoadManager {
   private segmentEnds: Map<number, THREE.Vector3> = new Map();
   private segmentDirections: Map<number, THREE.Vector3> = new Map();
 
-  constructor(scene: THREE.Scene, _noise: Noise) {
+  constructor(scene: THREE.Scene, noise: Noise) {
     this.scene = scene;
+    this.noise = noise;
     this.roadGroup = new THREE.Group();
     this.scene.add(this.roadGroup);
 
     // Initial segment data
-    // Start at origin, heading straight forward (Z+)
     const start = new THREE.Vector3(0, 0, 0);
     const dir = new THREE.Vector3(0, 0, 1);
     const end = start.clone().add(dir.clone().multiplyScalar(this.segmentLength));
@@ -30,7 +31,7 @@ export class RoadManager {
   }
 
   public getRoadHeight(_x: number, _z: number): number {
-    // Stage 1: Perfectly flat road to ensure core geometry works
+    // Stage 2: Curves added, keeping flat for now
     return 0;
   }
 
@@ -62,7 +63,6 @@ export class RoadManager {
   private generateSegmentData(index: number) {
     if (this.segmentStarts.has(index)) return;
 
-    // Recursive check for previous data
     if (!this.segmentEnds.has(index - 1)) {
         this.generateSegmentData(index - 1);
     }
@@ -70,12 +70,16 @@ export class RoadManager {
     const prevEnd = this.segmentEnds.get(index - 1)!.clone();
     const prevDir = this.segmentDirections.get(index - 1)!.clone();
     
-    // Step 1: Perfectly straight road (no rotation yet)
-    const newDir = prevDir.clone();
+    // Step 2: Add slight curves by rotating the DIRECTION vector
+    // Using deterministic noise for the angle
+    const angleNoise = this.noise.get(index * 10, 0, 1, 0.5, 1);
+    const angle = (angleNoise - 0.5) * 0.4;
+    
+    // Rotate direction vector around Y axis (not the mesh)
+    const newDir = prevDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     const newEnd = prevEnd.clone().add(newDir.clone().multiplyScalar(this.segmentLength));
 
-    // Force Y to 0 for Step 1
-    prevEnd.y = 0;
+    // Force flat for this stage
     newEnd.y = 0;
 
     this.segmentStarts.set(index, prevEnd);
@@ -89,7 +93,6 @@ export class RoadManager {
     const dir = new THREE.Vector3().subVectors(end, start);
     const length = dir.length();
 
-    // PlaneGeometry(width, height) - here height is the length of road
     const geometry = new THREE.PlaneGeometry(this.roadWidth, length);
     const material = new THREE.MeshStandardMaterial({ 
       color: 0x222222,
@@ -100,20 +103,19 @@ export class RoadManager {
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-    
-    // Position in the exact middle of start and end
     const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
     mesh.position.copy(midPoint);
     
-    // ALIGNMENT FIX
-    mesh.lookAt(end); // Point 'front' towards the end point
-    mesh.rotateX(-Math.PI / 2); // Flatten it so it lies on the XZ plane
+    // THE FIX
+    mesh.lookAt(end);
+    mesh.rotateX(-Math.PI / 2);
 
     mesh.receiveShadow = true;
     this.roadGroup.add(mesh);
     this.roadSegments.set(index, mesh);
 
     this.addSidelines(mesh);
+    this.addDebugSphere(start);
   }
 
   private addSidelines(parent: THREE.Mesh) {
@@ -121,11 +123,20 @@ export class RoadManager {
     const lineMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
     
     const l1 = new THREE.Mesh(lineGeo, lineMat);
-    l1.position.set(this.roadWidth / 2, 0.01, 0); // Tiny offset to prevent Z-fighting
+    l1.position.set(this.roadWidth / 2, 0.01, 0);
     parent.add(l1);
 
     const l2 = l1.clone();
     l2.position.set(-this.roadWidth / 2, 0.01, 0);
     parent.add(l2);
+  }
+
+  private addDebugSphere(pos: THREE.Vector3) {
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    );
+    sphere.position.copy(pos);
+    this.roadGroup.add(sphere);
   }
 }
