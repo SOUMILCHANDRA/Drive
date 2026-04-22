@@ -24,7 +24,8 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.2;
-    this.renderer.shadowMap.enabled = true; // Enable Cinematic Shadows
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace; // Calibrate for Sodium Glow
+    this.renderer.shadowMap.enabled = true; 
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     document.getElementById('app')?.appendChild(this.renderer.domElement);
@@ -43,8 +44,8 @@ export class Engine {
     moonlight.position.set(0, 100, -200);
     this.scene.add(moonlight);
 
-    // MOUNTAIN PRESENCE: Deep Purple Ambient (0.02)
-    const ambient = new THREE.AmbientLight(0x1a0a2e, 0.02);
+    // MOUNTAIN PRESENCE: Deep Purple Ambient (0.05)
+    const ambient = new THREE.AmbientLight(0x1a0a2e, 0.05);
     this.scene.add(ambient);
 
     const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.03);

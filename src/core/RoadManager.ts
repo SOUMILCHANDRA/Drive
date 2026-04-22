@@ -300,26 +300,31 @@ export class RoadManager {
         const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
         const sodiumColor = 0xFF9500;
-        const streetLight = new THREE.PointLight(sodiumColor, 15, 80, 2);
+        const streetLight = new THREE.PointLight(sodiumColor, 50, 100, 2);
         streetLight.position.copy(lightPos).add(normal.clone().multiplyScalar(12)).add(new THREE.Vector3(0, 15, 0));
         streetLight.castShadow = true;
         chunkGroup.add(streetLight);
 
         // Indigo Rim Light (Mountain silhouette)
-        const indigoLight = new THREE.PointLight(0x4444ff, 2, 60, 2);
+        const indigoLight = new THREE.PointLight(0x4444ff, 5, 80, 2);
         indigoLight.position.copy(streetLight.position).add(new THREE.Vector3(0, 2, 0));
         chunkGroup.add(indigoLight);
 
-        // Pole with Gradient
+        // Pole with Gradient and Emissive Glow
         const poleGeo = new THREE.BoxGeometry(0.4, 15, 0.4);
         const poleColors = [];
         for (let i = 0; i < poleGeo.attributes.position.count; i++) {
             const y = poleGeo.attributes.position.getY(i);
             const t = (y + 7.5) / 15; // 0 at bottom, 1 at top
-            poleColors.push(t * 1.0, t * 0.5, 0); // Orange to Black
+            poleColors.push(t * 1.0, t * 0.5, 0); 
         }
         poleGeo.setAttribute('color', new THREE.Float32BufferAttribute(poleColors, 3));
-        const pole = new THREE.Mesh(poleGeo, new THREE.MeshStandardMaterial({ vertexColors: true }));
+        const poleMat = new THREE.MeshStandardMaterial({ 
+            vertexColors: true,
+            emissive: sodiumColor,
+            emissiveIntensity: 5.0 // High emissive for "Sodium Glow"
+        });
+        const pole = new THREE.Mesh(poleGeo, poleMat);
         pole.position.copy(streetLight.position).sub(new THREE.Vector3(0, 7.5, 0));
         chunkGroup.add(pole);
     }

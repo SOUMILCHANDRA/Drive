@@ -109,13 +109,13 @@ export class Car {
     this.mesh.position.x += Math.sin(this.angle) * this.velocity.z * delta;
     this.mesh.position.z += Math.cos(this.angle) * this.velocity.z * delta;
 
-    // STABLE SPLINE ANCHOR: Height sampling + Offset
+    // STABLE SPLINE ANCHOR: Height sampling + Precision Snap
     const roadHeight = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
     const time = Date.now() * 0.003;
-    const bobbing = Math.sin(time) * 0.05;
+    const bobbing = Math.sin(time) * 0.04; // Reduced bobbing for stability
     
-    // Smooth settling lerp
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.5 + bobbing, 0.2);
+    // Snapped settling (Flush with road)
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + bobbing, 0.3);
     
     // Keep rotation stable
     this.mesh.rotation.y = this.angle;
