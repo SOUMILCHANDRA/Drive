@@ -111,14 +111,27 @@ export class RoadManager {
 
   public getRoadX(z: number): number {
     // Estimate X position of road at Z by finding nearest spline point
-    // This is used for terrain carving
-    const index = Math.floor((z + 20) / this.chunkSize);
+    const index = this.points.findIndex(p => p.z > z) - 1;
     if (index < 0 || index >= this.points.length - 1) return 0;
     
     const p1 = this.points[index];
     const p2 = this.points[index + 1];
     const t = (z - p1.z) / (p2.z - p1.z);
     return THREE.MathUtils.lerp(p1.x, p2.x, THREE.MathUtils.clamp(t, 0, 1));
+  }
+
+  public getAutopilotTarget(z: number) {
+    const index = this.points.findIndex(p => p.z > z) - 1;
+    if (index < 0 || index >= this.points.length - 1) return { x: 0, y: 0, z: z, angle: 0 };
+    
+    const p1 = this.points[index];
+    const p2 = this.points[index + 1];
+    const t = (z - p1.z) / (p2.z - p1.z);
+    
+    const pos = new THREE.Vector3().lerpVectors(p1, p2, THREE.MathUtils.clamp(t, 0, 1));
+    const angle = Math.atan2(p2.x - p1.x, p2.z - p1.z);
+    
+    return { x: pos.x, y: pos.y, z: pos.z, angle: angle };
   }
 
   public update(playerZ: number) {

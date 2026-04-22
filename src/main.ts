@@ -25,7 +25,10 @@ async function bootstrap() {
 
         // Physics
         if (autopilot) {
-            car.autopilot(road.getRoadX(car.mesh.position.z));
+            // Hard snap car to road spline to prevent drifting
+            const targetZ = car.mesh.position.z + car.velocityValue * delta;
+            const target = road.getAutopilotTarget(targetZ);
+            car.autopilot(target.x, target.z, target.angle, target.y);
         } else {
             car.update(delta, (x, z) => road.getRoadHeight(x, z));
         }

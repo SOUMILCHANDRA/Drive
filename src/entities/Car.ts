@@ -101,17 +101,18 @@ export class Car {
     }
   }
 
-  public autopilot(targetX: number) {
-    // Smoothly steer toward road center
-    const steerForce = (targetX - this.mesh.position.x) * 0.05;
-    this.mesh.position.x += steerForce;
-    this.mesh.rotation.y = -steerForce * 3;
+  public autopilot(targetX: number, targetZ: number, targetAngle: number, targetY: number) {
+    // 1. HARD LOCK POSITION: Snap to spline
+    this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, targetX, 0.1);
+    this.mesh.position.z = targetZ;
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY + 0.1, 0.4);
     
-    // Constant cinematic cruise speed (25 units/s ≈ 90 km/h)
+    // 2. SMOOTH ROTATION: Align to road direction
+    this.angle = THREE.MathUtils.lerp(this.angle, targetAngle, 0.1);
+    this.mesh.rotation.y = this.angle;
+    
+    // Constant speed (25 units/s)
     this.velocity.z = 25; 
-    this.mesh.position.z += this.velocity.z * 0.016;
-
-    // Spin wheels
     this.wheels.forEach(w => w.rotation.x += (this.velocity.z * 0.016) / 0.5);
   }
 
