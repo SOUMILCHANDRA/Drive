@@ -39,13 +39,10 @@ export class Engine {
     const renderScene = new RenderPass(this.scene, this.camera);
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      1.5,
+      0.5, // Lower strength
       0.4,
-      0.85
+      0.5  // Lower threshold
     );
-    bloomPass.threshold = 0.1;
-    bloomPass.strength = 1.2;
-    bloomPass.radius = 0.1;
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(renderScene);
@@ -60,17 +57,17 @@ export class Engine {
   }
 
   private setupLights() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     this.scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(100, 100, 50);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    this.scene.add(directionalLight);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+    hemiLight.position.set(0, 50, 0);
+    this.scene.add(hemiLight);
 
-    // Add some neon point lights later
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    directionalLight.position.set(100, 100, 100);
+    directionalLight.castShadow = true;
+    this.scene.add(directionalLight);
   }
 
   private setupResize() {

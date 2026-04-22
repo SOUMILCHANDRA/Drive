@@ -7,7 +7,7 @@ export class RoadManager {
   private roadSegments: Map<number, THREE.Mesh> = new Map();
   private segmentLength: number = 20;
   private roadWidth: number = 8;
-  private renderDistance: number = 20; 
+  private renderDistance: number = 40; 
 
   private segmentStarts: Map<number, THREE.Vector3> = new Map();
   private segmentEnds: Map<number, THREE.Vector3> = new Map();
@@ -33,11 +33,13 @@ export class RoadManager {
     const start = this.segmentStarts.get(index);
     const end = this.segmentEnds.get(index);
     
-    if (!start || !end) return 0.1;
+    // Fallback to 0 if out of bounds or not generated
+    if (!start || !end) return 0;
 
     // Linear interpolation based on Z
-    const t = (z - start.z) / (end.z - start.z);
-    return THREE.MathUtils.lerp(start.y, end.y, t) + 0.1;
+    const progress = (z - start.z) / (end.z - start.z);
+    const height = THREE.MathUtils.lerp(start.y, end.y, progress);
+    return height + 0.2; // Slightly above ground
   }
 
   public update(playerZ: number) {
