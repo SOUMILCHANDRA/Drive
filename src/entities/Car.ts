@@ -16,8 +16,7 @@ export class Car {
   public angle: number = 0;
 
   private keys: Record<string, boolean> = {};
-  
-  // Advanced Physics
+
   public driftFactor: number = 1.0;
   public isDrifting: boolean = false;
   private lastTapA: number = 0;
@@ -27,15 +26,14 @@ export class Car {
   private rollDirection: number = 0;
 
   public trailColor: THREE.Color = new THREE.Color(0xffffff);
-  
-  // Anti-Gravity
+
   public isAntiGravity: boolean = false;
   private gravityDir: number = 1;
-  
-  private headlightTargets: THREE.Object3D[] = [];
-  
-  // Wheels for animation
+
   private wheels: THREE.Object3D[] = [];
+
+  // Brake light meshes so we can update emissive on braking
+  private brakeLights: THREE.Mesh[] = [];
 
   constructor() {
     this.mesh = new THREE.Group();
@@ -48,145 +46,142 @@ export class Car {
       const dracoLoader = new DRACOLoader();
       dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/libs/draco/');
       loader.setDRACOLoader(dracoLoader);
-      
+
       const gltf = await loader.loadAsync('/models/car/car.glb');
       const loadedModel = gltf.scene;
-      
-      // Chevelle SS 454 specific scaling/alignment
-      loadedModel.scale.set(1.8, 1.8, 1.8); // Slightly larger for visibility
-      loadedModel.rotation.y = Math.PI; 
-      loadedModel.position.y = 0.25; 
-      loadedModel.position.z = 0; 
-      
-      // Setup shadows and find wheels
+
+      loadedModel.scale.set(1.8, 1.8, 1.8);
+      loadedModel.rotation.y = Math.PI;
+      loadedModel.position.y = 0.25;
+
       loadedModel.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           child.castShadow = true;
           child.receiveShadow = true;
-          // Ensure material is not too dark/transparent
           const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
           if (m) {
             m.roughness = Math.max(m.roughness, 0.3);
             m.metalness = Math.min(m.metalness, 0.8);
           }
         }
-        // Very basic wheel detection by name, might need adjusting based on the specific Sketchfab model
         if (child.name.toLowerCase().includes('wheel') || child.name.toLowerCase().includes('tire')) {
-            this.wheels.push(child);
+          this.wheels.push(child);
         }
       });
-      
+
       this.mesh.add(loadedModel);
-      console.log("Drive: 1970 Chevelle SS 454 Model Loaded Successfully");
+      console.log("Drive: 1970 Chevelle SS 454 Loaded");
       this.attachLights();
     } catch (e) {
-      console.warn("Drive: Model not found at /models/car/car.glb, using procedural fallback.", e);
+      console.warn("Drive: Model not found, using procedural fallback.", e);
       this.createProceduralModel();
     }
   }
 
   private createProceduralModel() {
-    // Body: Dark Charcoal Industrial Design
-    const bodyGeometry = new THREE.BoxGeometry(2.1, 0.6, 4.2);
-    const bodyMaterial = new THREE.MeshStandardMaterial({ 
+    const bodyMaterial = new THREE.MeshStandardMaterial({
       color: 0x111111,
       metalness: 0.9,
       roughness: 0.2
     });
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.6, 4.2), bodyMaterial);
     body.castShadow = true;
     body.position.y = 0.5;
     this.mesh.add(body);
-    
-    // Aesthetic spoiler
+
     const spoiler = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.1, 0.4), bodyMaterial);
     spoiler.position.set(0, 0.8, -1.8);
     this.mesh.add(spoiler);
 
-    // Windshield: Physical/Translucent
-    const cabGeometry = new THREE.BoxGeometry(1.6, 0.7, 1.8);
-    const cabMaterial = new THREE.MeshPhysicalMaterial({ 
-      color: 0x000000,
-      metalness: 0,
-      roughness: 0.05,
-      transmission: 0.6,
-      thickness: 0.5,
-      reflectivity: 1.0
-    });
-    const cab = new THREE.Mesh(cabGeometry, cabMaterial);
+    const cab = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.7, 1.8),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        metalness: 0,
+        roughness: 0.05,
+        transmission: 0.6,
+        thickness: 0.5,
+        reflectivity: 1.0
+      })
+    );
     cab.position.set(0, 1.1, -0.4);
     this.mesh.add(cab);
-    
+
     this.attachLights();
   }
 
   private attachLights() {
-    // Halogen Headlights (Cinematic SpotLights with Spread)
-    const headlightColor = CONFIG.CAR.HEADLIGHT_COLOR;
-    const createHeadlightGroup = (x: number) => {
+    const headlightColor = 0xfff2d0; // Warm halogen — hardcoded, not from config
+
+    const createHeadlight = (x: number) => {
       const container = new THREE.Group();
       container.position.set(x, 0.6, 2.1);
 
-      // Primary Beam
-      const spot = new THREE.SpotLight(headlightColor, CONFIG.LIGHTING.HEADLIGHT_INTENSITY);
-      spot.angle = CONFIG.LIGHTING.HEADLIGHT_ANGLE;
-      spot.distance = CONFIG.LIGHTING.HEADLIGHT_DISTANCE;
-      spot.penumbra = CONFIG.LIGHTING.HEADLIGHT_PENUMBRA;
+      // Primary beam — FIX: intensity 5, not 30+
+      const spot = new THREE.SpotLight(headlightColor, 5);
+      spot.angle = 0.28;
+      spot.distance = 90;
+      spot.penumbra = 0.5;
       spot.decay = 2;
-      spot.castShadow = true;
-      
-      const target = new THREE.Object3D();
-      // Target is relative to the car mesh, positioned 80 units ahead
-      target.position.set(x, 0, 80);
-      this.mesh.add(target); // Add to car mesh root
-      
-      spot.target = target;
-      this.headlightTargets.push(target);
+      spot.castShadow = false; // off for perf — shadows from headlights are expensive
 
-      // Outer Spread Beam (weaker)
-      const outerSpot = new THREE.SpotLight(headlightColor, CONFIG.LIGHTING.HEADLIGHT_INTENSITY * 0.4);
-      outerSpot.angle = CONFIG.LIGHTING.HEADLIGHT_ANGLE + 0.12;
-      outerSpot.distance = 40; 
-      outerSpot.penumbra = 0.8;
-      
+      // Target parented to car, aimed 60 units ahead and slightly down
+      const target = new THREE.Object3D();
+      target.position.set(x, -1, 60);
+      this.mesh.add(target);
+      spot.target = target;
+
+      // Outer spread — fills in the sides of the road
+      const outer = new THREE.SpotLight(headlightColor, 2);
+      outer.angle = 0.4;
+      outer.distance = 40;
+      outer.penumbra = 0.9;
+      outer.decay = 2;
+
       const outerTarget = new THREE.Object3D();
-      outerTarget.position.set(x > 0 ? 10 : -10, -2, 40);
+      outerTarget.position.set(x > 0 ? 15 : -15, -2, 35);
       this.mesh.add(outerTarget);
-      outerSpot.target = outerTarget;
-      
+      outer.target = outerTarget;
+
+      // Visible bulb mesh
       const bulb = new THREE.Mesh(
-        new THREE.SphereGeometry(0.15, 16, 16),
+        new THREE.SphereGeometry(0.12, 8, 8),
         new THREE.MeshBasicMaterial({ color: headlightColor })
       );
-      
+
       container.add(spot);
-      container.add(outerSpot);
+      container.add(outer);
       container.add(bulb);
       return container;
     };
 
-    this.mesh.add(createHeadlightGroup(0.7));
-    this.mesh.add(createHeadlightGroup(-0.7));
+    this.mesh.add(createHeadlight(0.7));
+    this.mesh.add(createHeadlight(-0.7));
 
-    // Underglow (Chassis silhouette)
-    const underglow = new THREE.RectAreaLight(0x002233, 150, 2, 0.5);
+    // FIX: Underglow intensity 150 was blowing out the entire scene
+    // Set to 1.5 — just enough to cast a faint blue glow on the road below
+    const underglow = new THREE.RectAreaLight(0x001122, 1.5, 2, 0.5);
     underglow.position.set(0, -0.4, 0);
     underglow.rotation.x = -Math.PI / 2;
     this.mesh.add(underglow);
 
-    // Brake Lights (Subtle Red Emissive)
-    const brakeGeo = new THREE.BoxGeometry(0.5, 0.15, 0.1);
-    const brakeMat = new THREE.MeshStandardMaterial({ 
-      color: 0x550000, 
-      emissive: 0xff0000, 
-      emissiveIntensity: 10 
+    // Brake lights
+    const brakeMat = new THREE.MeshStandardMaterial({
+      color: 0x330000,
+      emissive: 0xff0000,
+      emissiveIntensity: 1.5  // FIX: was 10, causing giant red glow
     });
-    const b1 = new THREE.Mesh(brakeGeo, brakeMat);
+
+    const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.1), brakeMat);
     b1.position.set(0.7, 0.6, -2.1);
     this.mesh.add(b1);
+    this.brakeLights.push(b1);
+
     const b2 = b1.clone();
     b2.position.x = -0.7;
     this.mesh.add(b2);
+    this.brakeLights.push(b2);
   }
 
   private setupInput() {
@@ -214,17 +209,29 @@ export class Car {
   }
 
   public update(delta: number, getHeight: (x: number, z: number) => number) {
+    const isBraking = this.keys['s'] || this.keys['arrowdown'];
+
+    // Update brake light intensity based on input
+    this.brakeLights.forEach(bl => {
+      (bl.material as THREE.MeshStandardMaterial).emissiveIntensity =
+        isBraking ? 3.0 : 1.5;
+    });
+
     this.isDrifting = this.keys[' '] && Math.abs(this.velocity.z) > 10;
-    this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, this.isDrifting ? CONFIG.CAR.DRIFT_SLIP : 1.0, 0.1);
+    this.driftFactor = THREE.MathUtils.lerp(
+      this.driftFactor,
+      this.isDrifting ? CONFIG.CAR.DRIFT_SLIP : 1.0,
+      0.1
+    );
 
     if (this.keys['w'] || this.keys['arrowup']) {
       this.velocity.z += this.acceleration * delta;
-    } else if (this.keys['s'] || this.keys['arrowdown']) {
+    } else if (isBraking) {
       this.velocity.z -= this.acceleration * delta;
     }
 
     if (Math.abs(this.velocity.z) > 0.1) {
-      let turnMult = (this.isDrifting ? 2.0 : 1.0) * Math.sign(this.velocity.z);
+      const turnMult = (this.isDrifting ? 2.0 : 1.0) * Math.sign(this.velocity.z);
       if (this.keys['a'] || this.keys['arrowleft']) this.angle += this.steeringAmount * turnMult;
       if (this.keys['d'] || this.keys['arrowright']) this.angle -= this.steeringAmount * turnMult;
     }
@@ -240,43 +247,41 @@ export class Car {
     this.velocity.z *= this.deceleration;
     if (this.velocity.z > this.maxSpeed) this.velocity.z = this.maxSpeed;
     if (this.velocity.z < -this.maxSpeed / 2) this.velocity.z = -this.maxSpeed / 2;
-    
-    // Rotate wheels based on velocity
+
     if (this.wheels.length > 0) {
-        const wheelRotation = (this.velocity.z * delta) / 0.5; // Assumed radius of 0.5
-        this.wheels.forEach(wheel => {
-            wheel.rotation.x += wheelRotation; // Depending on model's axis
-        });
+      const wheelRot = (this.velocity.z * delta) / 0.5;
+      this.wheels.forEach(w => { w.rotation.x += wheelRot; });
     }
 
     this.mesh.rotation.y = this.angle;
-    
+
     const moveX = Math.sin(this.angle) * this.velocity.z * delta * this.driftFactor;
     const moveZ = Math.cos(this.angle) * this.velocity.z * delta * this.driftFactor;
-    
     this.mesh.position.x += moveX;
     this.mesh.position.z += moveZ;
 
     this.gravityDir = THREE.MathUtils.lerp(this.gravityDir, this.isAntiGravity ? -1 : 1, 0.1);
-    const height = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0); // clamp to 0 if under terrain
+    const height = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
     const targetY = this.isAntiGravity ? height + 10 : height + 0.1;
     this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY, 0.4);
 
-    let targetTilt = -(this.keys['a'] ? 0.08 : 0) + (this.keys['d'] ? 0.08 : 0);
+    const targetTilt = -(this.keys['a'] ? 0.08 : 0) + (this.keys['d'] ? 0.08 : 0);
     const targetRoll = (this.isAntiGravity ? Math.PI : 0) + this.barrelRollAngle + targetTilt;
     this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, targetRoll, 0.1);
 
-    // Trail Color update
     this.trailColor.setHex(0xffffff).multiplyScalar(0.4);
   }
 
   public getCameraTransform() {
     const horizontalOffset = 14;
     const height = 4.5;
-    
+
+    const breathe = Math.sin(Date.now() * 0.001 * (CONFIG.VISUALS.CAM_BREATH_SPEED ?? 0.3))
+      * (CONFIG.VISUALS.CAM_BREATH_AMP ?? 0.08);
+
     const offset = new THREE.Vector3(
       Math.sin(this.angle) * -horizontalOffset,
-      height + Math.sin(Date.now() * 0.001 * CONFIG.VISUALS.CAM_BREATH_SPEED) * CONFIG.VISUALS.CAM_BREATH_AMP,
+      height + breathe,
       Math.cos(this.angle) * -horizontalOffset
     );
 
@@ -286,7 +291,7 @@ export class Car {
 
     return {
       position: this.mesh.position.clone().add(offset),
-      lookTarget: lookTarget
+      lookTarget
     };
   }
 }

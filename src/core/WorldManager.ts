@@ -25,7 +25,6 @@ export class WorldManager {
     const pX = Math.floor(playerPosition.x / this.chunkSize);
     const pZ = Math.floor(playerPosition.z / this.chunkSize);
 
-    // Keep track of chunks that should be visible
     const activeCoords = new Set<string>();
 
     for (let x = -this.renderDistance; x <= this.renderDistance; x++) {
@@ -40,24 +39,44 @@ export class WorldManager {
           this.chunks.set(key, chunk);
           this.scene.add(chunk.mesh);
 
-          // Spawn City Buildings if in Lowlands
+          // FIX: override chunk terrain material after creation
+          // Chunk.ts may be setting random/bright colors — force it dark here
+          chunk.mesh.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              const mesh = child as THREE.Mesh;
+              // Only override if it looks like terrain (not a road marking or structure)
+              const mat = mesh.material as THREE.MeshStandardMaterial;
+              if (mat && mat.isMeshStandardMaterial) {
+                const col = mat.color;
+                // If the material is brighter than expected for night terrain, darken it
+                const brightness = col.r + col.g + col.b;
+                if (brightness > 1.0) {
+                  // This is a suspiciously bright material — it's causing your colored blocks
+                  mat.color.set(0x1a2030);
+                  mat.roughness = 0.95;
+                  mat.metalness = 0.0;
+                  mat.emissive.set(0x000000);
+                  mat.emissiveIntensity = 0;
+                }
+              }
+            }
+          });
+
           if (BiomeManager.getBiome(cZ) === 'LOWLANDS' && getRoadX) {
-              CityGenerator.spawnCityRow(chunk.mesh as any, cZ - this.chunkSize/2, cZ + this.chunkSize/2, getRoadX);
+            CityGenerator.spawnCityRow(chunk.mesh as any, cZ - this.chunkSize / 2, cZ + this.chunkSize / 2, getRoadX);
           }
 
-          // Random POIs
           if (Math.random() > 0.98 && getRoadX) {
-              const roadX = getRoadX(cZ);
-              const gas = StructureLibrary.createGasStation();
-              gas.position.set(roadX + 25, 0, cZ);
-              gas.rotation.y = Math.PI / 2;
-              this.scene.add(gas);
+            const roadX = getRoadX(cZ);
+            const gas = StructureLibrary.createGasStation();
+            gas.position.set(roadX + 25, 0, cZ);
+            gas.rotation.y = Math.PI / 2;
+            this.scene.add(gas);
           }
         }
       }
     }
 
-    // Remove old chunks
     for (const [key, chunk] of this.chunks.entries()) {
       if (!activeCoords.has(key)) {
         this.scene.remove(chunk.mesh);
