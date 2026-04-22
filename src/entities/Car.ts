@@ -79,13 +79,20 @@ export class Car {
   }
 
   private attachLights() {
-    const headlight = new THREE.SpotLight(0xffcc88, 20, 80);
-    headlight.position.set(0, 1, 2);
-    headlight.target.position.set(0, 0, 10);
-    headlight.castShadow = true;
+    const headlightLeft = new THREE.SpotLight(0xffe6b0, 40, 120, Math.PI / 6, 0.8);
+    headlightLeft.position.set(-0.6, 0.3, 1.5);
+    headlightLeft.target.position.set(-0.6, 0.2, 10);
+    headlightLeft.castShadow = true;
 
-    this.mesh.add(headlight);
-    this.mesh.add(headlight.target);
+    const headlightRight = headlightLeft.clone();
+    headlightRight.position.set(0.6, 0.3, 1.5);
+    headlightRight.target.position.set(0.6, 0.2, 10);
+    headlightRight.castShadow = true;
+
+    this.mesh.add(headlightLeft);
+    this.mesh.add(headlightRight);
+    this.mesh.add(headlightLeft.target);
+    this.mesh.add(headlightRight.target);
 
     // GROUNDING SHADOW: Final Lock Physical Anchor
     const shadowGeo = new THREE.CircleGeometry(1.5, 32);

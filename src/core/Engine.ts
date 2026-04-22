@@ -29,7 +29,7 @@ export class Engine {
     (this.renderer as any).useLegacyLights = false; // For newer Three.js versions
     
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.5; // High exposure for visibility
+    this.renderer.toneMappingExposure = 1.2; // Dialed back for deep neon contrast
     this.renderer.outputColorSpace = THREE.SRGBColorSpace; 
     this.renderer.shadowMap.enabled = true; 
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -43,12 +43,16 @@ export class Engine {
   }
 
   /**
-   * Configures the environmental lighting. Minimalist setup.
+   * Configures the environmental lighting.
    */
   private setupLights() {
     // BASE LIGHT: Minimalist visibility
     const ambient = new THREE.AmbientLight(0x111122, 0.3);
     this.scene.add(ambient);
+
+    // SOFT GLOBAL VISIBILITY: Blue Hour Fill
+    const hemi = new THREE.HemisphereLight(0x111133, 0x000000, 0.2);
+    this.scene.add(hemi);
   }
 
   /**
