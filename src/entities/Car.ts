@@ -42,15 +42,19 @@ export class Car {
   }
 
   private attachLights() {
-    const headlightColor = 0xfff2d0;
+    const headlightColor = 0xFFB347; // Drive 2011 Warm Halogen
     const createHeadlight = (x: number) => {
-      const spot = new THREE.SpotLight(headlightColor, 100, 150, 0.4, 0.5, 1);
+      const spot = new THREE.SpotLight(headlightColor, 200, 150, 0.4, 0.5, 1);
       spot.position.set(x, 0.6, 2.1);
       const target = new THREE.Object3D();
-      target.position.set(x, -2, 80);
+      target.position.set(x, -0.5, 30);
       this.mesh.add(target);
       spot.target = target;
       this.mesh.add(spot);
+
+      const glow = new THREE.PointLight(headlightColor, 10, 5);
+      glow.position.set(x, 0.6, 2.1);
+      this.mesh.add(glow);
     };
     createHeadlight(0.8);
     createHeadlight(-0.8);
@@ -95,6 +99,24 @@ export class Car {
     if (this.wheels.length > 0) {
       this.wheels.forEach(w => w.rotation.x += (this.velocity.z * delta) / 0.5);
     }
+  }
+
+  public autopilot(targetX: number) {
+    // Smoothly steer toward road center
+    const steerForce = (targetX - this.mesh.position.x) * 0.05;
+    this.mesh.position.x += steerForce;
+    this.mesh.rotation.y = -steerForce * 3;
+    
+    // Constant cinematic cruise speed (25 units/s ≈ 90 km/h)
+    this.velocity.z = 25; 
+    this.mesh.position.z += this.velocity.z * 0.016;
+
+    // Spin wheels
+    this.wheels.forEach(w => w.rotation.x += (this.velocity.z * 0.016) / 0.5);
+  }
+
+  public get velocityValue(): number {
+    return this.velocity.z;
   }
 
   public getCameraTransform() {
