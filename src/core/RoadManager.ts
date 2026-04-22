@@ -205,9 +205,9 @@ export class RoadManager {
 
     const roadMat = new THREE.MeshStandardMaterial({
         color: 0x020205, 
-        roughness: 0.1,  // Wet look
-        metalness: 0.5,  // Reflective
-        emissive: 0x020205, // 0.02 "felt" boost
+        roughness: 0.2,  // Glistening wet look
+        metalness: 0.6,  // Reflective asphalt
+        emissive: 0x010103, // 0.01 subtle felt boost
         emissiveIntensity: 1.0,
         polygonOffset: true,
         polygonOffsetFactor: -1,
@@ -252,7 +252,7 @@ export class RoadManager {
             #include <emissivemap_fragment>
             
             // 1. Wet Look Specular Noise (Teal Highlights)
-            float spec = noise(vUv * 100.0) * 0.4;
+            float spec = noise(vUv * 100.0) * 0.3;
             diffuseColor.rgb += vec3(0.0, 0.4, 0.4) * spec;
 
             // 2. Center Dash Lines (Amber Glow)
@@ -274,11 +274,29 @@ export class RoadManager {
     };
 
     const roadMesh = new THREE.Mesh(geometry, roadMat);
-    roadMesh.frustumCulled = false; // Prevent segment flickering
+    roadMesh.frustumCulled = false;
     roadMesh.receiveShadow = true;
     
     const chunkGroup = new THREE.Group();
     chunkGroup.add(roadMesh);
+
+    // 2. CAT'S EYES: Self-illuminated guides every 20m
+    const markerGeo = new THREE.BoxGeometry(0.1, 0.05, 0.3);
+    const markerMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+    for (let i = 0; i <= segments; i += 4) { // Roughly 20m steps
+        const t = 1/3 + (i / segments) * (1/3);
+        const pos = curve.getPoint(t);
+        const tangent = curve.getTangent(t).normalize();
+        const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+        const mLeft = new THREE.Mesh(markerGeo, markerMat);
+        mLeft.position.copy(pos).add(normal.clone().multiplyScalar(-width / 2 + 0.5));
+        chunkGroup.add(mLeft);
+
+        const mRight = new THREE.Mesh(markerGeo, markerMat);
+        mRight.position.copy(pos).add(normal.clone().multiplyScalar(width / 2 - 0.5));
+        chunkGroup.add(mRight);
+    }
 
     if (index % 10 === 0) { 
         const lightPos = curve.getPoint(0.5);

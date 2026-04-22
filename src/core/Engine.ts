@@ -29,9 +29,14 @@ export class Engine {
   }
 
   private setupLights() {
-    // 10-degree Rim Light for mountains
-    const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.1);
-    rimLight.position.set(100, 20, -100);
+    // 1. MOONLIGHT: Deep Indigo Rim Light for world shape
+    const moonlight = new THREE.DirectionalLight(0x0a0a1f, 0.05);
+    moonlight.position.set(0, 100, -200); // High and behind car
+    this.scene.add(moonlight);
+
+    // 2. MAGENTA AFTERGLOW: Faint horizon rim
+    const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.05);
+    rimLight.position.set(100, 10, -100);
     this.scene.add(rimLight);
   }
 

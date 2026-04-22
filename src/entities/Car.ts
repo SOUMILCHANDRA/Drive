@@ -44,16 +44,16 @@ export class Car {
   private attachLights() {
     const headlightColor = 0xFFD700; // Drive 2011 Warm Amber
     const createHeadlight = (x: number) => {
-      // 5x Intensity Boost (2000) for Noir visibility
-      const spot = new THREE.SpotLight(headlightColor, 2000, 160, 0.7, 0.5, 2);
+      // Linear Decay (1.0) for longer throw + 3000 Intensity
+      const spot = new THREE.SpotLight(headlightColor, 3000, 200, 0.7, 0.5, 1.0);
       spot.position.set(x, 0.6, 2.1);
       const target = new THREE.Object3D();
-      target.position.set(x, -0.5, 40);
+      target.position.set(x, -0.5, 50);
       this.mesh.add(target);
       spot.target = target;
       this.mesh.add(spot);
 
-      const glow = new THREE.PointLight(headlightColor, 60, 10, 2);
+      const glow = new THREE.PointLight(headlightColor, 80, 15, 1.0);
       glow.position.set(x, 0.6, 2.1);
       this.mesh.add(glow);
     };
