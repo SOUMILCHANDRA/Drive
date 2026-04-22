@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 
+/**
+ * PropManager handles interactive track elements like boost rings.
+ * Manages spawning, animation, and collision detection.
+ */
 export class PropManager {
   private scene: THREE.Scene;
   private rings: THREE.Group[] = [];
