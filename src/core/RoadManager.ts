@@ -29,9 +29,9 @@ export class RoadManager {
       side: THREE.DoubleSide
     });
 
-    this.points.push(new THREE.Vector3(0, this.noise.get(0, -10, 4, 0.5, 0.005) * 50, -10));
-    this.points.push(new THREE.Vector3(0, this.noise.get(0, 0, 4, 0.5, 0.005) * 50, 0));
-    this.points.push(new THREE.Vector3(0, this.noise.get(0, 10, 4, 0.5, 0.005) * 50, 10));
+    this.points.push(new THREE.Vector3(0, this.noise.get(0, -10) * 50, -10));
+    this.points.push(new THREE.Vector3(0, this.noise.get(0, 0) * 50, 0));
+    this.points.push(new THREE.Vector3(0, this.noise.get(0, 10) * 50, 10));
     
     this.generateMorePoints(100);
   }
@@ -41,23 +41,63 @@ export class RoadManager {
     let lastDir = new THREE.Vector3().subVectors(lastPoint, this.points[this.points.length - 2]).normalize();
 
     for (let i = 0; i < count; i++) {
-        const index = this.points.length;
         const params = BiomeManager.getParams(lastPoint.z);
-        const sharpness = (params as any).TURN_SHARPNESS || 0.4;
-        const angle = (this.noise.get(index * 10, 0, 1, 0.5, 1) - 0.5) * sharpness;
-        const pitch = (this.noise.get(0, index * 10, 1, 0.5, 1) - 0.5) * 0.1;
+        
+        // 1. "Scouting" Logic: Test 3 directions (Left, Straight, Right)
+        const angles = [-0.4, 0, 0.4];
+        let bestDir = lastDir.clone();
+        let minGradient = Infinity;
 
-        const newDir = lastDir.clone()
-            .applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
-            .applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch)
-            .normalize();
+        for (const angle of angles) {
+            const testDir = lastDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle).normalize();
+            const testPos = lastPoint.clone().add(testDir.clone().multiplyScalar(this.chunkSize));
+            
+            // Sample height ahead
+            const h = this.noise.get(testPos.x, testPos.z) * params.ELEVATION_SCALE;
+            const gradient = Math.abs(h - lastPoint.y);
+            
+            // 2. Self-Intersection Check: Repulsion from history
+            let repulsion = 0;
+            const historyWindow = 50; // Check last 50 points
+            for (let j = Math.max(0, this.points.length - historyWindow); j < this.points.length - 5; j++) {
+                const dist = testPos.distanceTo(this.points[j]);
+                if (dist < 150) {
+                    repulsion += (150 - dist) * 10; // Strong steering bias away
+                }
+            }
 
-        const newPoint = lastPoint.clone().add(newDir.multiplyScalar(this.chunkSize));
-        newPoint.y = this.noise.get(newPoint.x, newPoint.z, 4, 0.5, 0.005) * params.ELEVATION_SCALE;
+            const score = gradient + repulsion;
+            if (score < minGradient) {
+                minGradient = score;
+                bestDir = testDir;
+            }
+        }
+
+        const newPoint = lastPoint.clone().add(bestDir.multiplyScalar(this.chunkSize));
+        newPoint.y = this.noise.get(newPoint.x, newPoint.z) * params.ELEVATION_SCALE;
+        
+        // 3. 9-Point Smoothing Retroactively
         this.points.push(newPoint);
+        if (this.points.length > 10) {
+            this.smoothPoints(this.points.length - 5);
+        }
+
         lastPoint = newPoint;
-        lastDir = newDir;
+        lastDir = bestDir;
     }
+  }
+
+  private smoothPoints(index: number) {
+    const window = 4;
+    let sumY = 0;
+    let count = 0;
+    for (let i = index - window; i <= index + window; i++) {
+        if (i >= 0 && i < this.points.length) {
+            sumY += this.points[i].y;
+            count++;
+        }
+    }
+    this.points[index].y = sumY / count;
   }
 
   private updateSpline() {
@@ -65,7 +105,7 @@ export class RoadManager {
   }
 
   public getRoadHeight(x: number, z: number): number {
-    return this.noise.get(x, z, 4, 0.5, 0.005) * 50;
+    return this.noise.get(x, z) * 50;
   }
 
   public getRoadX(z: number): number {

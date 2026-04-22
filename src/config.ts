@@ -45,8 +45,31 @@ export const CONFIG = {
     FILM_NOISE: 0.25,
     GRAIN_SOFTNESS: 0.4
   },
+  PLANETS: {
+    EARTH: {
+      OCTAVES: 4,
+      PERSISTENCE: 0.5,
+      SCALE: 0.005,
+      ELEVATION: 40,
+      FOG_COLOR: 0x1F3B4D
+    },
+    MARS: {
+      OCTAVES: 5,
+      PERSISTENCE: 0.4,
+      SCALE: 0.003,
+      ELEVATION: 80,
+      FOG_COLOR: 0x4d1f1f
+    },
+    MOON: {
+      OCTAVES: 6,
+      PERSISTENCE: 0.6,
+      SCALE: 0.01,
+      ELEVATION: 50,
+      FOG_COLOR: 0x050505
+    }
+  },
   BIOMES: {
-    CYCLE_DISTANCE: 800,
+    CYCLE_DISTANCE: 1200,
     LOWLANDS: {
       NAME: 'Metropolis',
       ELEVATION_SCALE: 10,

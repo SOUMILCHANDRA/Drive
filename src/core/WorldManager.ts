@@ -12,7 +12,7 @@ export class WorldManager {
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-    this.noise = new Noise(Math.random());
+    this.noise = new Noise(Math.random() * 1000000);
   }
 
   public getNoise(): Noise {
@@ -64,6 +64,6 @@ export class WorldManager {
   }
 
   public getHeight(x: number, z: number): number {
-    return this.noise.get(x, z, 4, 0.5, 0.005) * 50;
+    return this.noise.get(x, z) * 50;
   }
 }

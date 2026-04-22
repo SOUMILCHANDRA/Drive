@@ -1,6 +1,6 @@
 import * as THREE from 'three';
+import { CONFIG } from '../config';
 import { Noise } from '../utils/Noise';
-import { BiomeManager } from '../core/BiomeManager';
 
 export class Chunk {
   public mesh: THREE.Group;
@@ -20,28 +20,44 @@ export class Chunk {
     geometry.rotateX(-Math.PI / 2);
     
     const vertices = geometry.attributes.position.array;
+    const colors = new Float32Array(vertices.length);
+
     for (let i = 0; i < vertices.length; i += 3) {
       const vx = vertices[i] + x + size / 2;
       const vz = vertices[i + 2] + z - size / 2;
       
-      const params = BiomeManager.getParams(vz);
-      const noiseH = noise.get(vx, vz, 4, 0.5, 0.005) * params.ELEVATION_SCALE;
+      const planet = CONFIG.PLANETS.EARTH; // Currently defaulted to Earth
+      
+      const noiseH = noise.fbm(vx, vz, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
       
       const roadX = getRoadX ? getRoadX(vz) : 0;
       const distToRoad = Math.abs(vx - roadX);
       const roadWidth = 14;
-      const carveRadius = 30;
+      const carveRadius = 45; // Increased for natural embankments
       
       const carveFactor = 1.0 - Math.min(Math.max((distToRoad - roadWidth / 2) / carveRadius, 0), 1);
-      const h = THREE.MathUtils.lerp(noiseH, noise.get(roadX, vz, 4, 0.5, 0.005) * params.ELEVATION_SCALE, carveFactor);
+      // "Sinking" and "Lifting" the terrain to meet the road midline
+      const roadHeight = noise.fbm(roadX, vz, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
+      const h = THREE.MathUtils.lerp(noiseH, roadHeight, carveFactor);
 
       vertices[i + 1] = h;
+
+      // Vertex Coloring based on height and biome
+      let color = new THREE.Color(0x0a0c1a); // Deep blue base
+      if (h > 40) color.set(0xffffff); // Snow
+      else if (h > 20) color.set(0x444444); // Rock
+      else if (h > 5) color.set(0x1a331a);  // Forest green
+      
+      colors[i] = color.r;
+      colors[i + 1] = color.g;
+      colors[i + 2] = color.b;
     }
     
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0x00ffff, // DEBUG CYAN
+      vertexColors: true,
       roughness: 0.9,
       metalness: 0.1,
       flatShading: true,
