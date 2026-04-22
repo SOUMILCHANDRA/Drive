@@ -27,10 +27,18 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  transition: opacity 1.5s ease-in-out;
+  transition: opacity 1s ease, transform 1s ease;
   z-index: 100;
   cursor: pointer;
-  animation: slowDrift 10s ease-in-out infinite alternate;
+  animation: 
+    slowDrift 10s ease-in-out infinite alternate,
+    drift 12s ease-in-out infinite alternate;
+}
+
+#startScreen:hover .start-text {
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 7px;
+  transition: all 0.3s ease;
 }
 
 .splash-logo {
@@ -40,7 +48,7 @@ body {
   margin: 0;
   opacity: 0;
   animation: 
-    logoFadeIn 1.5s ease forwards,
+    logoReveal 1.2s ease forwards,
     glowPulse 3s ease-in-out infinite;
 }
 
@@ -53,7 +61,7 @@ body {
   backdrop-filter: blur(2px);
   opacity: 0;
   animation: 
-    textFadeIn 2s ease forwards,
+    textReveal 1.5s ease forwards,
     pulse 2s infinite;
   animation-delay: 0.8s, 0s;
 }
@@ -65,7 +73,7 @@ body {
   color: rgba(255, 255, 255, 0.35);
   text-transform: uppercase;
   opacity: 0;
-  animation: textFadeIn 2.5s ease forwards;
+  animation: textReveal 1.5s ease forwards;
   animation-delay: 1.2s;
 }
 
@@ -85,7 +93,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.2;
+  opacity: 0.15; /* Subtle film texture */
   background:
     linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.1) 50%),
     linear-gradient(90deg, rgba(255,0,0,0.02), rgba(0,255,0,0.01), rgba(0,0,255,0.02));
@@ -93,16 +101,22 @@ body::before {
   z-index: 60;
 }
 
+@keyframes drift {
+  from { transform: scale(1); }
+  to { transform: scale(1.02) translateY(-5px); }
+}
+
 @keyframes slowDrift {
   from { background-position: center; }
   to { background-position: 55% 45%; }
 }
 
-@keyframes logoFadeIn {
-  to { opacity: 1; }
+@keyframes logoReveal {
+  from { opacity: 0; filter: blur(8px); transform: translateY(10px); }
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
 }
 
-@keyframes textFadeIn {
+@keyframes textReveal {
   to { opacity: 1; }
 }
 

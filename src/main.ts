@@ -79,7 +79,10 @@ async function bootstrap() {
             playAudio();
         }, 200);
 
-        if (startScreen) startScreen.style.opacity = '0';
+        if (startScreen) {
+            startScreen.style.opacity = '0';
+            startScreen.style.transform = 'scale(1.05)'; // Cinematic zoom-cut
+        }
 
         setTimeout(() => {
             if (startScreen) startScreen.style.display = 'none';
