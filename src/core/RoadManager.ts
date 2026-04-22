@@ -9,9 +9,9 @@ export class RoadManager {
   private roadWidth: number = 8;
   private renderDistance: number = 20; 
 
-  // Building segments based on previous data
   private segmentStarts: Map<number, THREE.Vector3> = new Map();
   private segmentEnds: Map<number, THREE.Vector3> = new Map();
+  private segmentDirections: Map<number, THREE.Vector3> = new Map();
 
   constructor(scene: THREE.Scene, noise: Noise) {
     this.scene = scene;
@@ -19,12 +19,16 @@ export class RoadManager {
     this.scene.add(this.roadGroup);
 
     // Initial segment data
-    this.segmentStarts.set(0, new THREE.Vector3(0, 0, 0));
-    this.segmentEnds.set(0, new THREE.Vector3(0, 0, this.segmentLength));
+    const start = new THREE.Vector3(0, 0, 0);
+    const dir = new THREE.Vector3(0, 0, 1);
+    const end = start.clone().add(dir.clone().multiplyScalar(this.segmentLength));
+    
+    this.segmentStarts.set(0, start);
+    this.segmentDirections.set(0, dir);
+    this.segmentEnds.set(0, end);
   }
 
   public getRoadHeight(x: number, z: number): number {
-    // For now, straight and flat
     return 0.1;
   }
 
@@ -32,19 +36,17 @@ export class RoadManager {
     const currentSegmentIndex = Math.floor(playerZ / this.segmentLength);
     const activeSegments = new Set<number>();
 
-    // Load segments in front and slightly behind
     for (let i = -2; i < this.renderDistance; i++) {
-      const index = currentSegmentIndex + i;
-      if (index < 0) continue;
-      activeSegments.add(index);
-
-      if (!this.roadSegments.has(index)) {
-        this.generateSegmentData(index);
-        this.createSegmentMesh(index);
-      }
+        const index = currentSegmentIndex + i;
+        if (index < 0) continue;
+        activeSegments.add(index);
+  
+        if (!this.roadSegments.has(index)) {
+          this.generateSegmentData(index);
+          this.createSegmentMesh(index);
+        }
     }
 
-    // Cleanup
     for (const [index, mesh] of this.roadSegments.entries()) {
       if (!activeSegments.has(index)) {
         this.roadGroup.remove(mesh);
@@ -58,19 +60,27 @@ export class RoadManager {
   private generateSegmentData(index: number) {
     if (this.segmentStarts.has(index)) return;
 
-    // Ensure previous segment exists
     if (!this.segmentEnds.has(index - 1)) {
         this.generateSegmentData(index - 1);
     }
 
-    const start = this.segmentEnds.get(index - 1)!.clone();
+    const prevEnd = this.segmentEnds.get(index - 1)!.clone();
+    const prevDir = this.segmentDirections.get(index - 1)!.clone();
     
-    // Step 1: Perfectly straight road
-    const direction = new THREE.Vector3(0, 0, 1);
-    const end = start.clone().add(direction.multiplyScalar(this.segmentLength));
+    // Step 2: Add small curves (deterministic)
+    const noiseVal = this.noise.get(index * 10, 0, 1, 0.5, 1);
+    const angle = (noiseVal - 0.5) * 0.6;
+    const rotation = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        angle
+    );
 
-    this.segmentStarts.set(index, start);
-    this.segmentEnds.set(index, end);
+    const newDir = prevDir.clone().applyQuaternion(rotation);
+    const newEnd = prevEnd.clone().add(newDir.clone().multiplyScalar(this.segmentLength));
+
+    this.segmentStarts.set(index, prevEnd);
+    this.segmentDirections.set(index, newDir);
+    this.segmentEnds.set(index, newEnd);
   }
 
   private createSegmentMesh(index: number) {
@@ -89,20 +99,16 @@ export class RoadManager {
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-    
-    // Position center of road
     const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
     mesh.position.copy(midPoint);
     
-    // Orient road
     mesh.lookAt(end);
-    mesh.rotation.x += -Math.PI / 2; // Flatten to ground
+    mesh.rotation.x += -Math.PI / 2;
 
     mesh.receiveShadow = true;
     this.roadGroup.add(mesh);
     this.roadSegments.set(index, mesh);
 
-    // Neon sidelines
     this.addSidelines(mesh);
   }
 
