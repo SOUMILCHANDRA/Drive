@@ -21,9 +21,7 @@ engine.scene.fog = new THREE.FogExp2(0x050505, 0.005);
 engine.renderer.setClearColor(0x0a0a0a);
 
 // Initial Car Placement
-const startPos = road.getRoadCenter(0);
-car.mesh.position.copy(startPos);
-car.mesh.position.y += 0.5;
+car.mesh.position.set(0, 0.5, 0);
 
 // HUD & Splash Elements
 const splashElem = document.getElementById('splash');
@@ -56,7 +54,11 @@ engine.render((delta) => {
     particles.update(car.mesh.position, car.velocity.z);
 
     // Update Car
-    car.update(delta, (x, z) => world.getHeight(x, z));
+    car.update(delta, (x, z) => {
+      // Check if car is on road (approx)
+      // For now just return terrain height
+      return road.getRoadHeight(x, z);
+    });
 
     // Update HUD
     const currentSpeed = Math.abs(car.velocity.z);
