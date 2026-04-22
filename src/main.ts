@@ -3,6 +3,7 @@ import { Engine } from './core/Engine';
 import { Car } from './entities/Car';
 import { RoadManager } from './core/RoadManager';
 import { WorldManager } from './core/WorldManager';
+import { TerrainManager } from './core/TerrainManager';
 
 console.log("Drive: PHASE 3 RECONSTRUCTION - ADDING TERRAIN");
 
@@ -10,6 +11,7 @@ const engine = new Engine();
 const car = new Car();
 const world = new WorldManager(engine.scene);
 const road = new RoadManager(engine.scene, world.getNoise());
+const terrain = new TerrainManager(engine.scene, world.getNoise(), road);
 
 async function bootstrap() {
     await car.init();
@@ -26,6 +28,7 @@ async function bootstrap() {
         while (fixedTimeAccumulator >= fixedDelta) {
             // FIXED PHYSICS UPDATE (60Hz)
             world.update(car.mesh.position, (z) => road.getRoadX(z), (x, z) => road.getRoadHeight(x, z));
+            terrain.update(car.mesh.position);
             road.update(car.mesh.position.z);
             
             if (autopilot) {

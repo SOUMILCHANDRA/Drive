@@ -156,17 +156,17 @@ export class Car {
 
     this.velocity.z *= this.deceleration;
     
-    // Position Update
+    // POSITION UPDATE
     this.mesh.position.x += Math.sin(this.angle) * this.velocity.z * delta;
     this.mesh.position.z += Math.cos(this.angle) * this.velocity.z * delta;
 
-    // STABLE SPLINE ANCHOR: Height sampling + Precision Snap (-0.25 offset for flush contact)
+    // SLOW ROADS PHYSICS SNAP: Hard-lock Y to spline for stability
     const roadHeight = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
     const time = Date.now() * 0.003;
-    const bobbing = Math.sin(time) * 0.03;
+    const bobbing = Math.sin(time) * 0.02; // Reduced bobbing for 'Zen' stability
     
-    // Final Physics Lock: Snap directly to spline Y (-0.25 pivot correction)
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight - 0.25 + bobbing, 0.2);
+    // Final Physics Lock: Snap directly to spline Y (+0.5 offset for Slow Roads blueprint)
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.5 + bobbing, 0.4);
     
     // KINETIC STEERING: Heavy weight damping (0.03)
     this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.03);
