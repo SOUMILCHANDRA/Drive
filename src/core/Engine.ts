@@ -15,10 +15,10 @@ export class Engine {
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050508);
-    // VOLUMETRIC DENSITY: Indigo-Black Haze
-    this.scene.fog = new THREE.FogExp2(0x050508, 0.015); 
+    // VOLUMETRIC DENSITY: High-Density Midnight Haze
+    this.scene.fog = new THREE.FogExp2(0x050508, 0.02); 
     
-    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
+    this.camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 2000);
     
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -50,7 +50,7 @@ export class Engine {
     this.scene.add(ambient);
 
     // CINEMATIC FILL: Blue Hour 'Cheat' (Indigo Rim)
-    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.1);
+    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.15);
     this.scene.add(hemi);
 
     // SILHOUETTE LIFT: High-angle Indigo light for car definition
