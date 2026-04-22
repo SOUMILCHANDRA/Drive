@@ -125,7 +125,7 @@ export class Car {
 
     // Barrel Roll Animation
     if (this.isRolling) {
-      this.barrelRollAngle += delta * 10 * this.rollDirection;
+      this.barrelRollAngle += delta * 15 * this.rollDirection;
       if (Math.abs(this.barrelRollAngle) >= Math.PI * 2) {
         this.barrelRollAngle = 0;
         this.isRolling = false;
