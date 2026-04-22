@@ -15,7 +15,7 @@ export class Engine {
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0a0a0f); // Drive 2011 Near-Black
-    this.scene.fog = new THREE.FogExp2(0x050508, 0.02); 
+    this.scene.fog = new THREE.FogExp2(0x050508, 0.01); 
     
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
     
@@ -49,7 +49,7 @@ export class Engine {
     this.scene.add(ambient);
 
     // CINEMATIC FILL: Hemisphere light for silhouette definition
-    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x050505, 0.15);
+    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.1);
     this.scene.add(hemi);
 
     // SILHOUETTE LIFT: High-angle Indigo light for car definition

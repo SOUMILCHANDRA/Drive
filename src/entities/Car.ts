@@ -87,7 +87,7 @@ export class Car {
   private attachLights() {
     const headlightColor = 0xFFD700; 
     const createHeadlight = (x: number) => {
-      const spot = new THREE.SpotLight(headlightColor, 2000, 200, 0.6, 0.8, 1.0);
+      const spot = new THREE.SpotLight(headlightColor, 2000, 100, 0.6, 0.8, 1.0);
       spot.position.set(x, 0.6, 2.5);
       spot.castShadow = true;
       spot.shadow.mapSize.set(1024, 1024);
@@ -100,6 +100,14 @@ export class Car {
     };
     createHeadlight(0.7);
     createHeadlight(-0.7);
+
+    // GROUNDING SHADOW: Fake occlusion under car
+    const shadowGeo = new THREE.CircleGeometry(1.5, 32);
+    const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
+    const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.05; // Slightly above road to avoid z-fight
+    this.mesh.add(shadow);
 
     // THE "RED RIM" BEACONS - Decoupled to prevent internal bleed
     const tailColor = 0xFF0000;
