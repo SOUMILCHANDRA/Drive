@@ -77,10 +77,12 @@ async function bootstrap() {
         // AUDIO-VISUAL SYNC: Cinematic ignition
         setTimeout(() => {
             playAudio();
+            engine.ignite(); // Trigger the 3D power-on ramp
         }, 200);
 
         if (startScreen) {
             startScreen.style.opacity = '0';
+            startScreen.style.transform = 'scale(1.1)'; // Pulse-out effect
         }
 
         setTimeout(() => {

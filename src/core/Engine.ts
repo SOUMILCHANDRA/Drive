@@ -183,6 +183,37 @@ export class Engine {
   }
 
   /**
+   * Orchestrates the cinematic ignition sequence.
+   * Ramps exposure and FOV to simulate a camera lens focusing and headlights powering on.
+   */
+  public ignite() {
+    this.renderer.toneMappingExposure = 0;
+    const targetExposure = 1.2;
+    const duration = 2000; // 2s ramp
+    const start = performance.now();
+
+    const animateIgnition = (time: number) => {
+      const elapsed = time - start;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing: Quad Out
+      const ease = 1 - (1 - progress) * (1 - progress);
+      
+      this.renderer.toneMappingExposure = ease * targetExposure;
+      
+      // Subtle lens snap: Start slightly zoomed and pull back
+      this.camera.fov = 48 - (ease * 3); 
+      this.camera.updateProjectionMatrix();
+
+      if (progress < 1) {
+        requestAnimationFrame(animateIgnition);
+      }
+    };
+
+    requestAnimationFrame(animateIgnition);
+  }
+
+  /**
    * Starts the main render loop.
    * @param updateFn Callback for per-frame logic updates
    */
