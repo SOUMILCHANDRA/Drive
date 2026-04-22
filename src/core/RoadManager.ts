@@ -30,12 +30,20 @@ export class RoadManager {
     this.segmentEnds.set(0, end);
   }
 
-  public getRoadHeight(_x: number, _z: number): number {
-    // Stage 2: Curves added, keeping flat for now
-    return 0;
+  public getRoadHeight(_x: number, z: number): number {
+    const index = Math.floor(z / this.segmentLength);
+    const start = this.segmentStarts.get(index);
+    const end = this.segmentEnds.get(index);
+    
+    if (!start || !end) return 0;
+
+    // INTERPOLATION FIX
+    const t = (z - start.z) / (end.z - start.z);
+    const height = THREE.MathUtils.lerp(start.y, end.y, t);
+    return height + 0.1;
   }
 
-  public update(playerZ: number) {
+  public update(playerZ: number, getHeight: (x: number, z: number) => number) {
     const currentSegmentIndex = Math.floor(playerZ / this.segmentLength);
     const activeSegments = new Set<number>();
 
@@ -45,7 +53,7 @@ export class RoadManager {
         activeSegments.add(index);
   
         if (!this.roadSegments.has(index)) {
-          this.generateSegmentData(index);
+          this.generateSegmentData(index, getHeight);
           this.createSegmentMesh(index);
         }
     }
@@ -60,30 +68,35 @@ export class RoadManager {
     }
   }
 
-  private generateSegmentData(index: number) {
+  private generateSegmentData(index: number, getHeight: (x: number, z: number) => number) {
     if (this.segmentStarts.has(index)) return;
 
     if (!this.segmentEnds.has(index - 1)) {
-        this.generateSegmentData(index - 1);
+        this.generateSegmentData(index - 1, getHeight);
     }
 
     const prevEnd = this.segmentEnds.get(index - 1)!.clone();
     const prevDir = this.segmentDirections.get(index - 1)!.clone();
     
-    // Step 2: Add slight curves by rotating the DIRECTION vector
-    // Using deterministic noise for the angle
+    // Step 2: Curves
     const angleNoise = this.noise.get(index * 10, 0, 1, 0.5, 1);
     const angle = (angleNoise - 0.5) * 0.4;
-    
-    // Rotate direction vector around Y axis (not the mesh)
     const newDir = prevDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-    const newEnd = prevEnd.clone().add(newDir.clone().multiplyScalar(this.segmentLength));
+    
+    // Step 3: Elevation matching terrain
+    const nextPos2D = prevEnd.clone().add(newDir.clone().multiplyScalar(this.segmentLength));
+    const startY = getHeight(prevEnd.x, prevEnd.z);
+    const endY = getHeight(nextPos2D.x, nextPos2D.z);
+    
+    prevEnd.y = startY;
+    const newEnd = nextPos2D.clone();
+    newEnd.y = endY;
 
-    // Force flat for this stage
-    newEnd.y = 0;
+    // Recalculate direction based on Y change to keep continuity
+    const finalDir = new THREE.Vector3().subVectors(newEnd, prevEnd).normalize();
 
     this.segmentStarts.set(index, prevEnd);
-    this.segmentDirections.set(index, newDir);
+    this.segmentDirections.set(index, finalDir);
     this.segmentEnds.set(index, newEnd);
   }
 
@@ -106,7 +119,6 @@ export class RoadManager {
     const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
     mesh.position.copy(midPoint);
     
-    // THE FIX
     mesh.lookAt(end);
     mesh.rotateX(-Math.PI / 2);
 
@@ -115,7 +127,8 @@ export class RoadManager {
     this.roadSegments.set(index, mesh);
 
     this.addSidelines(mesh);
-    this.addDebugSphere(start);
+    // Debug Spheres
+    // this.addDebugSphere(start);
   }
 
   private addSidelines(parent: THREE.Mesh) {
@@ -123,20 +136,11 @@ export class RoadManager {
     const lineMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
     
     const l1 = new THREE.Mesh(lineGeo, lineMat);
-    l1.position.set(this.roadWidth / 2, 0.01, 0);
+    l1.position.set(this.roadWidth / 2, 0.02, 0);
     parent.add(l1);
 
     const l2 = l1.clone();
-    l2.position.set(-this.roadWidth / 2, 0.01, 0);
+    l2.position.set(-this.roadWidth / 2, 0.02, 0);
     parent.add(l2);
-  }
-
-  private addDebugSphere(pos: THREE.Vector3) {
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.5),
-      new THREE.MeshBasicMaterial({ color: 0xff0000 })
-    );
-    sphere.position.copy(pos);
-    this.roadGroup.add(sphere);
   }
 }

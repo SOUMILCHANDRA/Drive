@@ -46,7 +46,7 @@ splashElem?.addEventListener('click', () => {
 engine.render((delta) => {
     // Background updates
     world.update(car.mesh.position);
-    road.update(car.mesh.position.z);
+    road.update(car.mesh.position.z, (x, z) => world.getHeight(x, z));
     stars.update(car.mesh.position);
 
     if (gameStarted) {
