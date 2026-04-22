@@ -15,12 +15,11 @@ export class Chunk {
     this.size = size;
     this.mesh = new THREE.Group();
 
-    const segments = 40;
+    const segments = 32;
     const geometry = new THREE.PlaneGeometry(size, size, segments, segments);
     geometry.rotateX(-Math.PI / 2);
     
     const vertices = geometry.attributes.position.array;
-    const colors = new Float32Array(vertices.length);
     for (let i = 0; i < vertices.length; i += 3) {
       const vx = vertices[i] + x + size / 2;
       const vz = vertices[i + 2] + z - size / 2;
@@ -37,26 +36,12 @@ export class Chunk {
       const h = THREE.MathUtils.lerp(noiseH, noise.get(roadX, vz, 4, 0.5, 0.005) * params.ELEVATION_SCALE, carveFactor);
 
       vertices[i + 1] = h;
-
-      // FIX: Deep Nocturnal Palette (No bright colors)
-      const color = new THREE.Color();
-      if (carveFactor > 0.8) {
-        color.setRGB(0.02, 0.02, 0.03); // Deep black asphalt
-      } else if (h > 45) {
-        color.setRGB(0.15, 0.15, 0.2); // Faint mountain rim
-      } else {
-        color.setRGB(0.05, 0.06, 0.08); // Dark midnight terrain
-      }
-      colors[i] = color.r;
-      colors[i + 1] = color.g;
-      colors[i + 2] = color.b;
     }
     
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshStandardMaterial({
-      vertexColors: true,
+      color: 0x0a0a0f, // SOLID DARK COLOR - No vertex colors
       roughness: 0.9,
       metalness: 0.1,
       flatShading: true,
