@@ -250,8 +250,8 @@ export class RoadManager {
 
     const roadMat = new THREE.MeshPhysicalMaterial({
         color: 0x020205, // Deep desaturated indigo
-        roughness: 0.2,  // Specular smears for streetlight catch
-        metalness: 0.8,  // High sheen for 'Emergency' reveal
+        roughness: 0.15, // Sharp wet-look streaks
+        metalness: 0.8,  // High sheen for Halogen catch
         clearcoat: 1.0,  
         reflectivity: 1.0,
         emissive: 0x000000,
@@ -300,8 +300,8 @@ export class RoadManager {
         const tangent = curve.getTangent(0.5).normalize();
         const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-        const sodiumColor = 0xFF9500;
-        const streetLight = new THREE.PointLight(sodiumColor, 25, 100, 2);
+        const sodiumColor = 0xFF8C00; // Total Pivot: Warm Amber Sodium
+        const streetLight = new THREE.PointLight(sodiumColor, 35, 120, 2.5); // Increased decay & reach
         streetLight.position.copy(lightPos).add(normal.clone().multiplyScalar(12)).add(new THREE.Vector3(0, 15, 0));
         streetLight.castShadow = true;
         chunkGroup.add(streetLight);
@@ -337,9 +337,9 @@ export class RoadManager {
         const poleMat = new THREE.MeshStandardMaterial({ 
             color: 0x111111,
             emissive: sodiumColor,
-            emissiveIntensity: 3.0,
+            emissiveIntensity: 5.0, // Glistening glowing poles
             transparent: true,
-            opacity: 0.9 // Slight haze
+            opacity: 0.95
         });
         const pole = new THREE.Mesh(poleGeo, poleMat);
         pole.position.copy(streetLight.position).sub(new THREE.Vector3(0, 7.5, 0));

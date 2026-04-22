@@ -165,8 +165,8 @@ export class Car {
     const time = Date.now() * 0.003;
     const bobbing = Math.sin(time) * 0.02; 
     
-    // Final Physics Lock: Snap directly to spline Y (+0.1 offset for flush contact)
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.1 + bobbing, 0.4);
+    // TOTAL PIVOT: 'Zen' Physics Glide (Smooth Suspension)
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.1 + bobbing, 0.05);
     
     // KINETIC STEERING: Heavy weight damping (0.03)
     this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.03);
@@ -205,8 +205,8 @@ export class Car {
         .add(forward.clone().multiplyScalar(-3))
         .add(up.clone().multiplyScalar(2));
 
-    // Axis-independent Damping
-    this.currentCameraPos.lerp(idealPos, 0.1);
+    // Axis-independent Damping (Zen Damping: 0.05)
+    this.currentCameraPos.lerp(idealPos, 0.05);
 
     const lookTarget = this.mesh.position.clone()
         .add(forward.clone().multiplyScalar(15))
