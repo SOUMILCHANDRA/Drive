@@ -23,7 +23,7 @@ export class RoadManager {
     this.scene.add(this.roadGroup);
 
     this.roadMaterial = new THREE.MeshStandardMaterial({
-      color: 0x1a1a1b,
+      color: 0xff00ff, // DEBUG MAGENTA
       roughness: 0.4,
       metalness: 0.3,
       side: THREE.DoubleSide
