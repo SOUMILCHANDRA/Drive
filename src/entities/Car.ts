@@ -60,14 +60,14 @@ export class Car {
         
         this.mesh.add(this.model);
         
-        // MATERIAL RESTORATION & NORMAL RECALIBRATION
+        // MATERIAL RESTORATION: High-Gloss Neon-Noir Paint
         this.model.traverse(child => {
             if (child instanceof THREE.Mesh) {
-                child.geometry.computeVertexNormals(); // Fix light swallowing
+                child.geometry.computeVertexNormals(); 
                 child.material = new THREE.MeshStandardMaterial({
-                    color: child.material.color || 0x111111,
-                    roughness: 0.4,
-                    metalness: 0.6
+                    color: child.material.color || 0x050505,
+                    roughness: 0.2, // High-gloss finish
+                    metalness: 0.7  // Reflective catch for Sodium/Neon
                 });
                 child.castShadow = true;
                 child.receiveShadow = true;

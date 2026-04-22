@@ -337,7 +337,7 @@ export class RoadManager {
         const poleMat = new THREE.MeshStandardMaterial({ 
             color: 0x111111,
             emissive: sodiumColor,
-            emissiveIntensity: 5.0, // Glistening glowing poles
+            emissiveIntensity: 6.0, // Total Pivot: Glistening emissive poles
             transparent: true,
             opacity: 0.95
         });
