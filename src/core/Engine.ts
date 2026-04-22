@@ -15,8 +15,8 @@ export class Engine {
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050508);
-    // TOTAL PIVOT: 'Slow Roads' Atmospheric Secret
-    this.scene.fog = new THREE.FogExp2(0x050508, 0.02); 
+    // FINAL LOCK: Slow Roads Atmospheric Scale
+    this.scene.fog = new THREE.FogExp2(0x050508, 0.015); 
     
     this.camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 2000);
     
@@ -49,7 +49,7 @@ export class Engine {
     const ambient = new THREE.AmbientLight(0x0d0d2b, 0.05);
     this.scene.add(ambient);
 
-    // CINEMATIC DEPTH: Hemisphere 'Fill' (Indigo Rim)
+    // CINEMATIC DEPTH: Final Aesthetic Lock (Indigo Rim)
     const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.2);
     this.scene.add(hemi);
 

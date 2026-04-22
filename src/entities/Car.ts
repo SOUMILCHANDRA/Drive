@@ -87,6 +87,7 @@ export class Car {
   private attachLights() {
     const headlightColor = 0xFFD700; 
     const createHeadlight = (x: number) => {
+      // FINAL LOCK: Soft Amber Halogen Pools
       const spot = new THREE.SpotLight(headlightColor, 2000, 100, 0.6, 0.8, 1.0);
       spot.position.set(x, 0.6, 2.5);
       spot.castShadow = true;
@@ -101,9 +102,9 @@ export class Car {
     createHeadlight(0.7);
     createHeadlight(-0.7);
 
-    // GROUNDING SHADOW: Fake occlusion under car
+    // GROUNDING SHADOW: Final Lock Physical Anchor
     const shadowGeo = new THREE.CircleGeometry(1.5, 32);
-    const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
+    const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.7 });
     const shadow = new THREE.Mesh(shadowGeo, shadowMat);
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = 0.05; // Slightly above road to avoid z-fight
