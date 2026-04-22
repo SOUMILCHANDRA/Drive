@@ -204,11 +204,14 @@ export class RoadManager {
     geometry.computeVertexNormals();
 
     const roadMat = new THREE.MeshStandardMaterial({
-        color: 0x111111,
-        roughness: 0.7,
-        metalness: 0.3,
-        emissive: 0x00ffff,
-        emissiveIntensity: 0.1,
+        color: 0x0a0a0a, // Near-black asphalt
+        roughness: 0.9,
+        metalness: 0.1,
+        emissive: 0x000000,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+        transparent: true,
     });
 
     roadMat.onBeforeCompile = (shader) => {
@@ -217,6 +220,15 @@ export class RoadManager {
             `
             #include <common>
             varying vec2 vUv;
+            varying vec3 vWorldPosition;
+
+            float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            float noise(vec2 p) {
+                vec2 i = floor(p); vec2 f = fract(p);
+                vec2 u = f*f*(3.0-2.0*f);
+                return mix(mix(hash(i + vec2(0,0)), hash(i + vec2(1,0)), u.x),
+                           mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);
+            }
             `
         );
         shader.vertexShader = shader.vertexShader.replace(
@@ -224,11 +236,13 @@ export class RoadManager {
             `
             #include <common>
             varying vec2 vUv;
+            varying vec3 vWorldPosition;
             `
         ).replace(
-            '#include <uv_vertex>',
+            '#include <worldpos_vertex>',
             `
-            #include <uv_vertex>
+            #include <worldpos_vertex>
+            vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
             vUv = uv;
             `
         );
@@ -237,14 +251,24 @@ export class RoadManager {
             `
             #include <emissivemap_fragment>
             
-            // 1. Center Dash Lines
-            float dash = step(0.9, fract(vUv.x * 0.2)); // 5m dashes
-            float center = 1.0 - step(0.02, abs(vUv.y - 0.5));
-            totalEmissiveRadiance += vec3(1.0) * dash * center * 2.0;
+            // 1. Stochastic Asphalt Grain
+            float n = noise(vUv * 50.0) * 0.1;
+            n += noise(vUv * 200.0) * 0.05;
+            diffuseColor.rgb += vec3(n);
 
-            // 2. Edge Glow (Slow Roads Style)
-            float edge = step(0.95, abs(vUv.y - 0.5) * 2.0);
-            totalEmissiveRadiance += vec3(0.0, 0.9, 1.0) * edge * 1.5;
+            // 2. Center Dash Lines (Spline-Aligned)
+            float dash = step(0.7, fract(vUv.x * 0.1)); // 10m intervals
+            float center = 1.0 - step(0.015, abs(vUv.y - 0.5));
+            totalEmissiveRadiance += vec3(0.8, 0.8, 0.8) * dash * center * 3.0;
+
+            // 3. Edge Stitch (Blend into terrain)
+            float edgeMask = smoothstep(0.5, 0.45, abs(vUv.y - 0.5));
+            diffuseColor.a *= edgeMask;
+
+            // 4. Exponential Height Fog (Drive Aesthetic)
+            float dist = length(vWorldPosition - cameraPosition);
+            float fogFactor = 1.0 - exp(-dist * 0.004);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.04, 0.04, 0.06), clamp(fogFactor, 0.0, 1.0));
             `
         );
     };
