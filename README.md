@@ -1,16 +1,17 @@
-# 🎬 Drive | Midnight Procedural Road
+# 🌌 Infinite Zen Driving
+### A Procedural Cinematic Experience
 
-A moody, restrained cinematic driving experience inspired by the 2011 film **DRIVE**. Explore an infinite, procedurally generated nocturnal landscape designed with a focus on atmosphere, lighting, and tension over arcade speed.
+Inspired by **Slow Roads** and the atmospheric minimalism of **Drive (2011)**. This is an endless, nocturnal journey through a vast procedural landscape, guided only by your headlights and the rhythm of the road.
 
-![Drive Aesthetic](https://img.shields.io/badge/Aesthetic-DRIVE_(2011)-black?style=for-the-badge)
+![Aesthetic](https://img.shields.io/badge/Aesthetic-DRIVE_(2011)-black?style=for-the-badge)
 ![Tech](https://img.shields.io/badge/Powered_by-Three.js-blueviolet?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Infinite_Zen-green?style=for-the-badge)
 
-## 🌌 Cinematic Vision
-This project deviates from typical "Neon" racing games. Instead, it captures the grit and isolation of a midnight drive through Los Angeles:
-- **Restrained Lighting**: Deep blacks and cold blue-grey environments contrasted by warm halogen headlights.
-- **Atmospheric Depth**: Procedural sodium-orange streetlights creating islands of warmth in a vast nocturnal void.
-- **Film Grain & Texture**: 35mm celluloid film grain and soft vignettes emulate a high-end cinematic experience.
-- **Documentary HUD**: A minimalist, low-profile text overlay replacing traditional arcade gauges.
+## 🎥 Cinematic Vision
+This project prioritizes **Atmosphere over Mechanics**. It captures the isolation of a midnight drive:
+- **Restrained Lighting**: 70-80% darkness. Deep black and indigo shadows contrasted by warm halogen highlights.
+- **Isolated Pools of Light**: Sparse sodium-orange streetlights creating islands of safety in the void.
+- **Zen Driving**: No timers, no crashes, no traffic. Just you and the infinite path.
 
 ## ⚙️ Technical Features
 - **Procedural Spline Generation**: High-performance CatmullRom splines create a smooth, infinite roadway that maps to a "Wet Look" asphalt material.
