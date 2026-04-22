@@ -17,67 +17,99 @@ body {
   position: relative;
 }
 
-/* 🎬 Start Screen */
+/* 🎬 Final Frontend Start Screen */
 #startScreen {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at center, #0a0a0f, #000);
-  background-size: 150% 150%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  transition: opacity 1s ease, transform 1s ease;
   z-index: 100;
   cursor: pointer;
-  animation: 
-    slowDrift 10s ease-in-out infinite alternate,
-    drift 12s ease-in-out infinite alternate;
+  transition: opacity 1s ease;
+  overflow: hidden;
 }
 
-#startScreen:hover .start-text {
-  color: rgba(255, 255, 255, 0.9);
-  letter-spacing: 7px;
-  transition: all 0.3s ease;
+/* 🎥 Background Image */
+.bg {
+  position: absolute;
+  inset: 0;
+  background: url("/drive-bg.jpg") center/cover no-repeat;
+  filter: brightness(0.4) contrast(1.2) saturate(0.9);
+  transform: scale(1.05);
+  animation: drift 12s ease-in-out infinite alternate;
 }
 
-.splash-logo {
-  font-family: 'Caveat', cursive;
-  font-size: 8rem;
-  color: #fff;
+/* 🎬 Dark overlay (Cinematic Vignette) */
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.9));
+}
+
+/* 🎯 Content Layer */
+.content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  width: 100%;
+}
+
+/* 🔥 Iconic Drive Logo */
+#logo {
+  font-family: 'Brush Script MT', 'cursive';
+  font-size: 10rem;
+  color: #ff2d95;
+  text-shadow:
+    0 0 10px rgba(255, 45, 149, 0.8),
+    0 0 40px rgba(255, 45, 149, 0.4);
   margin: 0;
-  opacity: 0;
-  animation: 
-    logoReveal 1.2s ease forwards,
-    glowPulse 3s ease-in-out infinite;
+  animation: logoFadeIn 1.5s ease forwards;
 }
 
+/* Text Hierarchy */
 .start-text {
   margin-top: 20px;
-  font-size: 12px;
-  letter-spacing: 5px;
+  font-size: 14px;
+  letter-spacing: 6px;
   color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
-  backdrop-filter: blur(2px);
+  animation: pulse 2s infinite;
   opacity: 0;
-  animation: 
-    textReveal 1.5s ease forwards,
-    pulse 2s infinite;
+  animation: textFadeIn 2s ease forwards, pulse 2s infinite;
   animation-delay: 0.8s, 0s;
 }
 
 .controls-text {
   margin-top: 15px;
-  font-size: 0.65rem;
-  letter-spacing: 0.3rem;
-  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.7rem;
+  letter-spacing: 4px;
+  color: rgba(255, 255, 255, 0.4);
   text-transform: uppercase;
   opacity: 0;
-  animation: textReveal 1.5s ease forwards;
+  animation: textFadeIn 2.5s ease forwards;
   animation-delay: 1.2s;
 }
 
-/* 🎥 Vignette */
+@keyframes drift {
+  from { transform: scale(1.05) translateY(0); }
+  to { transform: scale(1.1) translateY(-15px); }
+}
+
+@keyframes logoFadeIn {
+  from { opacity: 0; filter: blur(8px); transform: translateY(10px); }
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+
+@keyframes textFadeIn {
+  to { opacity: 1; }
+}
+
+@keyframes pulse {
+  0%,100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* 🎥 Vignette & Scanlines preserved globally */
 body::after {
   content: "";
   position: fixed;
@@ -87,53 +119,17 @@ body::after {
   z-index: 50;
 }
 
-/* 📺 Scanlines */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.15; /* Subtle film texture */
+  opacity: 0.15;
   background:
     linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.1) 50%),
     linear-gradient(90deg, rgba(255,0,0,0.02), rgba(0,255,0,0.01), rgba(0,0,255,0.02));
   background-size: 100% 3px, 3px 100%;
   z-index: 60;
-}
-
-@keyframes drift {
-  from { transform: scale(1); }
-  to { transform: scale(1.02) translateY(-5px); }
-}
-
-@keyframes slowDrift {
-  from { background-position: center; }
-  to { background-position: 55% 45%; }
-}
-
-@keyframes logoReveal {
-  from { opacity: 0; filter: blur(8px); transform: translateY(10px); }
-  to { opacity: 1; filter: blur(0); transform: translateY(0); }
-}
-
-@keyframes textReveal {
-  to { opacity: 1; }
-}
-
-@keyframes glowPulse {
-  0%, 100% {
-    filter: drop-shadow(0 0 12px rgba(255, 45, 149, 0.5))
-            drop-shadow(0 0 30px rgba(255, 45, 149, 0.2));
-  }
-  50% {
-    filter: drop-shadow(0 0 18px rgba(255, 45, 149, 0.8))
-            drop-shadow(0 0 50px rgba(255, 45, 149, 0.4));
-  }
-}
-
-@keyframes pulse {
-  0%,100% { opacity: 0.4; }
-  50% { opacity: 1; }
 }
 
 canvas {

@@ -74,14 +74,13 @@ async function bootstrap() {
     }
 
     startScreen?.addEventListener('click', () => {
-        // AUDIO-VISUAL SYNC: Delay ignition to match visual fade
+        // AUDIO-VISUAL SYNC: Cinematic ignition
         setTimeout(() => {
             playAudio();
         }, 200);
 
         if (startScreen) {
             startScreen.style.opacity = '0';
-            startScreen.style.transform = 'scale(1.05)'; // Cinematic zoom-cut
         }
 
         setTimeout(() => {
