@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Noise } from '../utils/Noise';
 import { PropManager } from './PropManager';
 import { createRoadMaterial } from '../utils/RoadMaterial';
+import { CONFIG } from '../config';
 
 export class RoadManager {
   private roadGroup: THREE.Group;
@@ -11,9 +12,9 @@ export class RoadManager {
   private points: THREE.Vector3[] = [];
   private tunnelChunks: Set<number> = new Set();
   private chunks: Map<number, THREE.Mesh> = new Map();
-  private chunkSize: number = 100; // units
-  private roadWidth: number = 10;
-  private renderDistance: number = 5; // chunks
+  private chunkSize: number = CONFIG.ROAD.CHUNK_SIZE;
+  private roadWidth: number = CONFIG.ROAD.WIDTH;
+  private renderDistance: number = CONFIG.ROAD.RENDER_DISTANCE;
   
   private spline: THREE.CatmullRomCurve3 | null = null;
   private propManager: PropManager;
