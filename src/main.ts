@@ -60,21 +60,22 @@ async function bootstrap() {
         }
     });
 
-    const splash = document.getElementById('splash');
+    const startBtn = document.getElementById('splash');
     const hud = document.getElementById('hud');
-    const bgm = new Audio('/bgm.webm');
-    bgm.loop = true;
-    bgm.volume = 0.6;
 
-    if (splash) {
-        splash.addEventListener('click', () => {
-            splash.classList.add('hidden');
-            if (hud) hud.style.display = 'block';
-            
-            // Start BGM on user interaction
-            bgm.play().catch(e => console.error("BGM Play Failed:", e));
-        });
-    }
+    startBtn?.addEventListener('click', () => {
+        // AUDIO IGNITION: Low-frequency Engine Drone
+        const bgm = new Audio('bgm.webm');
+        bgm.loop = true;
+        bgm.volume = 0.6;
+        bgm.play().catch(e => console.warn("Audio ignition failed:", e));
+
+        startBtn.classList.add('hidden');
+        if (hud) {
+            hud.style.display = 'block';
+            hud.classList.add('visible');
+        }
+    });
 
     window.addEventListener('keydown', (e) => {
         if (e.key.toLowerCase() === 'a') {

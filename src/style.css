@@ -110,3 +110,27 @@ canvas {
   pointer-events: none;
   opacity: 0;
 }
+
+/* KINETIC GRAIN: Dynamic Reaction to Sodium Lighting */
+#app::after {
+  content: "";
+  position: fixed;
+  top: -100%;
+  left: -100%;
+  width: 300%;
+  height: 300%;
+  background-image: url('https://grainy-gradients.vercel.app/noise.svg');
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 10;
+  animation: noise 0.2s infinite steps(4);
+  mix-blend-mode: overlay; /* Reacts to lighting */
+}
+
+@keyframes noise {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(1%, 1%); }
+  50% { transform: translate(-1%, -1%); }
+  75% { transform: translate(1%, -1%); }
+  100% { transform: translate(0, 0); }
+}

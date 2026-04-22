@@ -332,12 +332,14 @@ export class RoadManager {
         indigoLight.position.copy(streetLight.position).add(new THREE.Vector3(0, 2, 0));
         chunkGroup.add(indigoLight);
 
-        // Pole
+        // Pole: Hazy Incandescent Glow
         const poleGeo = new THREE.BoxGeometry(0.4, 15, 0.4);
         const poleMat = new THREE.MeshStandardMaterial({ 
             color: 0x111111,
             emissive: sodiumColor,
-            emissiveIntensity: 3.0 
+            emissiveIntensity: 3.0,
+            transparent: true,
+            opacity: 0.9 // Slight haze
         });
         const pole = new THREE.Mesh(poleGeo, poleMat);
         pole.position.copy(streetLight.position).sub(new THREE.Vector3(0, 7.5, 0));
