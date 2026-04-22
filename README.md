@@ -1,4 +1,4 @@
-# 🌌 Infinite Zen Driving
+# 🌌 Drive 
 ### A Procedural Cinematic Experience
 
 Inspired by **Slow Roads** and the atmospheric minimalism of **Drive (2011)**. This is an endless, nocturnal journey through a vast procedural landscape, guided only by your headlights and the rhythm of the road.
@@ -51,4 +51,4 @@ This project prioritizes **Atmosphere over Mechanics**. It captures the isolatio
 Currently tuned for **Visual Immersion**. The system is optimized for a 1.8 exposure/0.006 fog density ratio to maintain visibility while preserving the deep nocturnal mood.
 
 ---
-*Created with focus on visual excellence and cinematic restraint.*
+*Its litrelly me.*
