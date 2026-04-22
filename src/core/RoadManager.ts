@@ -9,9 +9,9 @@ export class RoadManager {
   
   private points: THREE.Vector3[] = [];
   private chunks: Map<number, THREE.Group> = new Map();
-  private chunkSize: number = CONFIG.ROAD.CHUNK_SIZE;
+  private chunkSize: number = 20;
   private roadWidth: number = CONFIG.ROAD.WIDTH;
-  private renderDistance: number = CONFIG.ROAD.RENDER_DISTANCE;
+  private renderDistance: number = 15;
   
   private spline: THREE.CatmullRomCurve3 | null = null;
   private roadMaterial: THREE.MeshStandardMaterial;
@@ -36,12 +36,11 @@ export class RoadManager {
       metalness: 0
     });
 
-    this.points.push(new THREE.Vector3(0, 0, -100));
-    this.points.push(new THREE.Vector3(0, 0, 0));
-    this.points.push(new THREE.Vector3(0, 0, 100));
+    this.points.push(new THREE.Vector3(0, this.noise.get(0, -20, 4, 0.5, 0.005) * 50, -20));
+    this.points.push(new THREE.Vector3(0, this.noise.get(0, 0, 4, 0.5, 0.005) * 50, 0));
+    this.points.push(new THREE.Vector3(0, this.noise.get(0, 20, 4, 0.5, 0.005) * 50, 20));
     
-    this.generateMorePoints(10);
-    this.updateSpline();
+    this.generateMorePoints(50);
   }
 
   private generateMorePoints(count: number) {
@@ -59,6 +58,7 @@ export class RoadManager {
             .normalize();
 
         const newPoint = lastPoint.clone().add(newDir.multiplyScalar(this.chunkSize));
+        newPoint.y = this.noise.get(newPoint.x, newPoint.z, 4, 0.5, 0.005) * 50;
         this.points.push(newPoint);
         lastPoint = newPoint;
         lastDir = newDir;
@@ -66,13 +66,11 @@ export class RoadManager {
   }
 
   private updateSpline() {
-    this.spline = new THREE.CatmullRomCurve3(this.points);
+    // No longer using global spline for meshes
   }
 
   public getRoadHeight(_x: number, z: number): number {
-    if (!this.spline) return 0;
-    const t = THREE.MathUtils.clamp((z + 100) / (this.points.length * this.chunkSize), 0, 1);
-    return this.spline.getPointAt(t).y;
+    return this.noise.get(_x, z, 4, 0.5, 0.005) * 50;
   }
 
   public update(playerZ: number) {
@@ -98,16 +96,27 @@ export class RoadManager {
   }
 
   private createChunkMesh(index: number) {
-    const startT = (index * this.chunkSize) / (this.points.length * this.chunkSize);
-    const endT = ((index + 1) * this.chunkSize) / (this.points.length * this.chunkSize);
-    
-    const segmentPoints: THREE.Vector3[] = [];
-    for (let i = 0; i <= 20; i++) {
-        segmentPoints.push(this.spline!.getPointAt(THREE.MathUtils.clamp(startT + (endT - startT) * (i / 20), 0, 1)));
-    }
+    if (index < 0 || index >= this.points.length - 1) return;
 
-    const curve = new THREE.CatmullRomCurve3(segmentPoints);
-    const geometry = new THREE.TubeGeometry(curve, 20, this.roadWidth / 2, 8, false);
+    // Use local points for stable curve generation
+    const p0 = this.points[Math.max(0, index - 1)];
+    const p1 = this.points[index];
+    const p2 = this.points[index + 1];
+    const p3 = this.points[Math.min(this.points.length - 1, index + 2)];
+
+    const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3]);
+    // The segment between p1 and p2 is roughly t=1/3 to t=2/3 in a 4-point curve if distances are equal.
+    // However, an easier way is to just create a curve from p1 to p2 and use start/end tangents.
+    // Three.js CatmullRomCurve3 maps t=0 to the first point and t=1 to the last point, but if we want 
+    // the segment between p1 and p2, we evaluate from t=1/3 to t=2/3.
+    // Actually, to make it perfectly align, we extract the segment points:
+    const segmentPoints: THREE.Vector3[] = [];
+    for (let i = 0; i <= 10; i++) {
+        segmentPoints.push(curve.getPoint(1/3 + (i/10) * (1/3)));
+    }
+    
+    const localCurve = new THREE.CatmullRomCurve3(segmentPoints);
+    const geometry = new THREE.TubeGeometry(localCurve, 10, this.roadWidth / 2, 8, false);
     const roadMesh = new THREE.Mesh(geometry, this.roadMaterial);
     roadMesh.scale.y = 0.02; // Flatten to ribbon
     roadMesh.receiveShadow = true;
@@ -116,7 +125,7 @@ export class RoadManager {
     chunkGroup.add(roadMesh);
 
     // Center Marking
-    const markingGeo = new THREE.TubeGeometry(curve, 20, 0.15, 8, false);
+    const markingGeo = new THREE.TubeGeometry(localCurve, 10, 0.15, 8, false);
     const markingMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       emissive: 0xffffff,
@@ -128,8 +137,8 @@ export class RoadManager {
     chunkGroup.add(marking);
 
     // Sodium Streetlights
-    if (index % 1 === 0) {
-        const lightPos = this.spline!.getPointAt(THREE.MathUtils.clamp(startT + (endT - startT) * 0.5, 0, 1));
+    if (index % 5 === 0) { // Every 5 chunks (100 units)
+        const lightPos = localCurve.getPoint(0.5);
         const light = new THREE.PointLight(0xff6a00, 1.5, 80, 2);
         light.position.copy(lightPos).add(new THREE.Vector3(8, 8, 0));
         chunkGroup.add(light);
@@ -142,13 +151,7 @@ export class RoadManager {
         chunkGroup.add(pole);
     }
 
-    // Terrain Background
-    const terrainGeo = new THREE.PlaneGeometry(1000, this.chunkSize, 2, 2);
-    const terrain = new THREE.Mesh(terrainGeo, this.terrainMaterial);
-    terrain.rotation.x = -Math.PI / 2;
-    terrain.position.copy(this.spline!.getPointAt(THREE.MathUtils.clamp(startT + (endT - startT) * 0.5, 0, 1)));
-    terrain.position.y -= 0.1;
-    chunkGroup.add(terrain);
+    // Removed flat terrain plane to prevent clipping with WorldManager procedural terrain
 
     this.roadGroup.add(chunkGroup);
     this.chunks.set(index, chunkGroup);
