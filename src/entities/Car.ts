@@ -44,17 +44,21 @@ export class Car {
   private attachLights() {
     const headlightColor = 0xFFD700; // Drive 2011 Warm Amber
     const createHeadlight = (x: number) => {
-      // Penumbra 0.5 for realistic feathered beams
-      const spot = new THREE.SpotLight(headlightColor, 3000, 200, 0.7, 0.5, 1.0);
-      spot.position.set(x, 0.6, 2.1);
+      // Shift forward 2 units (z=4.1) to decouple from body
+      const spot = new THREE.SpotLight(headlightColor, 2000, 200, 0.6, 0.8, 1.0);
+      spot.position.set(x, 0.6, 4.1);
+      spot.castShadow = true;
+      spot.shadow.mapSize.width = 1024;
+      spot.shadow.mapSize.height = 1024;
+
       const target = new THREE.Object3D();
-      target.position.set(x, -0.5, 50);
+      target.position.set(x, -0.5, 60);
       this.mesh.add(target);
       spot.target = target;
       this.mesh.add(spot);
 
-      const glow = new THREE.PointLight(headlightColor, 80, 15, 1.0);
-      glow.position.set(x, 0.6, 2.1);
+      const glow = new THREE.PointLight(headlightColor, 40, 15, 1.0);
+      glow.position.set(x, 0.6, 4.1);
       this.mesh.add(glow);
     };
     createHeadlight(0.8);
@@ -125,22 +129,22 @@ export class Car {
   }
 
   public getCameraTransform() {
-    // Cinematic Driver Camera: Higher and further back for better perspective
+    // Focused Chase Camera: 7m behind, 2.5m above
     const time = Date.now() * 0.01;
     const shake = new THREE.Vector3(
-        Math.sin(time * 0.7) * 0.04,
-        Math.cos(time * 0.8) * 0.04,
+        Math.sin(time * 0.7) * 0.02,
+        Math.cos(time * 0.8) * 0.02,
         0
     );
 
     const offset = new THREE.Vector3(
-        Math.sin(this.angle) * -18, 
-        5.5, 
-        Math.cos(this.angle) * -18
+        Math.sin(this.angle) * -7, 
+        2.5, 
+        Math.cos(this.angle) * -7
     ).add(shake);
 
     const lookTarget = this.mesh.position.clone().add(
-        new THREE.Vector3(Math.sin(this.angle) * 15, 1.2, Math.cos(this.angle) * 15)
+        new THREE.Vector3(Math.sin(this.angle) * 20, 1.0, Math.cos(this.angle) * 20)
     );
     
     return { position: this.mesh.position.clone().add(offset), lookTarget };

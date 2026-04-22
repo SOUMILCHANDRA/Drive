@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { EffectComposer, RenderPass, UnrealBloomPass, ShaderPass } from 'three-stdlib';
+import { EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, AfterimagePass } from 'three-stdlib';
 
 export class Engine {
   public scene: THREE.Scene;
@@ -19,7 +19,10 @@ export class Engine {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.5;
+    this.renderer.toneMappingExposure = 1.2;
+    this.renderer.shadowMap.enabled = true; // Enable Cinematic Shadows
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
     document.getElementById('app')?.appendChild(this.renderer.domElement);
 
     this.clock = new THREE.Clock();
@@ -29,7 +32,6 @@ export class Engine {
   }
 
   private setupLights() {
-    // 1. MOONLIGHT: Deep Indigo (#050510) Rim Light
     const moonlight = new THREE.DirectionalLight(0x050510, 0.1);
     moonlight.position.set(0, 100, -200);
     this.scene.add(moonlight);
@@ -43,7 +45,11 @@ export class Engine {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-    // High Strength (1.5), Sharp Radius (0.4) for "Neon Gems"
+    // 1. AFTERIMAGE: Synthwave Trails (0.7 damp)
+    const afterimage = new AfterimagePass(0.7);
+    this.composer.addPass(afterimage);
+
+    // 2. SELECTIVE BLOOM
     const bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
         1.5, 0.4, 0.85
@@ -51,7 +57,40 @@ export class Engine {
     bloomPass.threshold = 0.1; 
     this.composer.addPass(bloomPass);
 
-    // 2. FILM GRAIN: 35mm Texture
+    // 3. VIGNETTE: Dark Indigo Tint
+    const vignetteShader = {
+        uniforms: {
+            "tDiffuse": { value: null },
+            "offset": { value: 1.0 },
+            "darkness": { value: 1.5 },
+            "color": { value: new THREE.Color(0x0a0a1f) }
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D tDiffuse;
+            uniform float offset;
+            uniform float darkness;
+            uniform vec3 color;
+            varying vec2 vUv;
+            void main() {
+                vec4 texel = texture2D(tDiffuse, vUv);
+                vec2 uv = (vUv - 0.5) * 2.0;
+                float dist = length(uv);
+                float vignette = smoothstep(offset, offset - 0.5, dist);
+                gl_FragColor = vec4(mix(color, texel.rgb, vignette), texel.a);
+            }
+        `
+    };
+    const vignettePass = new ShaderPass(vignetteShader);
+    this.composer.addPass(vignettePass);
+
+    // 4. FILM GRAIN
     const grainShader = {
         uniforms: {
             "tDiffuse": { value: null },

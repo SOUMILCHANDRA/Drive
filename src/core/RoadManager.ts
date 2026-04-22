@@ -203,11 +203,13 @@ export class RoadManager {
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
 
-    const roadMat = new THREE.MeshStandardMaterial({
+    const roadMat = new THREE.MeshPhysicalMaterial({
         color: 0x020205, 
-        roughness: 0.2,  // Glistening wet look
-        metalness: 0.6,  // Reflective asphalt
-        emissive: 0x010103, // 0.01 subtle felt boost
+        roughness: 0.1, 
+        metalness: 0.2,
+        clearcoat: 0.8, // High-gloss clearcoat for "Wet" look
+        reflectivity: 0.3, // Lower base reflectivity for sharper streaks
+        emissive: 0x010103,
         emissiveIntensity: 1.0,
         polygonOffset: true,
         polygonOffsetFactor: -1,
