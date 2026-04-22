@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Drive | Procedural Adventure</title>
+    <title>Drive | Night Drive</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,35 +21,11 @@
         </div>
       </div>
 
-      <!-- HUD Overlay (Initially hidden) -->
+      <!-- HUD Overlay (Minimal Documentary Style) -->
       <div id="hud" class="hud" style="display: none;">
-        <div class="hud-top">
-          <div class="title">Neon Drive</div>
-          <div class="stats">
-            <div class="stat-item">Distance: <span id="dist-val" class="stat-value">0</span> m</div>
-            <div class="stat-item">Elevation: <span id="elev-val" class="stat-value">0</span> m</div>
-          </div>
-        </div>
-        <div class="hud-bottom">
-          <div id="antigrav-warn" class="antigrav-indicator" style="display: none;">ANTI-GRAVITY</div>
-          
-          <div class="gauge-container">
-            <svg class="speed-gauge" viewBox="0 0 200 100">
-               <path class="gauge-bg" d="M 20 90 A 80 80 0 0 1 180 90" fill="none" stroke="#1a1a1a" stroke-width="10" />
-               <path id="gauge-fill" class="gauge-fill" d="M 20 90 A 80 80 0 0 1 180 90" fill="none" stroke="#00f3ff" stroke-width="10" stroke-dasharray="251" stroke-dashoffset="251" />
-            </svg>
-            <div class="speedometer">
-              <span id="speed-val" class="speed-value">0</span>
-              <span class="speed-unit">km/h</span>
-            </div>
-          </div>
-
-          <div class="boost-container">
-            <div class="boost-label">BOOST</div>
-            <div class="boost-bar-bg">
-              <div id="boost-fill" class="boost-bar-fill"></div>
-            </div>
-          </div>
+        <div class="hud-content">
+          <div class="hud-item">KM/H: <span id="speed-val">0</span></div>
+          <div class="hud-item">DIST: <span id="dist-val">0</span>M</div>
         </div>
       </div>
     </div>
