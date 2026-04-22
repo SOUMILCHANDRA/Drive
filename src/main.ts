@@ -9,7 +9,7 @@ import { TerrainManager } from './core/TerrainManager';
 console.log("Drive: PHASE 1 RECONSTRUCTION - INFINITE RUNNER LOOP");
 
 // EMERGENCY DEBUG: Display errors on screen if black
-window.onerror = function(msg, url, line, col, error) {
+window.onerror = function(msg, _url, line, col, error) {
     const debug = document.createElement('div');
     debug.style.position = 'fixed';
     debug.style.top = '0';
