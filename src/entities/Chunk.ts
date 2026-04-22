@@ -9,7 +9,7 @@ export class Chunk {
   public x: number;
   public z: number;
 
-  constructor(x: number, z: number, size: number, noise: Noise, getRoadX?: (z: number) => number) {
+  constructor(x: number, z: number, size: number, noise: Noise, getRoadX?: (z: number) => number, getRoadHeight?: (x: number, z: number) => number) {
     this.x = x;
     this.z = z;
     this.size = size;
@@ -38,8 +38,9 @@ export class Chunk {
       const t = Math.min(Math.max((distToRoad - roadWidth / 2) / carveRadius, 0), 1);
       const carveFactor = 1.0 - (t * t * (3 - 2 * t)); // Smoothstep(0, 1, t) inverted
       
-      const roadHeight = noise.fbm(roadX, vz, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
-      const h = THREE.MathUtils.lerp(noiseH, roadHeight, carveFactor);
+      // MASTER FIX: Use the actual smoothed spline height
+      const targetHeight = getRoadHeight ? getRoadHeight(roadX, vz) : noiseH;
+      const h = THREE.MathUtils.lerp(noiseH, targetHeight, carveFactor);
 
       vertices[i + 1] = h;
 

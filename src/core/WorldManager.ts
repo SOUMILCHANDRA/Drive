@@ -19,7 +19,7 @@ export class WorldManager {
     return this.noise;
   }
 
-  public update(playerPosition: THREE.Vector3, getRoadX?: (z: number) => number) {
+  public update(playerPosition: THREE.Vector3, getRoadX?: (z: number) => number, getRoadHeight?: (x: number, z: number) => number) {
     const pX = Math.floor(playerPosition.x / this.chunkSize);
     const pZ = Math.floor(playerPosition.z / this.chunkSize);
 
@@ -33,7 +33,7 @@ export class WorldManager {
         activeCoords.add(key);
 
         if (!this.chunks.has(key)) {
-          const chunk = new Chunk(cX, cZ, this.chunkSize, this.noise, getRoadX);
+          const chunk = new Chunk(cX, cZ, this.chunkSize, this.noise, getRoadX, getRoadHeight);
           this.chunks.set(key, chunk);
           this.scene.add(chunk.mesh);
 

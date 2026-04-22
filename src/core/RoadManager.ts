@@ -108,9 +108,15 @@ export class RoadManager {
     // No longer using global spline for meshes
   }
 
-  public getRoadHeight(x: number, z: number): number {
-    const planet = CONFIG.PLANETS.EARTH;
-    return this.noise.fbm(x, z, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
+  public getRoadHeight(_x: number, z: number): number {
+    // Return interpolated height from spline points for perfect terrain sync
+    const index = Math.floor((z + 20) / this.chunkSize);
+    if (index < 0 || index >= this.points.length - 1) return 0;
+    
+    const p1 = this.points[index];
+    const p2 = this.points[index + 1];
+    const t = (z - p1.z) / (p2.z - p1.z);
+    return THREE.MathUtils.lerp(p1.y, p2.y, THREE.MathUtils.clamp(t, 0, 1));
   }
 
   public getRoadX(z: number): number {

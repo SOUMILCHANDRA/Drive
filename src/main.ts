@@ -17,7 +17,7 @@ async function bootstrap() {
 
     engine.render((delta) => {
         // Core Logic
-        world.update(car.mesh.position, (z) => road.getRoadX(z));
+        world.update(car.mesh.position, (z) => road.getRoadX(z), (x, z) => road.getRoadHeight(x, z));
         road.update(car.mesh.position.z);
 
         // Physics
