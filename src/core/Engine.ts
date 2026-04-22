@@ -48,6 +48,11 @@ export class Engine {
     const ambient = new THREE.AmbientLight(0x0d0d2b, 0.05);
     this.scene.add(ambient);
 
+    // SILHOUETTE LIFT: High-angle Indigo light for car definition
+    const lift = new THREE.DirectionalLight(0x0a0a2e, 0.1);
+    lift.position.set(0, 100, 0);
+    this.scene.add(lift);
+
     const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.03);
     rimLight.position.set(100, 10, -100);
     this.scene.add(rimLight);

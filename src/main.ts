@@ -17,19 +17,26 @@ async function bootstrap() {
 
     let distance = 0;
     let autopilot = false; // Manual by default
+    let fixedTimeAccumulator = 0;
+    const fixedDelta = 1 / 60;
 
     engine.render((delta) => {
-        // Core Logic
-        world.update(car.mesh.position, (z) => road.getRoadX(z), (x, z) => road.getRoadHeight(x, z));
-        road.update(car.mesh.position.z);
-
-        // Physics
-        if (autopilot) {
-            const targetZ = car.mesh.position.z + car.velocityValue * delta;
-            const target = road.getAutopilotTarget(targetZ);
-            car.autopilot(target.x, target.z, target.angle, target.y);
-        } else {
-            car.update(delta, (x, z) => road.getRoadHeight(x, z));
+        fixedTimeAccumulator += delta;
+        
+        while (fixedTimeAccumulator >= fixedDelta) {
+            // FIXED PHYSICS UPDATE (60Hz)
+            world.update(car.mesh.position, (z) => road.getRoadX(z), (x, z) => road.getRoadHeight(x, z));
+            road.update(car.mesh.position.z);
+            
+            if (autopilot) {
+                const targetZ = car.mesh.position.z + car.velocityValue * fixedDelta;
+                const target = road.getAutopilotTarget(targetZ);
+                car.autopilot(target.x, target.z, target.angle, target.y);
+            } else {
+                car.update(fixedDelta, (x, z) => road.getRoadHeight(x, z));
+            }
+            
+            fixedTimeAccumulator -= fixedDelta;
         }
 
         // HUD & Stability Logging
@@ -42,10 +49,10 @@ async function bootstrap() {
         if (speedVal) speedVal.innerText = speedKmh.toString();
         if (distVal) distVal.innerText = Math.floor(distance).toString();
 
-        // Camera Stability Fix (Cinematic Glide)
+        // Spring-Arm Camera Follow (Interpolated)
         const cameraTarget = car.getCameraTransform();
         if (cameraTarget && !isNaN(cameraTarget.position.x)) {
-            engine.camera.position.lerp(cameraTarget.position, 0.05); // 0.05 for maximum glide
+            engine.camera.position.copy(cameraTarget.position); // Spring-arm handles damping
             engine.camera.lookAt(cameraTarget.lookTarget);
         } else {
             engine.camera.position.set(0, 15, 25);
