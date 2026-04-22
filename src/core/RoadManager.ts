@@ -9,7 +9,7 @@ export class RoadManager {
   
   private points: THREE.Vector3[] = [];
   private tunnelChunks: Set<number> = new Set();
-  private chunks: Map<number, THREE.Mesh> = new Map();
+  private chunks: Map<number, THREE.Group> = new Map();
   private chunkSize: number = CONFIG.ROAD.CHUNK_SIZE;
   private roadWidth: number = CONFIG.ROAD.WIDTH;
   private renderDistance: number = CONFIG.ROAD.RENDER_DISTANCE;
@@ -24,19 +24,19 @@ export class RoadManager {
     this.roadGroup = new THREE.Group();
     this.scene.add(this.roadGroup);
 
-    // DRIVE Aesthetic Materials: Wet asphalt & Matte dirt
+    // DRIVE Aesthetic Materials: Improved Readability
     this.roadMaterial = new THREE.MeshStandardMaterial({
       color: CONFIG.ROAD.COLOR,
-      roughness: 0.3,
-      metalness: 0.6,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.05 // Subtle sheen
+      roughness: CONFIG.ROAD.ROUGHNESS,
+      metalness: CONFIG.ROAD.METALNESS,
+      emissive: 0x0a0a0a // Baseline visibility
     });
 
     this.terrainMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0d0d0d,
-      roughness: 1.0,
-      metalness: 0
+      color: 0x141820,
+      roughness: 0.9,
+      metalness: 0,
+      emissive: 0x050505 // Baseline silhouette
     });
 
     this.points.push(new THREE.Vector3(0, 0, -50));
@@ -89,10 +89,10 @@ export class RoadManager {
         if (!this.chunks.has(index)) this.createChunkMesh(index);
     }
 
-    for (const [index, mesh] of this.chunks.entries()) {
+    for (const [index, group] of this.chunks.entries()) {
       if (index < currentChunkIndex - 2 || index > currentChunkIndex + this.renderDistance) {
-        this.roadGroup.remove(mesh);
-        mesh.children.forEach(c => {
+        this.roadGroup.remove(group);
+        group.children.forEach(c => {
           if (c instanceof THREE.Mesh) {
             c.geometry.dispose();
             (c.material as THREE.Material).dispose();
@@ -119,7 +119,7 @@ export class RoadManager {
 
     const curve = new THREE.CatmullRomCurve3(segmentPoints);
     const geometry = new THREE.TubeGeometry(curve, 10, this.roadWidth / 2, 2, false);
-    const roadMesh = new THREE.Mesh(geometry, this.roadMaterial.clone());
+    const roadMesh = new THREE.Mesh(geometry, this.roadMaterial);
     roadMesh.scale.y = 0.05;
     roadMesh.receiveShadow = true;
     
@@ -138,10 +138,15 @@ export class RoadManager {
     marking.position.y = 0.01;
     chunkGroup.add(marking);
 
-    // Roadside Streetlights (Sodium Orange every ~80m)
+    // Roadside Streetlights (Double Intensity vs previous)
     if (index % 1 === 0) {
         const lightPos = this.spline!.getPointAt(startT + (endT - startT) * 0.5);
-        const light = new THREE.PointLight(CONFIG.LIGHTING.STREETLIGHT_COLOR, CONFIG.LIGHTING.STREETLIGHT_INTENSITY, 25, 2);
+        const light = new THREE.PointLight(
+          CONFIG.LIGHTING.STREETLIGHT_COLOR, 
+          CONFIG.LIGHTING.STREETLIGHT_INTENSITY, 
+          CONFIG.LIGHTING.STREETLIGHT_DISTANCE, 
+          2
+        );
         light.position.copy(lightPos).add(new THREE.Vector3(8, 6, 0));
         chunkGroup.add(light);
         
@@ -153,21 +158,21 @@ export class RoadManager {
         chunkGroup.add(pole);
     }
 
-    // Terrain Silhouettes
-    const terrainGeo = new THREE.PlaneGeometry(200, this.chunkSize, 4, 4);
+    // Terrain Silhouettes (Visible Dark Blue-Grey)
+    const terrainGeo = new THREE.PlaneGeometry(300, this.chunkSize, 4, 4);
     const tL = new THREE.Mesh(terrainGeo, this.terrainMaterial);
     tL.rotation.x = -Math.PI / 2;
     tL.position.copy(this.spline!.getPointAt(startT + (endT - startT) * 0.5));
-    tL.position.x -= 110;
+    tL.position.x -= 150;
     chunkGroup.add(tL);
 
     const tR = tL.clone();
-    tR.position.x += 220;
+    tR.position.x += 300;
     chunkGroup.add(tR);
 
     this.roadGroup.add(chunkGroup);
-    this.chunks.set(index, chunkGroup as any);
+    this.chunks.set(index, chunkGroup);
   }
 
-  public isInTunnel() { return false; } // Removed for DRIVE aesthetic
+  public isInTunnel() { return false; }
 }
