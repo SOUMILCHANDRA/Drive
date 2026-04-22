@@ -4,6 +4,10 @@ import { PropManager } from './PropManager';
 import { createRoadMaterial } from '../utils/RoadMaterial';
 import { CONFIG } from '../config';
 
+/**
+ * RoadManager handles the procedural generation and maintenance of the road spline.
+ * It manages chunks of track and integrates anti-gravity logic.
+ */
 export class RoadManager {
   private roadGroup: THREE.Group;
   private scene: THREE.Scene;
