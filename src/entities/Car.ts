@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 RectAreaLightUniformsLib.init();
 
@@ -31,14 +32,47 @@ export class Car {
   private gravityDir: number = 1;
   
   private headlightTargets: THREE.Object3D[] = [];
+  
+  // Wheels for animation
+  private wheels: THREE.Object3D[] = [];
 
   constructor() {
     this.mesh = new THREE.Group();
-    this.createModel();
     this.setupInput();
   }
 
-  private createModel() {
+  public async init() {
+    try {
+      const loader = new GLTFLoader();
+      const gltf = await loader.loadAsync('/models/car/scene.gltf');
+      
+      const loadedModel = gltf.scene;
+      
+      // We assume the model needs scaling. The user can adjust if needed.
+      loadedModel.scale.set(0.8, 0.8, 0.8);
+      loadedModel.position.y = 0.3; // slightly lift it up
+      
+      // Setup shadows and find wheels
+      loadedModel.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+        // Very basic wheel detection by name, might need adjusting based on the specific Sketchfab model
+        if (child.name.toLowerCase().includes('wheel') || child.name.toLowerCase().includes('tire')) {
+            this.wheels.push(child);
+        }
+      });
+      
+      this.mesh.add(loadedModel);
+      this.attachLights();
+    } catch (e) {
+      console.warn("Could not load 3D model, falling back to procedural car.", e);
+      this.createProceduralModel();
+    }
+  }
+
+  private createProceduralModel() {
     // Body: Dark Charcoal Industrial Design
     const bodyGeometry = new THREE.BoxGeometry(2.1, 0.6, 4.2);
     const bodyMaterial = new THREE.MeshStandardMaterial({ 
@@ -64,7 +98,11 @@ export class Car {
     const cab = new THREE.Mesh(cabGeometry, cabMaterial);
     cab.position.set(0, 1.1, -0.4);
     this.mesh.add(cab);
+    
+    this.attachLights();
+  }
 
+  private attachLights() {
     // Halogen Headlights (Cinematic SpotLights with Spread)
     const headlightColor = CONFIG.CAR.HEADLIGHT_COLOR;
     const createHeadlightGroup = (x: number) => {
@@ -113,7 +151,7 @@ export class Car {
     this.mesh.add(createHeadlightGroup(-0.7));
 
     // Underglow (Chassis silhouette)
-    const underglow = new THREE.RectAreaLight(0x002233, 2, 2, 0.5);
+    const underglow = new THREE.RectAreaLight(0x002233, 150, 2, 0.5);
     underglow.position.set(0, -0.4, 0);
     underglow.rotation.x = -Math.PI / 2;
     this.mesh.add(underglow);
@@ -123,7 +161,7 @@ export class Car {
     const brakeMat = new THREE.MeshStandardMaterial({ 
       color: 0x550000, 
       emissive: 0xff0000, 
-      emissiveIntensity: 0.8 
+      emissiveIntensity: 10 
     });
     const b1 = new THREE.Mesh(brakeGeo, brakeMat);
     b1.position.set(0.7, 0.6, -2.1);
@@ -184,6 +222,14 @@ export class Car {
     this.velocity.z *= this.deceleration;
     if (this.velocity.z > this.maxSpeed) this.velocity.z = this.maxSpeed;
     if (this.velocity.z < -this.maxSpeed / 2) this.velocity.z = -this.maxSpeed / 2;
+    
+    // Rotate wheels based on velocity
+    if (this.wheels.length > 0) {
+        const wheelRotation = (this.velocity.z * delta) / 0.5; // Assumed radius of 0.5
+        this.wheels.forEach(wheel => {
+            wheel.rotation.x += wheelRotation; // Depending on model's axis
+        });
+    }
 
     this.mesh.rotation.y = this.angle;
     
@@ -194,7 +240,7 @@ export class Car {
     this.mesh.position.z += moveZ;
 
     this.gravityDir = THREE.MathUtils.lerp(this.gravityDir, this.isAntiGravity ? -1 : 1, 0.1);
-    const height = getHeight(this.mesh.position.x, this.mesh.position.z);
+    const height = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0); // clamp to 0 if under terrain
     const targetY = this.isAntiGravity ? height + 10 : height + 0.5;
     this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY, 0.1);
 
