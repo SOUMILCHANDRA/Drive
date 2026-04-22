@@ -28,8 +28,16 @@ export class RoadManager {
     this.segmentEnds.set(0, end);
   }
 
-  public getRoadHeight(x: number, z: number): number {
-    return 0.1;
+  public getRoadHeight(_x: number, z: number): number {
+    const index = Math.floor(z / this.segmentLength);
+    const start = this.segmentStarts.get(index);
+    const end = this.segmentEnds.get(index);
+    
+    if (!start || !end) return 0.1;
+
+    // Linear interpolation based on Z
+    const t = (z - start.z) / (end.z - start.z);
+    return THREE.MathUtils.lerp(start.y, end.y, t) + 0.1;
   }
 
   public update(playerZ: number) {
@@ -76,6 +84,16 @@ export class RoadManager {
     );
 
     const newDir = prevDir.clone().applyQuaternion(rotation);
+    
+    // Step 3: Add elevation (pitch)
+    const pitchNoise = this.noise.get(0, index * 10, 1, 0.5, 1);
+    const pitchAngle = (pitchNoise - 0.5) * 0.2;
+    const pitchRotation = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(1, 0, 0),
+        pitchAngle
+    );
+    newDir.applyQuaternion(pitchRotation);
+
     const newEnd = prevEnd.clone().add(newDir.clone().multiplyScalar(this.segmentLength));
 
     this.segmentStarts.set(index, prevEnd);
