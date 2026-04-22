@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { Chunk } from '../entities/Chunk';
 import { Noise } from '../utils/Noise';
-import { BiomeManager } from './BiomeManager';
-import { CityGenerator } from './CityGenerator';
 import { StructureLibrary } from '../entities/StructureLibrary';
 
 export class WorldManager {
@@ -39,9 +37,11 @@ export class WorldManager {
           this.chunks.set(key, chunk);
           this.scene.add(chunk.mesh);
 
+          /* 
           if (BiomeManager.getBiome(cZ) === 'LOWLANDS' && getRoadX) {
             CityGenerator.spawnCityRow(chunk.mesh as THREE.Group, cZ - this.chunkSize / 2, cZ + this.chunkSize / 2, getRoadX);
           }
+          */
 
           if (Math.random() > 0.98 && getRoadX) {
             const roadX = getRoadX(cZ);
