@@ -10,23 +10,13 @@ export class RoadManager {
   private points: THREE.Vector3[] = [];
   private chunks: Map<number, THREE.Group> = new Map();
   private chunkSize: number = 10;
-  private roadWidth: number = CONFIG.ROAD.WIDTH;
   private renderDistance: number = 60;
-  
-  private roadMaterial: THREE.MeshStandardMaterial;
 
   constructor(scene: THREE.Scene, noise: Noise) {
     this.scene = scene;
     this.noise = noise;
     this.roadGroup = new THREE.Group();
     this.scene.add(this.roadGroup);
-
-    this.roadMaterial = new THREE.MeshStandardMaterial({
-      color: 0xff00ff, // DEBUG MAGENTA
-      roughness: 0.4,
-      metalness: 0.3,
-      side: THREE.DoubleSide
-    });
 
     const planet = CONFIG.PLANETS.EARTH;
     const h0 = this.noise.fbm(0, -10, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
@@ -163,67 +153,48 @@ export class RoadManager {
     const p3 = this.points[Math.min(this.points.length - 1, index + 2)];
 
     const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3]);
-    // The segment between p1 and p2 is roughly t=1/3 to t=2/3 in a 4-point curve if distances are equal.
-    // However, an easier way is to just create a curve from p1 to p2 and use start/end tangents.
-    // Three.js CatmullRomCurve3 maps t=0 to the first point and t=1 to the last point, but if we want 
-    // the segment between p1 and p2, we evaluate from t=1/3 to t=2/3.
-    // Actually, to make it perfectly align, we extract the segment points:
     const segmentPoints: THREE.Vector3[] = [];
     for (let i = 0; i <= 10; i++) {
         segmentPoints.push(curve.getPoint(1/3 + (i/10) * (1/3)));
     }
     
-    const localCurve = new THREE.CatmullRomCurve3(segmentPoints);
-    const geometry = new THREE.TubeGeometry(localCurve, 10, this.roadWidth / 2, 8, false);
-    const roadMesh = new THREE.Mesh(geometry, this.roadMaterial);
-    roadMesh.scale.y = 0.02; // Flatten to ribbon
-    roadMesh.receiveShadow = true;
-    
     const chunkGroup = new THREE.Group();
-    chunkGroup.add(roadMesh);
 
-    // Center Marking
-    const markingGeo = new THREE.TubeGeometry(localCurve, 10, 0.15, 8, false);
-    const markingMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.5
-    });
-    const marking = new THREE.Mesh(markingGeo, markingMat);
-    marking.scale.y = 0.03;
-    marking.position.y = 0.01;
-    chunkGroup.add(marking);
+    // 1. GOLDEN PATH: Thin Yellow Centerline
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(segmentPoints);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0xffff00 });
+    const centerline = new THREE.Line(lineGeo, lineMat);
+    chunkGroup.add(centerline);
 
-    // Side Neon Markers (Reflective depth)
-    const addSideMarkers = (side: number, color: number) => {
-        const markerMat = new THREE.MeshStandardMaterial({
-            color: color,
-            emissive: color,
-            emissiveIntensity: 3.0
-        });
-        const markerGeo = new THREE.SphereGeometry(0.12, 8, 8);
-        for (let i = 0; i <= 2; i++) {
-            const p = localCurve.getPoint(i / 2);
-            const tangent = localCurve.getTangent(i / 2);
-            const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-            
-            const marker = new THREE.Mesh(markerGeo, markerMat);
-            marker.position.copy(p).add(normal.multiplyScalar(side * (this.roadWidth / 2 - 0.2)));
-            marker.position.y += 0.1;
-            chunkGroup.add(marker);
-        }
-    };
-    addSideMarkers(1, 0xFF2D95);  // Hot Pink
-    addSideMarkers(-1, 0x00E5FF); // Electric Blue
+    // 2. CYAN DOTS: Milestone Points
+    const dotGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+    
+    // 3. VECTOR VIZ: Red (Direction) and Green (Up)
+    for (let i = 0; i <= 2; i++) {
+        const t = i / 2;
+        const p = curve.getPoint(1/3 + t * (1/3));
+        const dir = curve.getTangent(1/3 + t * (1/3)).normalize();
+        const up = new THREE.Vector3(0, 1, 0);
 
-    // Streetlight poles removed for debug clarity
+        // Cyan Milestone
+        const dot = new THREE.Mesh(dotGeo, dotMat);
+        dot.position.copy(p);
+        chunkGroup.add(dot);
+
+        // Red Direction Arrow
+        const dirArrow = new THREE.ArrowHelper(dir, p, 2.5, 0xff0000);
+        chunkGroup.add(dirArrow);
+
+        // Green Up Arrow
+        const upArrow = new THREE.ArrowHelper(up, p, 1.5, 0x00ff00);
+        chunkGroup.add(upArrow);
+    }
+
     if (index % 10 === 0) { 
-        const lightPos = localCurve.getPoint(0.5);
-        const sideOffset = new THREE.Vector3(12, 0, 0); 
-        const poleWorldPos = lightPos.clone().add(sideOffset);
-        
+        const lightPos = curve.getPoint(0.5);
         const light = new THREE.PointLight(0xFFB347, 5.0, 100, 1.5);
-        light.position.set(poleWorldPos.x, lightPos.y + 12, poleWorldPos.z);
+        light.position.set(lightPos.x + 12, lightPos.y + 12, lightPos.z);
         chunkGroup.add(light);
     }
 
