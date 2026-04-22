@@ -60,21 +60,30 @@ async function bootstrap() {
         }
     });
 
-    const startBtn = document.getElementById('splash');
+    let audioStarted = false;
+    const startScreen = document.getElementById('startScreen');
     const hud = document.getElementById('hud');
 
-    startBtn?.addEventListener('click', () => {
-        // AUDIO IGNITION: Low-frequency Engine Drone
-        const bgm = new Audio('bgm.webm');
-        bgm.loop = true;
-        bgm.volume = 0.6;
-        bgm.play().catch(e => console.warn("Audio ignition failed:", e));
+    function playAudio() {
+        if (audioStarted) return;
+        const audio = new Audio('bgm.webm'); // Fallback to verified file
+        audio.loop = true;
+        audio.volume = 0.5;
+        audio.play().catch(e => console.warn("Audio ignition failed:", e));
+        audioStarted = true;
+    }
 
-        startBtn.classList.add('hidden');
-        if (hud) {
-            hud.style.display = 'block';
-            hud.classList.add('visible');
-        }
+    startScreen?.addEventListener('click', () => {
+        playAudio();
+        if (startScreen) startScreen.style.opacity = '0';
+
+        setTimeout(() => {
+            if (startScreen) startScreen.style.display = 'none';
+            if (hud) {
+                hud.style.display = 'block';
+                hud.classList.add('visible');
+            }
+        }, 1000);
     });
 
     window.addEventListener('keydown', (e) => {

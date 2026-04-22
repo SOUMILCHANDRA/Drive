@@ -14,8 +14,8 @@ export class Engine {
 
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0a0f); // Drive 2011 Near-Black
-    this.scene.fog = new THREE.FogExp2(0x050508, 0.01); 
+    this.scene.background = new THREE.Color(0x050508);
+    this.scene.fog = new THREE.Fog(0x0a0a0f, 20, 120); 
     
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
     
