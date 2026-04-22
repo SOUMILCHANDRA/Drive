@@ -44,8 +44,8 @@ export class Engine {
     moonlight.position.set(0, 100, -200);
     this.scene.add(moonlight);
 
-    // MOUNTAIN PRESENCE: Blue Hour Ambient (0.08)
-    const ambient = new THREE.AmbientLight(0x0a0a2e, 0.08);
+    // MOUNTAIN PRESENCE: Blue Hour Fill (0.05)
+    const ambient = new THREE.AmbientLight(0x0d0d2b, 0.05);
     this.scene.add(ambient);
 
     const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.03);
