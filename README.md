@@ -18,6 +18,9 @@ This project prioritizes **Atmosphere over Mechanics**. It captures the isolatio
 - **Planetary fBM Noise**: Layered Fractal Brownian Motion with deterministic parameters for **Earth, Mars, and Moon** geologies.
 - **Conforming Terrain System**: A master-spline link that physically deforms mountain geometry to meet the road via **Smoothstep Carving**.
 - **Deterministic Seed (Alea)**: High-performance PRNG ensuring every world is reproducible from a single seed.
+- **Rhythmic Sodium Lighting**: Warm orange streetlights (#FF9500) spawned every 50m with volumetric gradients and Indigo rim-lights to reveal mountain silhouettes.
+- **High-Gloss "Wet" Asphalt**: Advanced MeshPhysicalMaterial with 0.8 Clearcoat and 0.7 Metalness, creating sharp specular streaks from the rhythmic streetlights.
+- **Cinematic Cockpit Rig**: A tight, lower camera perspective (4.5m behind, 1.8m above) designed to emphasize the sense of scale and the strobe-like effect of overhead lights.
 - **Treadmill LOD System**: High-detail near-player chunks with large-scale low-detail far grids for infinite visibility.
 
 ## 🕹️ Controls
