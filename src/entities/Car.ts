@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 RectAreaLightUniformsLib.init();
 
@@ -44,19 +45,30 @@ export class Car {
   public async init() {
     try {
       const loader = new GLTFLoader();
-      const gltf = await loader.loadAsync('/models/car/scene.gltf');
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/libs/draco/');
+      loader.setDRACOLoader(dracoLoader);
       
+      const gltf = await loader.loadAsync('/models/car/car.glb');
       const loadedModel = gltf.scene;
       
-      // We assume the model needs scaling. The user can adjust if needed.
-      loadedModel.scale.set(0.8, 0.8, 0.8);
-      loadedModel.position.y = 0.3; // slightly lift it up
+      // Chevelle SS 454 specific scaling/alignment
+      loadedModel.scale.set(1.8, 1.8, 1.8); // Slightly larger for visibility
+      loadedModel.rotation.y = Math.PI; 
+      loadedModel.position.y = 0.25; 
+      loadedModel.position.z = 0; 
       
       // Setup shadows and find wheels
       loadedModel.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           child.castShadow = true;
           child.receiveShadow = true;
+          // Ensure material is not too dark/transparent
+          const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+          if (m) {
+            m.roughness = Math.max(m.roughness, 0.3);
+            m.metalness = Math.min(m.metalness, 0.8);
+          }
         }
         // Very basic wheel detection by name, might need adjusting based on the specific Sketchfab model
         if (child.name.toLowerCase().includes('wheel') || child.name.toLowerCase().includes('tire')) {
@@ -65,9 +77,10 @@ export class Car {
       });
       
       this.mesh.add(loadedModel);
+      console.log("Drive: 1970 Chevelle SS 454 Model Loaded Successfully");
       this.attachLights();
     } catch (e) {
-      console.warn("Could not load 3D model, falling back to procedural car.", e);
+      console.warn("Drive: Model not found at /models/car/car.glb, using procedural fallback.", e);
       this.createProceduralModel();
     }
   }
@@ -76,14 +89,19 @@ export class Car {
     // Body: Dark Charcoal Industrial Design
     const bodyGeometry = new THREE.BoxGeometry(2.1, 0.6, 4.2);
     const bodyMaterial = new THREE.MeshStandardMaterial({ 
-      color: CONFIG.CAR.BODY_COLOR,
+      color: 0x111111,
       metalness: 0.9,
-      roughness: 0.25
+      roughness: 0.2
     });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.castShadow = true;
     body.position.y = 0.5;
     this.mesh.add(body);
+    
+    // Aesthetic spoiler
+    const spoiler = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.1, 0.4), bodyMaterial);
+    spoiler.position.set(0, 0.8, -1.8);
+    this.mesh.add(spoiler);
 
     // Windshield: Physical/Translucent
     const cabGeometry = new THREE.BoxGeometry(1.6, 0.7, 1.8);
