@@ -17,7 +17,13 @@ body {
   position: relative;
 }
 
-/* 🎬 Cinematic Start Screen (Halo Polish) */
+/* 
+ * 🎬 Cinematic Start Screen (Halo Polish) 
+ * Design Philosophy:
+ * - Asymmetry: Left-weighted UI balances the right-weighted vehicle subject.
+ * - Asymptotic Drift: Slow horizontal translation simulates an 'alive' camera breathing.
+ * - Neon Realism: White core + pink halo drop-shadows emulate gas-discharge light spill.
+ */
 #startScreen {
   position: fixed;
   inset: 0;
