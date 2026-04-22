@@ -166,41 +166,100 @@ export class RoadManager {
     const p3 = this.points[Math.min(this.points.length - 1, index + 2)];
 
     const curve = new THREE.CatmullRomCurve3([p0, p1, p2, p3]);
-    const segmentPoints: THREE.Vector3[] = [];
-    for (let i = 0; i <= 10; i++) {
-        segmentPoints.push(curve.getPoint(1/3 + (i/10) * (1/3)));
+    const segments = 20;
+    const width = 14;
+    
+    // 1. CUSTOM RIBBON GEOMETRY: Spline-Space UVs
+    const geometry = new THREE.BufferGeometry();
+    const vertices: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+
+    for (let i = 0; i <= segments; i++) {
+        const t = 1/3 + (i / segments) * (1/3);
+        const pos = curve.getPoint(t);
+        const tangent = curve.getTangent(t).normalize();
+        const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+        // Left and Right vertices
+        const left = pos.clone().add(normal.clone().multiplyScalar(-width / 2));
+        const right = pos.clone().add(normal.clone().multiplyScalar(width / 2));
+
+        vertices.push(left.x, left.y, left.z, right.x, right.y, right.z);
+        
+        // UVs: U = distance along spline, V = across (-1 to 1)
+        const u = (index * this.chunkSize) + (i / segments) * this.chunkSize;
+        uvs.push(u, 0, u, 1);
+
+        if (i < segments) {
+            const base = i * 2;
+            indices.push(base, base + 1, base + 2);
+            indices.push(base + 1, base + 3, base + 2);
+        }
     }
+
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+
+    const roadMat = new THREE.MeshStandardMaterial({
+        color: 0x111111,
+        roughness: 0.7,
+        metalness: 0.3,
+        emissive: 0x00ffff,
+        emissiveIntensity: 0.1,
+    });
+
+    roadMat.onBeforeCompile = (shader) => {
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <common>',
+            `
+            #include <common>
+            varying vec2 vUv;
+            `
+        );
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <common>',
+            `
+            #include <common>
+            varying vec2 vUv;
+            `
+        ).replace(
+            '#include <uv_vertex>',
+            `
+            #include <uv_vertex>
+            vUv = uv;
+            `
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <emissivemap_fragment>',
+            `
+            #include <emissivemap_fragment>
+            
+            // 1. Center Dash Lines
+            float dash = step(0.9, fract(vUv.x * 0.2)); // 5m dashes
+            float center = 1.0 - step(0.02, abs(vUv.y - 0.5));
+            totalEmissiveRadiance += vec3(1.0) * dash * center * 2.0;
+
+            // 2. Edge Glow (Slow Roads Style)
+            float edge = step(0.95, abs(vUv.y - 0.5) * 2.0);
+            totalEmissiveRadiance += vec3(0.0, 0.9, 1.0) * edge * 1.5;
+            `
+        );
+    };
+
+    const roadMesh = new THREE.Mesh(geometry, roadMat);
+    roadMesh.receiveShadow = true;
     
     const chunkGroup = new THREE.Group();
+    chunkGroup.add(roadMesh);
 
-    // 1. GOLDEN PATH: Thin Yellow Centerline
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(segmentPoints);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0xffff00 });
-    const centerline = new THREE.Line(lineGeo, lineMat);
-    chunkGroup.add(centerline);
-
-    // 2. CYAN DOTS: Milestone Points
-    const dotGeo = new THREE.SphereGeometry(0.1, 8, 8);
-    const dotMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-    
-    // 3. VECTOR VIZ: Red (Direction) and Green (Up)
+    // 2. VECTOR VIZ: Keep for math confirmation
     for (let i = 0; i <= 2; i++) {
-        const t = i / 2;
-        const p = curve.getPoint(1/3 + t * (1/3));
-        const dir = curve.getTangent(1/3 + t * (1/3)).normalize();
-        const up = new THREE.Vector3(0, 1, 0);
-
-        // Cyan Milestone
-        const dot = new THREE.Mesh(dotGeo, dotMat);
-        dot.position.copy(p);
-        chunkGroup.add(dot);
-
-        // Red Direction Arrow
-        const dirArrow = new THREE.ArrowHelper(dir, p, 2.5, 0xff0000);
-        chunkGroup.add(dirArrow);
-
-        // Green Up Arrow
-        const upArrow = new THREE.ArrowHelper(up, p, 1.5, 0x00ff00);
+        const t = 1/3 + (i / 2) * (1/3);
+        const p = curve.getPoint(t);
+        const upArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), p, 1.5, 0x00ff00);
         chunkGroup.add(upArrow);
     }
 
