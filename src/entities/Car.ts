@@ -4,6 +4,10 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 
 RectAreaLightUniformsLib.init();
 
+/**
+ * Represents the player vehicle with cinematic physics and camera logic.
+ * Implements vintage suspension bobbing and stable spline-based grounding.
+ */
 export class Car {
   public mesh: THREE.Group;
   public velocity: THREE.Vector3 = new THREE.Vector3();
@@ -82,6 +86,11 @@ export class Car {
     return this.velocity.z;
   }
 
+  /**
+   * Main update loop for manual driving.
+   * @param delta Frame delta time
+   * @param getHeight Function to sample road height at current X, Z
+   */
   public update(delta: number, getHeight: (x: number, z: number) => number) {
     const isBraking = this.keys['s'] || this.keys['arrowdown'];
     this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 5 : 1.5);
@@ -115,6 +124,9 @@ export class Car {
     this.normal.set(0, 1, 0);
   }
 
+  /**
+   * Logic for autonomous spline following.
+   */
   public autopilot(targetX: number, targetZ: number, targetAngle: number, targetY: number) {
     this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, targetX, 0.1);
     this.mesh.position.z = targetZ;
@@ -126,6 +138,10 @@ export class Car {
     this.mesh.rotation.y = this.angle;
   }
 
+  /**
+   * Calculates the camera's world position and look-at target based on vehicle state.
+   * @returns { position: Vector3, lookTarget: Vector3 }
+   */
   public getCameraTransform() {
     // Cinematic Cockpit Camera: Closer and lower for streetlight strobe effect
     const time = Date.now() * 0.01;
