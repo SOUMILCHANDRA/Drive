@@ -41,7 +41,7 @@ export class Chunk {
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0x0a0a0f, // SOLID DARK COLOR - No vertex colors
+      color: 0x00ffff, // DEBUG CYAN
       roughness: 0.9,
       metalness: 0.1,
       flatShading: true,

@@ -1,38 +1,29 @@
 import './style.css';
-import * as THREE from 'three';
 import { Engine } from './core/Engine';
 import { Car } from './entities/Car';
 import { RoadManager } from './core/RoadManager';
-import { Noise } from './utils/Noise';
+import { WorldManager } from './core/WorldManager';
 
-console.log("Drive: PHASE 2 RECONSTRUCTION - ADDING ROAD");
+console.log("Drive: PHASE 3 RECONSTRUCTION - ADDING TERRAIN");
 
 const engine = new Engine();
 const car = new Car();
-const noise = new Noise(Math.random());
+const world = new WorldManager(engine.scene);
+const road = new RoadManager(engine.scene, world.getNoise());
 
 async function bootstrap() {
     await car.init();
-    
-    // Road Manager integration
-    const road = new RoadManager(engine.scene, noise);
     engine.scene.add(car.mesh);
 
     engine.render((delta) => {
-        // Keep the debug cube
-        const cube = engine.scene.children.find(child => child instanceof THREE.Mesh && child.geometry instanceof THREE.BoxGeometry && child.geometry.parameters.width === 2);
-        if (cube) {
-            cube.rotation.x += delta;
-            cube.rotation.y += delta;
-        }
-
-        // Road update
+        // Core Logic
+        world.update(car.mesh.position, (z) => road.getRoadX(z));
         road.update(car.mesh.position.z);
 
-        // Update car with road height
+        // Physics
         car.update(delta, (x, z) => road.getRoadHeight(x, z));
 
-        // Camera follow
+        // Camera
         const cameraTarget = car.getCameraTransform();
         engine.camera.position.lerp(cameraTarget.position, 0.1);
         engine.camera.lookAt(cameraTarget.lookTarget);
