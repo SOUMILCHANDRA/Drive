@@ -1,54 +1,49 @@
-# 🏎️ Drive: Procedural Adventure
+# 🏎️ Drive: Next-Gen Procedural Racer
 
 ![Drive Splash](public/splash_bg.png)
 
-A high-performance, procedural 3D driving exploration game built for the browser. Inspired by *Slow Roads*, **Drive** offers an infinite, relaxing journey through a synthwave-inspired sunset landscape.
+A high-performance, procedural 3D racing experience built for the browser. Inspired by *Slow Roads* and *WipEout*, **Drive** offers an infinite journey through a synthwave-inspired neon landscape with anti-gravity mechanics and smooth spline-based generation.
 
-## 🌟 Features
+## 🌟 Next-Gen Features
 
-- **Infinite Procedural World**: Never-ending terrain and roads generated in real-time using Simplex Noise.
-*   **Local Transform Connection**: A robust road generation system that ensures segments connect perfectly with zero gaps or alignment issues.
-- **Cinematic Visuals**:
-  - **Dynamic Bloom**: High-quality neon glow effects for car headlights and road sidelines.
-  - **Atmospheric Fog**: Exponential fog blending for seamless horizon transitions.
-  - **Motion Blur Particles**: Speed-sensitive particle effects to enhance the sense of momentum.
-- **Arcade Physics**: Simple yet satisfying car handling with terrain-hugging "ground adhesion" logic.
-- **Dynamic HUD**: Real-time tracking of speed, distance, and elevation with a glassmorphic design.
-- **Immersive Splash Screen**: A beautiful hand-crafted front screen with smooth transitions into gameplay.
+- **Infinite Spline Generation**: Transitioned to a `CatmullRomCurve3` system for perfectly smooth curves and infinite track chunks.
+- **Anti-Gravity Physics**:
+  - **Gravity-Flip Tunnels**: Enclosed hexagonal tubes where physics inverts and you drive on the ceiling.
+  - **Wall-Riding**: Natural banking and vertical loops integrated into the procedural generation.
+- **Advanced Car Controls**:
+  - **Drift System**: Hold `Space` to slide through corners with dynamic trail effects.
+  - **Barrel Rolls**: Double-tap `A/D` to perform cinematic rotations.
+  - **Boost Bursts**: Floating rings that grant speed boosts and screen flash effects.
+- **Visual Excellence**:
+  - **Professional Post-Processing**: `UnrealBloomPass` + `ChromaticAberrationShader` for a premium cinematic look.
+  - **Animated Road Shader**: Custom GLSL road material with speed-synced neon grid scrolling.
+  - **Dynamic Elements**: Speed-lines, neon ribbons (trails), and orbital camera intros.
+- **Pro HUD & Audio**:
+  - **Procedural Engine Sounds**: Web Audio API oscillator that modulates frequency based on car speed.
+  - **Glassmorphic HUD**: Real-time SVG gauge, boost bar, and a live minimap projection.
 
 ## 🛠️ Tech Stack
 
 - **Core**: [Three.js](https://threejs.org/) (WebGL)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Audio**: Web Audio API
 - **Build Tool**: [Vite](https://vitejs.dev/)
-- **Logic**: Simplex Noise for procedural heightmaps and road curves.
 
 ## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js (v18+)
-- npm or yarn
-
-### Installation
 
 1.  **Clone the repository**:
     ```bash
     git clone https://github.com/SOUMILCHANDRA/Drive.git
     cd Drive
     ```
-
 2.  **Install dependencies**:
     ```bash
     npm install
     ```
-
 3.  **Run development server**:
     ```bash
     npm run dev
     ```
-
-4.  Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## 🎮 Controls
 
@@ -56,22 +51,9 @@ A high-performance, procedural 3D driving exploration game built for the browser
 | :--- | :--- |
 | **W / Arrow Up** | Accelerate |
 | **S / Arrow Down** | Brake / Reverse |
-| **A / D / Arrow Left / Right** | Steer |
-| **Mouse Click** | Start Game (Splash Screen) |
-
-## 🏗️ Architecture Overview
-
-### `Engine`
-Handles the Three.js boilerplate, including Scene, Camera with dynamic FOV, and the Post-processing pipeline (UnrealBloomPass).
-
-### `RoadManager`
-Manages the infinite road chain. Each segment stores its specific transform (position/rotation) and connects flawlessly to the previous segment's endpoint.
-
-### `WorldManager`
-Orchestrates the chunk-based terrain system. It generates and disposes of 200x200 terrain meshes based on the player's proximity.
-
-### `Car`
-Handles input processing and simple Rigidbody-style physics calculations. It uses the `RoadManager`'s height interpolation to stay grounded as the terrain changes.
+| **A / D** | Steer (Double tap for Barrell Roll) |
+| **Space** | Drift |
+| **Mouse Click** | Start Game / Initial Cinematic |
 
 ## 📄 License
-MIT License - feel free to use this as a base for your own procedural experiments!
+MIT License
