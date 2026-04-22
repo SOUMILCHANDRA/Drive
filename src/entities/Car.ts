@@ -105,7 +105,7 @@ export class Car {
     // THE "RED RIM" BEACONS - Decoupled to prevent internal bleed
     const tailColor = 0xFF0000;
     const createTailLight = (x: number) => {
-        const light = new THREE.PointLight(tailColor, 40, 20, 2); 
+        const light = new THREE.PointLight(tailColor, 10, 15, 2); 
         light.position.set(x, 0.6, -2.8); // Shifted behind bumper
         this.mesh.add(light);
         
@@ -202,10 +202,10 @@ export class Car {
   }
 
   public getCameraTransform() {
-    const targetCamPos = new THREE.Vector3(0, 2, -6);
+    const targetCamPos = this.mesh.position.clone().add(new THREE.Vector3(0, 2, -6));
     this.currentCameraPos.lerp(targetCamPos, 0.08);
 
-    const lookTarget = new THREE.Vector3(0, 1, 5);
+    const lookTarget = this.mesh.position.clone().add(new THREE.Vector3(0, 1, 5));
     
     return { position: this.currentCameraPos.clone(), lookTarget };
   }
