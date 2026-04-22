@@ -42,13 +42,15 @@ export class Chunk {
 
       const color = new THREE.Color();
       if (carveFactor > 0.8) {
-        color.setHSL(0.6, 0.2, 0.1);
+        color.setHSL(0.6, 0.2, 0.08); // Asphalt shoulder
+      } else if (h > 45) {
+        color.setHSL(0.0, 0.0, 0.95); // Snow caps on peaks
       } else if (h > 35) {
-        color.setHSL(0.8, 1, 0.2);
+        color.setHSL(0.8, 0.3, 0.15); // Deep mountain purple
       } else if (h > 15) {
-        color.setHSL(0.5, 0.8, 0.1); 
+        color.setHSL(0.5, 0.5, 0.1); // Rolling hills
       } else {
-        color.setHSL(0.9, 0.5, 0.05);
+        color.setHSL(0.9, 0.2, 0.05); // City basin
       }
       colors[i] = color.r;
       colors[i + 1] = color.g;
