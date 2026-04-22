@@ -47,32 +47,37 @@ export class Car {
         const gltf = await loader.loadAsync('models/car/chevelle.glb');
         this.model = gltf.scene;
         
-        // Muscle Car Calibration
-        this.model.scale.set(0.02, 0.02, 0.02); // Typical scale for high-poly sketchfab models
-        
+        // AUTO-SCALE TO 4.5m LENGTH
         const box = new THREE.Box3().setFromObject(this.model);
-        const center = box.getCenter(new THREE.Vector3());
-        this.model.position.set(-center.x, -box.min.y, -center.z); 
+        const size = box.getSize(new THREE.Vector3());
+        const scaleFactor = 4.5 / size.z;
+        this.model.scale.set(scaleFactor, scaleFactor, scaleFactor);
+        
+        // RE-CALIBRATE PIVOT
+        const scaledBox = new THREE.Box3().setFromObject(this.model);
+        const center = scaledBox.getCenter(new THREE.Vector3());
+        this.model.position.set(-center.x, -scaledBox.min.y, -center.z); 
         
         this.mesh.add(this.model);
         this.model.traverse(child => {
             if (child instanceof THREE.Mesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
+                child.frustumCulled = true;
             }
         });
     } catch (e) {
         console.warn("Model load failed, falling back to procedural box");
         const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.5 });
         const body = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 4.5), mat);
-        body.position.y = 0.25; // Flush bottom
+        body.position.y = 0.25; 
         body.castShadow = true;
         this.mesh.add(body);
     }
   }
 
   private attachLights() {
-    const headlightColor = 0xFFD700; // Drive 2011 Warm Amber
+    const headlightColor = 0xFFD700; 
     const createHeadlight = (x: number) => {
       const spot = new THREE.SpotLight(headlightColor, 2000, 200, 0.6, 0.8, 1.0);
       spot.position.set(x, 0.6, 2.5);
@@ -88,16 +93,16 @@ export class Car {
     createHeadlight(0.7);
     createHeadlight(-0.7);
 
-    // Drive Tail Lights (Dim Red #8B0000)
-    const tailColor = 0x8B0000;
+    // THE "RED RIM" BEACONS (Bright Red #FF0000)
+    const tailColor = 0xFF0000;
     const createTailLight = (x: number) => {
-        const light = new THREE.PointLight(tailColor, 10, 15, 2);
+        const light = new THREE.PointLight(tailColor, 50, 20, 2); // Brighter beacon
         light.position.set(x, 0.6, -2.5);
         this.mesh.add(light);
         
         const lens = new THREE.Mesh(
             new THREE.BoxGeometry(0.5, 0.2, 0.1),
-            new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff0000, emissiveIntensity: 1 })
+            new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0xff0000, emissiveIntensity: 5 })
         );
         lens.position.set(x, 0.6, -2.5);
         this.mesh.add(lens);
@@ -144,11 +149,11 @@ export class Car {
     const time = Date.now() * 0.003;
     const bobbing = Math.sin(time) * 0.03;
     
-    // Final Physics Lock: Snap directly to spline Y
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + bobbing, 0.2);
+    // Final Physics Lock: Snap directly to spline Y (-0.25 pivot correction)
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight - 0.25 + bobbing, 0.2);
     
-    // Keep rotation stable
-    this.mesh.rotation.y = this.angle;
+    // KINETIC STEERING: Angular Damping for heavy feel
+    this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.05);
     
     // Reset normal for stability
     this.normal.set(0, 1, 0);
@@ -160,12 +165,14 @@ export class Car {
   public autopilot(targetX: number, targetZ: number, targetAngle: number, targetY: number) {
     this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, targetX, 0.1);
     this.mesh.position.z = targetZ;
-    this.angle = THREE.MathUtils.lerp(this.angle, targetAngle, 0.1);
+    this.angle = targetAngle;
     this.velocity.z = 25;
     
-    // Vertical stabilization
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY, 0.2);
-    this.mesh.rotation.y = this.angle;
+    // Vertical stabilization (-0.25 pivot correction)
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY - 0.25, 0.2);
+    
+    // KINETIC STEERING: Heavy weight damping
+    this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.05);
   }
 
   /**
