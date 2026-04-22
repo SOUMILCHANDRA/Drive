@@ -96,8 +96,8 @@ export class RoadManager {
       }
     }
 
-    if (playerZ > (this.points.length - 40) * this.chunkSize) {
-        this.generateMorePoints(20);
+    if (playerZ > (this.points.length - 100) * this.chunkSize) {
+        this.generateMorePoints(100);
         this.updateSpline();
     }
   }
