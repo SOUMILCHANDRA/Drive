@@ -36,19 +36,18 @@ export class Engine {
 
     // Post-processing
     const renderScene = new RenderPass(this.scene, this.camera);
-    // FIX: bloom threshold 0.75 so only headlight cores bloom, not the whole scene
+    // OPTIMIZATION: Use 50% resolution for bloom to save GPU
     const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.35,  // strength — subtle
+      new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2),
+      0.4,   // strength
       0.4,   // radius
-      0.75   // threshold — only near-white pixels bloom
+      0.85   // threshold
     );
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(renderScene);
     this.composer.addPass(bloomPass);
-    // Film grain — adds enormous cinematic realism
-    this.composer.addPass(new FilmPass(0.2, false));
+    this.composer.addPass(new FilmPass(0.15, false));
 
     const vignette = new ShaderPass(VignetteShader);
     vignette.uniforms['offset'].value = 0.9;
@@ -56,7 +55,32 @@ export class Engine {
     this.composer.addPass(vignette);
 
     this.setupLights();
+    this.setupStars(); // Added Starfield
     this.setupResize();
+  }
+
+  private setupStars() {
+    const starQty = 2000;
+    const geometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array(starQty * 3);
+    
+    for (let i = 0; i < starQty; i++) {
+        vertices[i * 3] = (Math.random() - 0.5) * 2000;
+        vertices[i * 3 + 1] = Math.random() * 500; // Only in sky
+        vertices[i * 3 + 2] = (Math.random() - 0.5) * 2000;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.8,
+        transparent: true,
+        opacity: 0.5,
+        sizeAttenuation: true
+    });
+    
+    const stars = new THREE.Points(geometry, material);
+    this.scene.add(stars);
   }
 
   private setupLights() {

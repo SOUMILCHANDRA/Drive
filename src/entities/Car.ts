@@ -127,29 +127,29 @@ export class Car {
       const container = new THREE.Group();
       container.position.set(x, 0.6, 2.1);
 
-      // Primary beam — FIX: intensity 5, not 30+
-      const spot = new THREE.SpotLight(headlightColor, 5);
-      spot.angle = 0.28;
-      spot.distance = 90;
+      // Primary beam — BOOSTED for playability
+      const spot = new THREE.SpotLight(headlightColor, 80);
+      spot.angle = 0.35;
+      spot.distance = 150;
       spot.penumbra = 0.5;
-      spot.decay = 2;
-      spot.castShadow = false; // off for perf — shadows from headlights are expensive
+      spot.decay = 1.5;
+      spot.castShadow = false; // Performance optimization
 
       // Target parented to car, aimed 60 units ahead and slightly down
       const target = new THREE.Object3D();
-      target.position.set(x, -1, 60);
+      target.position.set(x, -2, 80);
       this.mesh.add(target);
       spot.target = target;
 
       // Outer spread — fills in the sides of the road
-      const outer = new THREE.SpotLight(headlightColor, 2);
-      outer.angle = 0.4;
-      outer.distance = 40;
+      const outer = new THREE.SpotLight(headlightColor, 15);
+      outer.angle = 0.6;
+      outer.distance = 50;
       outer.penumbra = 0.9;
       outer.decay = 2;
 
       const outerTarget = new THREE.Object3D();
-      outerTarget.position.set(x > 0 ? 15 : -15, -2, 35);
+      outerTarget.position.set(x > 0 ? 20 : -20, -3, 40);
       this.mesh.add(outerTarget);
       outer.target = outerTarget;
 

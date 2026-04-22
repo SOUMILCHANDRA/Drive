@@ -143,20 +143,43 @@ export class RoadManager {
     marking.position.y = 0.01;
     chunkGroup.add(marking);
 
-    if (index % 5 === 0) { // Every 5 chunks (100 units)
+    // Side Neon Markers (Reflective depth)
+    const addSideMarkers = (side: number, color: number) => {
+        const markerMat = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 3.0
+        });
+        const markerGeo = new THREE.SphereGeometry(0.12, 8, 8);
+        for (let i = 0; i <= 2; i++) {
+            const p = localCurve.getPoint(i / 2);
+            const tangent = localCurve.getTangent(i / 2);
+            const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+            
+            const marker = new THREE.Mesh(markerGeo, markerMat);
+            marker.position.copy(p).add(normal.multiplyScalar(side * (this.roadWidth / 2 - 0.2)));
+            marker.position.y += 0.1;
+            chunkGroup.add(marker);
+        }
+    };
+    addSideMarkers(1, 0xFF2D95);  // Hot Pink
+    addSideMarkers(-1, 0x00E5FF); // Electric Blue
+
+    if (index % 5 === 0) { // Every 5 chunks (50 units)
         const lightPos = localCurve.getPoint(0.5);
-        const sideOffset = new THREE.Vector3(8, 0, 0);
+        const sideOffset = new THREE.Vector3(10, 0, 0); // Moved further back
         const poleWorldPos = lightPos.clone().add(sideOffset);
         const terrainH = this.getRoadHeight(poleWorldPos.x, poleWorldPos.z);
         
-        const light = new THREE.PointLight(0xff6a00, 1.5, 80, 2);
-        light.position.set(poleWorldPos.x, lightPos.y + 8, poleWorldPos.z);
+        // FIX: Use warm streetlight orange from breakdown
+        const light = new THREE.PointLight(0xFFB347, 4.0, 100, 1.5);
+        light.position.set(poleWorldPos.x, lightPos.y + 12, poleWorldPos.z);
         chunkGroup.add(light);
         
-        const poleHeight = (lightPos.y + 8) - terrainH;
+        const poleHeight = (lightPos.y + 12) - terrainH;
         const pole = new THREE.Mesh(
-          new THREE.BoxGeometry(0.2, poleHeight, 0.2),
-          new THREE.MeshStandardMaterial({ color: 0x050505 })
+          new THREE.BoxGeometry(0.3, poleHeight, 0.3),
+          new THREE.MeshStandardMaterial({ color: 0x080808, metalness: 1, roughness: 0.1 })
         );
         pole.position.set(poleWorldPos.x, terrainH + poleHeight / 2, poleWorldPos.z);
         chunkGroup.add(pole);
