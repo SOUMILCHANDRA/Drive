@@ -31,7 +31,8 @@ This project deviates from typical "Neon" racing games. Instead, it captures the
 - **Engine**: Three.js (WebGL)
 - **Physics**: Custom procedural spline-alignment system
 - **Environment**: Custom GLSL Color Grading & Post-processing
-- **Asset Pipeline**: Minimalist procedural geometry (No heavy meshes)
+- **Asset Pipeline**: Support for external GLTF/GLB models with procedural fallbacks.
+- **Wheel Animation**: Physically calculated wheel rotation mapped to vehicle velocity.
 
 ## 🏁 Development State
 Currently tuned for **Visual Immersion**. The system is optimized for a 1.8 exposure/0.006 fog density ratio to maintain visibility while preserving the deep nocturnal mood.
