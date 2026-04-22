@@ -17,115 +17,46 @@ export class Engine {
 
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(CONFIG.VISUALS.FOG_COLOR, CONFIG.VISUALS.FOG_DENSITY);
-    this.camera = new THREE.PerspectiveCamera(
-      CONFIG.VISUALS.CAM_FOV,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
+    this.scene.fog = new THREE.FogExp2(0x050810, 0.006);
+    this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: false,
-      alpha: true,
-      powerPreference: 'high-performance'
-    });
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMappingExposure = 1.0; 
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.8;
 
     const container = document.getElementById('app');
-    if (container) {
-      container.appendChild(this.renderer.domElement);
-    }
+    if (container) container.appendChild(this.renderer.domElement);
 
     this.clock = new THREE.Clock();
 
-    // Post processing
     const renderScene = new RenderPass(this.scene, this.camera);
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      CONFIG.VISUALS.BLOOM_STRENGTH,
-      CONFIG.VISUALS.BLOOM_RADIUS,
-      CONFIG.VISUALS.BLOOM_THRESHOLD
-    );
-
-    const filmPass = new FilmPass(CONFIG.VISUALS.FILM_NOISE, 0, 0, false);
-    
-    const vignettePass = new ShaderPass(VignetteShader);
-    vignettePass.uniforms['offset'].value = 0.95;
-    vignettePass.uniforms['darkness'].value = 1.6;
-
-    const rgbShiftPass = new ShaderPass(RGBShiftShader);
-    rgbShiftPass.uniforms['amount'].value = 0.0006;
-
-    // Custom Color Grading Shader (Balanced)
-    const colorGradeShader = {
-      uniforms: {
-        "tDiffuse": { value: null },
-        "uShadows": { value: new THREE.Color(0x0a0e1a) },
-        "uHighlights": { value: new THREE.Color(0xfff5e0) }
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform sampler2D tDiffuse;
-        uniform vec3 uShadows;
-        uniform vec3 uHighlights;
-        varying vec2 vUv;
-        void main() {
-          vec4 color = texture2D(tDiffuse, vUv);
-          float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-          vec3 shadows = mix(uShadows * 0.3, color.rgb, gray);
-          vec3 highlights = mix(color.rgb, uHighlights, gray);
-          color.rgb = mix(shadows, highlights, gray * 0.5 + 0.5);
-          gl_FragColor = color;
-        }
-      `
-    };
-    const gradePass = new ShaderPass(colorGradeShader);
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.4, 0.4, 0.7);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(renderScene);
     this.composer.addPass(bloomPass);
-    this.composer.addPass(rgbShiftPass);
-    this.composer.addPass(filmPass);
-    this.composer.addPass(vignettePass);
-    this.composer.addPass(gradePass);
+    this.composer.addPass(new FilmPass(0.1, 0, 0, false));
+    
+    const vignette = new ShaderPass(VignetteShader);
+    vignette.uniforms['offset'].value = 0.95;
+    vignette.uniforms['darkness'].value = 1.3;
+    this.composer.addPass(vignette);
 
     this.setupLights();
     this.setupResize();
-    this.scene.background = new THREE.Color(CONFIG.VISUALS.BACKGROUND_COLOR);
-
-    // Default camera position
-    this.camera.position.set(0, 5, 10);
-    this.camera.lookAt(0, 0, 0);
+    this.scene.background = new THREE.Color(0x03050a);
   }
 
   private setupLights() {
-    // Ambient Visibility
-    const ambientLight = new THREE.AmbientLight(CONFIG.LIGHTING.AMBIENT_COLOR, CONFIG.LIGHTING.AMBIENT_INTENSITY);
-    this.scene.add(ambientLight);
-
-    // Atmosphere Tint
-    const hemiLight = new THREE.HemisphereLight(
-      CONFIG.LIGHTING.HEMI_SKY_COLOR,
-      CONFIG.LIGHTING.HEMI_GROUND_COLOR,
-      0.4
-    );
-    this.scene.add(hemiLight);
-
-    // Rim/Key Light from behind-above
-    const rimLight = new THREE.DirectionalLight(0x1a2a3a, 0.4);
-    rimLight.position.set(0, 10, -20);
-    this.scene.add(rimLight);
+    this.scene.add(new THREE.AmbientLight(0x1a2035, 0.6));
+    this.scene.add(new THREE.HemisphereLight(0x1e2a3a, 0x0a0a0f, 0.4));
+    
+    const rim = new THREE.DirectionalLight(0x445577, 0.4);
+    rim.position.set(0, 10, -20);
+    this.scene.add(rim);
   }
 
   private setupResize() {
