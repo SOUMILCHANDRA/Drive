@@ -39,6 +39,8 @@ async function bootstrap() {
         }
     });
 
+    let firstFrame = true;
+
     engine.render((delta) => {
         const speed = Math.abs(car.velocity.z);
 
@@ -46,13 +48,13 @@ async function bootstrap() {
         world.update(car.mesh.position);
         road.update(car.mesh.position.z);
 
-        // 2. Car Updates (Always update logic/lights, physics only if gameStarted)
+        // 2. Car Updates
         car.update(gameStarted ? delta : 0, (x, z) => road.getRoadHeight(x, z));
 
         if (gameStarted) {
             audio.update(speed * 0.5); // Quieter engine
 
-            // 3. HUD Updates (Minimalist)
+            // 3. HUD Updates
             if (speedElem) speedElem.innerText = Math.round(speed * 3.6).toString();
             totalDistance += speed * delta;
             if (distElem) distElem.innerText = Math.round(totalDistance).toString();
@@ -61,10 +63,13 @@ async function bootstrap() {
         // 4. Cinematic Soft Follow Camera
         const cameraTarget = car.getCameraTransform();
         
-        // Slower, smoother lerp for cinema feel
-        engine.camera.position.lerp(cameraTarget.position, 0.03);
+        if (firstFrame) {
+            engine.camera.position.copy(cameraTarget.position);
+            firstFrame = false;
+        } else {
+            engine.camera.position.lerp(cameraTarget.position, 0.05);
+        }
         
-        // Smooth LookAt
         engine.camera.lookAt(cameraTarget.lookTarget);
     });
 }

@@ -136,18 +136,22 @@ export class RoadManager {
     marking.position.y = 0.01;
     chunkGroup.add(marking);
 
-    // Sodium Streetlights
     if (index % 5 === 0) { // Every 5 chunks (100 units)
         const lightPos = localCurve.getPoint(0.5);
+        const sideOffset = new THREE.Vector3(8, 0, 0);
+        const poleWorldPos = lightPos.clone().add(sideOffset);
+        const terrainH = this.getRoadHeight(poleWorldPos.x, poleWorldPos.z);
+        
         const light = new THREE.PointLight(0xff6a00, 1.5, 80, 2);
-        light.position.copy(lightPos).add(new THREE.Vector3(8, 8, 0));
+        light.position.set(poleWorldPos.x, lightPos.y + 8, poleWorldPos.z);
         chunkGroup.add(light);
         
+        const poleHeight = (lightPos.y + 8) - terrainH;
         const pole = new THREE.Mesh(
-          new THREE.BoxGeometry(0.2, 8, 0.2),
+          new THREE.BoxGeometry(0.2, poleHeight, 0.2),
           new THREE.MeshStandardMaterial({ color: 0x050505 })
         );
-        pole.position.copy(lightPos).add(new THREE.Vector3(8, 4, 0));
+        pole.position.set(poleWorldPos.x, terrainH + poleHeight / 2, poleWorldPos.z);
         chunkGroup.add(pole);
     }
 
