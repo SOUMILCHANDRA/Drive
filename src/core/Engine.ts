@@ -4,6 +4,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { RGBShiftShader } from 'three/examples/jsm/shaders/RGBShiftShader.js';
+import { CONFIG } from '../config';
 
 export class Engine {
   public scene: THREE.Scene;
@@ -14,6 +15,7 @@ export class Engine {
 
   constructor() {
     this.scene = new THREE.Scene();
+    this.scene.fog = new THREE.FogExp2(0x050505, CONFIG.VISUALS.FOG_DENSITY);
     this.camera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
@@ -42,9 +44,9 @@ export class Engine {
     const renderScene = new RenderPass(this.scene, this.camera);
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      1.5, // strength
-      0.8, // radius
-      0.1  // threshold
+      CONFIG.VISUALS.BLOOM_STRENGTH,
+      CONFIG.VISUALS.BLOOM_RADIUS,
+      0.1
     );
 
     const rgbShiftPass = new ShaderPass(RGBShiftShader);
