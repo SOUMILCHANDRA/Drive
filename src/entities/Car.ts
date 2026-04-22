@@ -44,7 +44,7 @@ export class Car {
   private attachLights() {
     const headlightColor = 0xFFD700; // Drive 2011 Warm Amber
     const createHeadlight = (x: number) => {
-      // Linear Decay (1.0) for longer throw + 3000 Intensity
+      // Penumbra 0.5 for realistic feathered beams
       const spot = new THREE.SpotLight(headlightColor, 3000, 200, 0.7, 0.5, 1.0);
       spot.position.set(x, 0.6, 2.1);
       const target = new THREE.Object3D();
@@ -77,6 +77,10 @@ export class Car {
     window.addEventListener('keyup', (e) => this.keys[e.key.toLowerCase()] = false);
   }
 
+  public get velocityValue(): number {
+    return this.velocity.z;
+  }
+
   public update(delta: number, getHeight: (x: number, z: number) => number) {
     const isBraking = this.keys['s'] || this.keys['arrowdown'];
     this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 5 : 1.5);
@@ -94,8 +98,11 @@ export class Car {
     this.mesh.position.x += Math.sin(this.angle) * this.velocity.z * delta;
     this.mesh.position.z += Math.cos(this.angle) * this.velocity.z * delta;
 
-    const height = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, height + 0.1, 0.4);
+    // Suspension & Raycasting Fix: Height Offset (0.5m) + Soft Bobbing
+    const time = Date.now() * 0.003;
+    const bobbing = Math.sin(time) * 0.05;
+    const roadHeight = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.5 + bobbing, 0.3);
     
     if (this.wheels.length > 0) {
       this.wheels.forEach(w => w.rotation.x += (this.velocity.z * delta) / 0.5);
@@ -103,41 +110,37 @@ export class Car {
   }
 
   public autopilot(targetX: number, targetZ: number, targetAngle: number, targetY: number) {
-    // 1. HARD LOCK POSITION: Snap to spline
+    const time = Date.now() * 0.003;
+    const bobbing = Math.sin(time) * 0.05;
+    
     this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, targetX, 0.1);
     this.mesh.position.z = targetZ;
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY + 0.1, 0.4);
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY + 0.5 + bobbing, 0.3);
     
-    // 2. SMOOTH ROTATION: Align to road direction
     this.angle = THREE.MathUtils.lerp(this.angle, targetAngle, 0.1);
     this.mesh.rotation.y = this.angle;
     
-    // Constant speed (25 units/s)
     this.velocity.z = 25; 
     this.wheels.forEach(w => w.rotation.x += (this.velocity.z * 0.016) / 0.5);
   }
 
-  public get velocityValue(): number {
-    return this.velocity.z;
-  }
-
   public getCameraTransform() {
-    // 35mm Chase-Car Camera: Handheld shake + Tracking offset
+    // Cinematic Driver Camera: Higher and further back for better perspective
     const time = Date.now() * 0.01;
     const shake = new THREE.Vector3(
-        Math.sin(time * 0.7) * 0.03,
-        Math.cos(time * 0.8) * 0.03,
+        Math.sin(time * 0.7) * 0.04,
+        Math.cos(time * 0.8) * 0.04,
         0
     );
 
     const offset = new THREE.Vector3(
-        Math.sin(this.angle) * -16, 
-        4.0, 
-        Math.cos(this.angle) * -16
+        Math.sin(this.angle) * -18, 
+        5.5, 
+        Math.cos(this.angle) * -18
     ).add(shake);
 
     const lookTarget = this.mesh.position.clone().add(
-        new THREE.Vector3(Math.sin(this.angle) * 12, 1.0, Math.cos(this.angle) * 12)
+        new THREE.Vector3(Math.sin(this.angle) * 15, 1.2, Math.cos(this.angle) * 15)
     );
     
     return { position: this.mesh.position.clone().add(offset), lookTarget };

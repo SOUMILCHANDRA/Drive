@@ -251,9 +251,10 @@ export class RoadManager {
             `
             #include <emissivemap_fragment>
             
-            // 1. Wet Look Specular Noise (Teal Highlights)
-            float spec = noise(vUv * 100.0) * 0.3;
-            diffuseColor.rgb += vec3(0.0, 0.4, 0.4) * spec;
+            // 1. Wet Look Specular Streaks (High-Freq Roughness Noise)
+            float roughnessNoise = noise(vUv * 500.0);
+            float spec = pow(noise(vUv * vec2(1.0, 400.0)) * 0.5 + 0.5, 8.0); // Streaks
+            diffuseColor.rgb += vec3(0.0, 0.6, 0.6) * spec * roughnessNoise;
 
             // 2. Center Dash Lines (Amber Glow)
             float dash = step(0.7, fract(vUv.x * 0.1));

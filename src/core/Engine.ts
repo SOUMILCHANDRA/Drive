@@ -29,13 +29,12 @@ export class Engine {
   }
 
   private setupLights() {
-    // 1. MOONLIGHT: Deep Indigo Rim Light for world shape
-    const moonlight = new THREE.DirectionalLight(0x0a0a1f, 0.05);
-    moonlight.position.set(0, 100, -200); // High and behind car
+    // 1. MOONLIGHT: Deep Indigo (#050510) Rim Light
+    const moonlight = new THREE.DirectionalLight(0x050510, 0.1);
+    moonlight.position.set(0, 100, -200);
     this.scene.add(moonlight);
 
-    // 2. MAGENTA AFTERGLOW: Faint horizon rim
-    const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.05);
+    const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.03);
     rimLight.position.set(100, 10, -100);
     this.scene.add(rimLight);
   }
@@ -44,10 +43,10 @@ export class Engine {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-    // SELECTIVE BLOOM: High sensitivity (0.1) for amber pop
+    // High Strength (1.5), Sharp Radius (0.4) for "Neon Gems"
     const bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        1.2, 0.4, 0.85
+        1.5, 0.4, 0.85
     );
     bloomPass.threshold = 0.1; 
     this.composer.addPass(bloomPass);
