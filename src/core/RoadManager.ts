@@ -154,6 +154,15 @@ export class RoadManager {
     return THREE.MathUtils.lerp(p1.y, p2.y, THREE.MathUtils.clamp(t, 0, 1));
   }
 
+  public getTangent(z: number): THREE.Vector3 {
+    const index = this.points.findIndex(p => p.z > z) - 1;
+    if (index < 0 || index >= this.points.length - 1) return new THREE.Vector3(0, 0, 1);
+    
+    const p1 = this.points[index];
+    const p2 = this.points[index + 1];
+    return new THREE.Vector3().subVectors(p2, p1).normalize();
+  }
+
   public getRoadX(z: number): number {
     // Estimate X position of road at Z by finding nearest spline point
     const index = this.points.findIndex(p => p.z > z) - 1;

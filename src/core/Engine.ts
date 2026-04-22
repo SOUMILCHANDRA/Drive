@@ -15,8 +15,8 @@ export class Engine {
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050508);
-    // FINAL LOCK: Slow Roads Atmospheric Scale
-    this.scene.fog = new THREE.FogExp2(0x050508, 0.015); 
+    // STABLE ATMOSPHERE: High-Density Haze
+    this.scene.fog = new THREE.FogExp2(0x050508, 0.02); 
     
     this.camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 2000);
     
@@ -41,22 +41,14 @@ export class Engine {
    * Configures the environmental lighting (Moonlight, Rim lights, and Ambient Presence).
    */
   private setupLights() {
-    const moonlight = new THREE.DirectionalLight(0x050510, 0.1);
-    moonlight.position.set(0, 100, -200);
-    this.scene.add(moonlight);
+    // MOONLIGHT FEEL: Subtle directional rim
+    const dir = new THREE.DirectionalLight(0x0a0a2e, 0.1);
+    dir.position.set(5, 10, 2);
+    this.scene.add(dir);
 
-    // MOUNTAIN PRESENCE: Blue Hour Fill (0.05)
-    const ambient = new THREE.AmbientLight(0x0d0d2b, 0.05);
-    this.scene.add(ambient);
-
-    // CINEMATIC DEPTH: Final Aesthetic Lock (Indigo Rim)
-    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.2);
+    // SOFT GLOBAL VISIBILITY: Blue Hour Fill
+    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.15);
     this.scene.add(hemi);
-
-    // SILHOUETTE LIFT: High-angle Indigo light for car definition
-    const lift = new THREE.DirectionalLight(0x0a0a2e, 0.1);
-    lift.position.set(0, 100, 0);
-    this.scene.add(lift);
 
     // THE "DRIVER" RIM LIGHT: Pink silhouette definition
     const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.05);

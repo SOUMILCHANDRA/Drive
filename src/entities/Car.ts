@@ -24,7 +24,6 @@ export class Car {
   private currentCameraPos: THREE.Vector3 = new THREE.Vector3(0, 10, -20);
 
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
-  private normal: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
 
   constructor() {
     this.mesh = new THREE.Group();
@@ -85,16 +84,15 @@ export class Car {
   }
 
   private attachLights() {
-    const headlightColor = 0xFFD700; 
+    const headlightColor = 0xffd27f; // Stable Amber Sodium
     const createHeadlight = (x: number) => {
-      // FINAL LOCK: Soft Amber Halogen Pools
-      const spot = new THREE.SpotLight(headlightColor, 2000, 100, 0.6, 0.8, 1.0);
-      spot.position.set(x, 0.6, 2.5);
+      // REAL SPOTLIGHTS: 60m range, 0.5 penumbra
+      const spot = new THREE.SpotLight(headlightColor, 5, 60, Math.PI / 6, 0.5);
+      spot.position.set(x, 0.2, 1.5);
       spot.castShadow = true;
-      spot.shadow.mapSize.set(1024, 1024);
 
       const target = new THREE.Object3D();
-      target.position.set(x, -0.5, 60);
+      target.position.set(x, 0, 10);
       this.mesh.add(target);
       spot.target = target;
       this.mesh.add(spot);
@@ -140,10 +138,8 @@ export class Car {
 
   /**
    * Main update loop for manual driving.
-   * @param delta Frame delta time
-   * @param getHeight Function to sample road height at current X, Z
    */
-  public update(delta: number, getHeight: (x: number, z: number) => number) {
+  public update(delta: number, getHeight: (x: number, z: number) => number, getTangent: (z: number) => THREE.Vector3) {
     const isBraking = this.keys['s'] || this.keys['arrowdown'];
     this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 10 : 3);
 
@@ -157,23 +153,30 @@ export class Car {
 
     this.velocity.z *= this.deceleration;
     
-    // POSITION UPDATE
-    this.mesh.position.x += Math.sin(this.angle) * this.velocity.z * delta;
+    // POSITION UPDATE: 1D Forward Progress + Steering Offset
     this.mesh.position.z += Math.cos(this.angle) * this.velocity.z * delta;
+    this.mesh.position.x += Math.sin(this.angle) * this.velocity.z * delta;
 
-    // EMERGENCY GROUNDING SNAP: Hard-lock Y to road surface
+    // STABLE SPLINE LOCK: Height sampling + Negative Offset (-0.6)
     const roadHeight = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
     const time = Date.now() * 0.003;
-    const bobbing = Math.sin(time) * 0.02; 
+    const bobbing = Math.sin(time) * 0.01; // Zen stability
     
-    // TOTAL PIVOT: 'Zen' Physics Glide (Smooth Suspension)
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight + 0.1 + bobbing, 0.05);
+    // Final Physics Lock: Snap directly to road surface (-0.6 pivot correction)
+    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight - 0.6 + bobbing, 0.1);
     
-    // KINETIC STEERING: Heavy weight damping (0.03)
-    this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.03);
+    // KINETIC ROTATION: Slerp toward road tangent (0.1 damping)
+    const tangent = getTangent(this.mesh.position.z);
+    const targetRot = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      tangent.clone().normalize()
+    );
     
-    // Reset normal for stability
-    this.normal.set(0, 1, 0);
+    // Combine road curvature with manual steering
+    const steeringQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.angle);
+    targetRot.multiply(steeringQuat);
+    
+    this.mesh.quaternion.slerp(targetRot, 0.1);
   }
 
   /**
@@ -194,24 +197,23 @@ export class Car {
 
   /**
    * Calculates the camera's world position and look-at target based on vehicle state.
-   * Implements a Spring-Arm damping system to absorb high-frequency road math jitter.
-   * @returns { position: Vector3, lookTarget: Vector3 }
+   * Decoupled Spring-Arm: Absorbs car jitter via 0.08 damping.
    */
   public getCameraTransform() {
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.mesh.quaternion);
+    const cameraOffset = new THREE.Vector3(0, 2, -6);
     
-    // SPRING-ARM TARGET: 3m behind, 2m above
-    const idealPos = this.mesh.position.clone()
-        .add(forward.clone().multiplyScalar(-3))
-        .add(up.clone().multiplyScalar(2));
+    // Calculate desired position in world space
+    const desiredPosition = this.mesh.position.clone().add(
+      cameraOffset.clone().applyQuaternion(this.mesh.quaternion)
+    );
 
-    // Axis-independent Damping (Zen Damping: 0.05)
-    this.currentCameraPos.lerp(idealPos, 0.05);
+    // Smooth Follow (0.08 Damping)
+    this.currentCameraPos.lerp(desiredPosition, 0.08);
 
-    const lookTarget = this.mesh.position.clone()
-        .add(forward.clone().multiplyScalar(15))
-        .add(up.clone().multiplyScalar(1.0));
+    // Look ahead logic for cinematic weight
+    const lookTarget = this.mesh.position.clone().add(
+        new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion).multiplyScalar(15)
+    );
     
     return { position: this.currentCameraPos.clone(), lookTarget };
   }

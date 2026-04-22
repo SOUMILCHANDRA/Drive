@@ -36,7 +36,11 @@ async function bootstrap() {
                 const target = road.getAutopilotTarget(targetZ);
                 car.autopilot(target.x, target.z, target.angle, target.y);
             } else {
-                car.update(fixedDelta, (x, z) => road.getRoadHeight(x, z));
+                car.update(
+                    fixedDelta, 
+                    (x, z) => road.getRoadHeight(x, z),
+                    (z) => road.getTangent(z)
+                );
             }
             
             fixedTimeAccumulator -= fixedDelta;
