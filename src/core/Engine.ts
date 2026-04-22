@@ -8,7 +8,7 @@ export class Engine {
 
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x222222); // Grey for debug
+    this.scene.background = new THREE.Color(0x00ff00); // DEBUG GREEN
     
     this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 2000);
     // STEP 3: Fix Camera
@@ -23,7 +23,8 @@ export class Engine {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.8;
     
-    document.body.appendChild(this.renderer.domElement);
+    // Parent to #app instead of body
+    document.getElementById('app')?.appendChild(this.renderer.domElement);
 
     this.clock = new THREE.Clock();
     
