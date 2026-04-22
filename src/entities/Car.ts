@@ -80,7 +80,10 @@ export class Car {
       spot.castShadow = true;
       
       const target = new THREE.Object3D();
+      // Target is relative to the car mesh, positioned 80 units ahead
       target.position.set(x, 0, 80);
+      this.mesh.add(target); // Add to car mesh root
+      
       spot.target = target;
       this.headlightTargets.push(target);
 
@@ -92,6 +95,7 @@ export class Car {
       
       const outerTarget = new THREE.Object3D();
       outerTarget.position.set(x > 0 ? 10 : -10, -2, 40);
+      this.mesh.add(outerTarget);
       outerSpot.target = outerTarget;
       
       const bulb = new THREE.Mesh(
@@ -101,8 +105,6 @@ export class Car {
       
       container.add(spot);
       container.add(outerSpot);
-      container.add(target);
-      container.add(outerTarget);
       container.add(bulb);
       return container;
     };
@@ -191,11 +193,6 @@ export class Car {
     this.mesh.position.x += moveX;
     this.mesh.position.z += moveZ;
 
-    // Update headlight targets to 80m ahead
-    this.headlightTargets.forEach(target => {
-        target.position.set(0, -0.6, 80);
-    });
-
     this.gravityDir = THREE.MathUtils.lerp(this.gravityDir, this.isAntiGravity ? -1 : 1, 0.1);
     const height = getHeight(this.mesh.position.x, this.mesh.position.z);
     const targetY = this.isAntiGravity ? height + 10 : height + 0.5;
@@ -205,7 +202,7 @@ export class Car {
     const targetRoll = (this.isAntiGravity ? Math.PI : 0) + this.barrelRollAngle + targetTilt;
     this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, targetRoll, 0.1);
 
-    // DRIVE Color: Restrained white trail
+    // Trail Color update
     this.trailColor.setHex(0xffffff).multiplyScalar(0.4);
   }
 
