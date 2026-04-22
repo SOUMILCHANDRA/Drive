@@ -4,15 +4,24 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Neon Drive | Procedural Adventure</title>
+    <title>Drive | Procedural Adventure</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="app">
-      <div class="hud fade-in">
+      <!-- Splash Screen -->
+      <div id="splash" class="splash-screen">
+        <div class="splash-content">
+          <h1 class="splash-logo">Drive</h1>
+          <p class="splash-cta">CLICK TO START</p>
+        </div>
+      </div>
+
+      <!-- HUD Overlay (Initially hidden) -->
+      <div id="hud" class="hud" style="display: none;">
         <div class="hud-top">
           <div class="title">Neon Drive</div>
           <div class="stats">
