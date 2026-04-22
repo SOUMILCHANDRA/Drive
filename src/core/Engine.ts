@@ -15,9 +15,8 @@ export class Engine {
 
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x03050a);
-    // FIX: fog density 0.006 — previous 0.018 blacked out at ~20m
-    this.scene.fog = new THREE.FogExp2(0x050810, 0.006);
+    this.scene.background = new THREE.Color(0x0A0A0F);
+    this.scene.fog = new THREE.FogExp2(0x1F3B4D, 0.005);
 
     this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
 

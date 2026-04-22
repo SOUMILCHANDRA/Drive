@@ -14,8 +14,8 @@ export class CityGenerator {
         mesh.scale.set(width, height, depth);
         mesh.position.y = height / 2;
         
-        // Neon windows
-        const colors = [0x00ffff, 0xff00ff, 0xffff00, 0xff0000];
+        // Neon windows: Hot Pink and Electric Blue ONLY
+        const colors = [0xFF2D95, 0x00E5FF];
         const color = colors[Math.floor(Math.random() * colors.length)];
         
         const windows = new THREE.Mesh(
