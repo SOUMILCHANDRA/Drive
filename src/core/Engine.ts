@@ -5,8 +5,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { FilmPass } from 'three/examples/jsm/postprocessing/FilmPass.js';
 import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
-import { RGBShiftShader } from 'three/examples/jsm/shaders/RGBShiftShader.js';
-import { CONFIG } from '../config';
+
 
 export class Engine {
   public scene: THREE.Scene;
@@ -38,7 +37,7 @@ export class Engine {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(renderScene);
     this.composer.addPass(bloomPass);
-    this.composer.addPass(new FilmPass(0.1, 0, 0, false));
+    this.composer.addPass(new FilmPass(0.1, false));
     
     const vignette = new ShaderPass(VignetteShader);
     vignette.uniforms['offset'].value = 0.95;
@@ -72,7 +71,7 @@ export class Engine {
     const loop = () => {
       const delta = this.clock.getDelta();
       callback(delta);
-      this.composer.render();
+      this.renderer.render(this.scene, this.camera);
       requestAnimationFrame(loop);
     };
     loop();
