@@ -21,7 +21,8 @@ body {
 #startScreen {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at center, #0a0a0f 0%, #000 100%);
+  background: radial-gradient(circle at center, #0a0a0f, #000);
+  background-size: 150% 150%;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -29,36 +30,43 @@ body {
   transition: opacity 1.5s ease-in-out;
   z-index: 100;
   cursor: pointer;
+  animation: slowDrift 10s ease-in-out infinite alternate;
 }
 
 .splash-logo {
   font-family: 'Caveat', cursive;
   font-size: 8rem;
   color: #fff;
-  filter:
-    drop-shadow(0 0 12px rgba(255, 45, 149, 0.6))
-    drop-shadow(0 0 40px rgba(255, 45, 149, 0.2));
   margin: 0;
-  animation: logoFade 1.5s ease-out;
+  opacity: 0;
+  animation: 
+    logoFadeIn 1.5s ease forwards,
+    glowPulse 3s ease-in-out infinite;
 }
 
 .start-text {
   margin-top: 20px;
   font-size: 12px;
   letter-spacing: 5px;
-  color: rgba(255,255,255,0.5);
-  animation: pulse 2s infinite;
+  color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  animation: 
+    textFadeIn 2s ease forwards,
+    pulse 2s infinite;
+  animation-delay: 0.8s, 0s;
 }
 
-.splash-controls {
-  font-family: 'Inter', sans-serif;
-  font-size: 0.7rem;
+.controls-text {
+  margin-top: 15px;
+  font-size: 0.65rem;
   letter-spacing: 0.3rem;
-  color: #fff;
-  opacity: 0.2;
+  color: rgba(255, 255, 255, 0.35);
   text-transform: uppercase;
-  margin-top: 40px;
+  opacity: 0;
+  animation: textFadeIn 2.5s ease forwards;
+  animation-delay: 1.2s;
 }
 
 /* 🎥 Vignette */
@@ -85,13 +93,32 @@ body::before {
   z-index: 60;
 }
 
-@keyframes logoFade {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes slowDrift {
+  from { background-position: center; }
+  to { background-position: 55% 45%; }
+}
+
+@keyframes logoFadeIn {
+  to { opacity: 1; }
+}
+
+@keyframes textFadeIn {
+  to { opacity: 1; }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 12px rgba(255, 45, 149, 0.5))
+            drop-shadow(0 0 30px rgba(255, 45, 149, 0.2));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(255, 45, 149, 0.8))
+            drop-shadow(0 0 50px rgba(255, 45, 149, 0.4));
+  }
 }
 
 @keyframes pulse {
-  0%,100% { opacity: 0.3; }
+  0%,100% { opacity: 0.4; }
   50% { opacity: 1; }
 }
 

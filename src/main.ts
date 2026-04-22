@@ -74,7 +74,11 @@ async function bootstrap() {
     }
 
     startScreen?.addEventListener('click', () => {
-        playAudio();
+        // AUDIO-VISUAL SYNC: Delay ignition to match visual fade
+        setTimeout(() => {
+            playAudio();
+        }, 200);
+
         if (startScreen) startScreen.style.opacity = '0';
 
         setTimeout(() => {
