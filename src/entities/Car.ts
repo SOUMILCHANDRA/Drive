@@ -21,7 +21,7 @@ export class Car {
   private isRolling: boolean = false;
   private rollDirection: number = 0;
 
-  public trailColor: THREE.Color = new THREE.Color(0x00f3ff);
+  public trailColor: THREE.Color = new THREE.Color(0xffffff);
   
   // Anti-Gravity
   public isAntiGravity: boolean = false;
@@ -34,56 +34,86 @@ export class Car {
   }
 
   private createModel() {
-    // Car Body - A sleek box for now, will polish later
-    const bodyGeometry = new THREE.BoxGeometry(2, 0.5, 4);
+    // Body: Dark Charcoal Industrial Design
+    const bodyGeometry = new THREE.BoxGeometry(2.1, 0.6, 4.2);
     const bodyMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x00f3ff,
-      emissive: 0x00f3ff,
-      emissiveIntensity: 0.2,
-      metalness: 0.8,
-      roughness: 0.2
+      color: CONFIG.CAR.BODY_COLOR,
+      metalness: 0.9,
+      roughness: 0.25
     });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.castShadow = true;
     body.position.y = 0.5;
     this.mesh.add(body);
 
-    // Cab
-    const cabGeometry = new THREE.BoxGeometry(1.5, 0.6, 2);
-    const cabMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x111111,
-      metalness: 0.9,
-      roughness: 0.1
+    // Windshield: Physical/Translucent
+    const cabGeometry = new THREE.BoxGeometry(1.6, 0.7, 1.8);
+    const cabMaterial = new THREE.MeshPhysicalMaterial({ 
+      color: 0x000000,
+      metalness: 0,
+      roughness: 0.05,
+      transmission: 0.6,
+      thickness: 0.5,
+      reflectivity: 1.0
     });
     const cab = new THREE.Mesh(cabGeometry, cabMaterial);
-    cab.position.y = 1.05;
-    cab.position.z = -0.5;
+    cab.position.set(0, 1.1, -0.4);
     this.mesh.add(cab);
 
-    // Headlights (Glow)
-    const lightGeo = new THREE.BoxGeometry(0.5, 0.2, 0.1);
-    const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    
-    const l1 = new THREE.Mesh(lightGeo, lightMat);
-    l1.position.set(0.6, 0.5, 2.01);
-    this.mesh.add(l1);
+    // Halogen Headlights (Cinematic SpotLights)
+    const headlightColor = CONFIG.CAR.HEADLIGHT_COLOR;
+    const createHeadlight = (x: number) => {
+      const spot = new THREE.SpotLight(headlightColor, CONFIG.LIGHTING.HEADLIGHT_INTENSITY);
+      spot.angle = CONFIG.LIGHTING.HEADLIGHT_ANGLE;
+      spot.penumbra = CONFIG.LIGHTING.HEADLIGHT_PENUMBRA;
+      spot.decay = 2;
+      spot.distance = 150;
+      spot.castShadow = true;
+      spot.shadow.bias = -0.0001;
+      
+      const target = new THREE.Object3D();
+      target.position.set(x, 0, 50);
+      spot.target = target;
+      
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15, 16, 16),
+        new THREE.MeshBasicMaterial({ color: headlightColor })
+      );
+      
+      const container = new THREE.Group();
+      container.position.set(x, 0.6, 2.1);
+      container.add(spot);
+      container.add(target);
+      container.add(bulb);
+      return container;
+    };
 
-    const l2 = l1.clone();
-    l2.position.set(-0.6, 0.5, 2.01);
-    this.mesh.add(l2);
+    this.mesh.add(createHeadlight(0.7));
+    this.mesh.add(createHeadlight(-0.7));
+
+    // Brake Lights (Subtle Red Emissive)
+    const brakeGeo = new THREE.BoxGeometry(0.5, 0.15, 0.1);
+    const brakeMat = new THREE.MeshStandardMaterial({ 
+      color: 0x550000, 
+      emissive: 0xff0000, 
+      emissiveIntensity: 0.8 
+    });
+    const b1 = new THREE.Mesh(brakeGeo, brakeMat);
+    b1.position.set(0.7, 0.6, -2.1);
+    this.mesh.add(b1);
+    const b2 = b1.clone();
+    b2.position.x = -0.7;
+    this.mesh.add(b2);
   }
 
   private setupInput() {
     window.addEventListener('keydown', (e) => {
       this.keys[e.key.toLowerCase()] = true;
-      
-      // Double tap A
       if (e.key.toLowerCase() === 'a') {
         const now = Date.now();
         if (now - this.lastTapA < 300) this.startBarrelRoll(-1);
         this.lastTapA = now;
       }
-      // Double tap D
       if (e.key.toLowerCase() === 'd') {
         const now = Date.now();
         if (now - this.lastTapD < 300) this.startBarrelRoll(1);
@@ -101,29 +131,21 @@ export class Car {
   }
 
   public update(delta: number, getHeight: (x: number, z: number) => number) {
-    // Drifting
     this.isDrifting = this.keys[' '] && Math.abs(this.velocity.z) > 10;
     this.driftFactor = THREE.MathUtils.lerp(this.driftFactor, this.isDrifting ? CONFIG.CAR.DRIFT_SLIP : 1.0, 0.1);
 
-    // Acceleration
     if (this.keys['w'] || this.keys['arrowup']) {
-      this.velocity.z += this.acceleration * delta * (this.isDrifting ? 0.5 : 1.0);
+      this.velocity.z += this.acceleration * delta;
     } else if (this.keys['s'] || this.keys['arrowdown']) {
       this.velocity.z -= this.acceleration * delta;
     }
 
-    // Steering with drift slide
     if (Math.abs(this.velocity.z) > 0.1) {
-      let turnMult = (this.isDrifting ? 2.5 : 1.0) * Math.sign(this.velocity.z);
-      if (this.keys['a'] || this.keys['arrowleft']) {
-        this.angle += this.steeringAmount * turnMult;
-      }
-      if (this.keys['d'] || this.keys['arrowright']) {
-        this.angle -= this.steeringAmount * turnMult;
-      }
+      let turnMult = (this.isDrifting ? 2.0 : 1.0) * Math.sign(this.velocity.z);
+      if (this.keys['a'] || this.keys['arrowleft']) this.angle += this.steeringAmount * turnMult;
+      if (this.keys['d'] || this.keys['arrowright']) this.angle -= this.steeringAmount * turnMult;
     }
 
-    // Barrel Roll Animation
     if (this.isRolling) {
       this.barrelRollAngle += delta * 15 * this.rollDirection;
       if (Math.abs(this.barrelRollAngle) >= Math.PI * 2) {
@@ -132,57 +154,43 @@ export class Car {
       }
     }
 
-    // Apply Deceleration (Friction)
-    this.velocity.z *= this.isDrifting ? 0.995 : this.deceleration;
-
-    // Limit Max Speed
+    this.velocity.z *= this.deceleration;
     if (this.velocity.z > this.maxSpeed) this.velocity.z = this.maxSpeed;
     if (this.velocity.z < -this.maxSpeed / 2) this.velocity.z = -this.maxSpeed / 2;
 
-    // Update Mesh position and rotation
     this.mesh.rotation.y = this.angle;
     
-    // Slide physics during drift
     const moveX = Math.sin(this.angle) * this.velocity.z * delta * this.driftFactor;
     const moveZ = Math.cos(this.angle) * this.velocity.z * delta * this.driftFactor;
     
     this.mesh.position.x += moveX;
     this.mesh.position.z += moveZ;
 
-    // Update Y position based on terrain/ceiling
     this.gravityDir = THREE.MathUtils.lerp(this.gravityDir, this.isAntiGravity ? -1 : 1, 0.1);
     const height = getHeight(this.mesh.position.x, this.mesh.position.z);
-    
     const targetY = this.isAntiGravity ? height + 10 : height + 0.5;
     this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY, 0.1);
 
-    // Subtle tilting + Barrel Roll
-    let targetTilt = -(this.keys['a'] ? 0.1 : 0) + (this.keys['d'] ? 0.1 : 0);
-    if (this.isDrifting) targetTilt *= 3;
-    
-    // Flip rotation when anti-gravity is on
+    let targetTilt = -(this.keys['a'] ? 0.08 : 0) + (this.keys['d'] ? 0.08 : 0);
     const targetRoll = (this.isAntiGravity ? Math.PI : 0) + this.barrelRollAngle + targetTilt;
     this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, targetRoll, 0.1);
 
-    // Trail Color update
-    const speed = Math.abs(this.velocity.z);
-    if (speed < 30) this.trailColor.setHex(0x00f3ff); // Cyan
-    else if (speed < 55) this.trailColor.setHex(0xff00ff); // Magenta
-    else this.trailColor.setHex(0xffffff); // White
+    // DRIVE Color: Restrained white trail
+    this.trailColor.setHex(0xffffff).multiplyScalar(0.4);
   }
 
   public getCameraTransform() {
-    const horizontalOffset = 15;
-    const height = 5 + (Math.abs(this.velocity.z) / 20);
+    const horizontalOffset = 14;
+    const height = 4.5;
     
     const offset = new THREE.Vector3(
       Math.sin(this.angle) * -horizontalOffset,
-      height,
+      height + Math.sin(Date.now() * 0.001 * CONFIG.VISUALS.CAM_BREATH_SPEED) * CONFIG.VISUALS.CAM_BREATH_AMP,
       Math.cos(this.angle) * -horizontalOffset
     );
 
     const lookTarget = this.mesh.position.clone().add(
-      new THREE.Vector3(Math.sin(this.angle) * 10, 2, Math.cos(this.angle) * 10)
+      new THREE.Vector3(Math.sin(this.angle) * 8, 1.5, Math.cos(this.angle) * 8)
     );
 
     return {
