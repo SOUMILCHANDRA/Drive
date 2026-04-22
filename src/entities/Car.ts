@@ -42,10 +42,9 @@ export class Car {
   }
 
   private attachLights() {
-    const headlightColor = 0xFFB347; // Drive 2011 Warm Halogen
+    const headlightColor = 0xFFD700; // Drive 2011 Warm Amber
     const createHeadlight = (x: number) => {
-      // Wider cone (0.7) and softer falloff (0.5) to reveal road bed walls
-      const spot = new THREE.SpotLight(headlightColor, 350, 150, 0.7, 0.5, 2);
+      const spot = new THREE.SpotLight(headlightColor, 400, 160, 0.7, 0.5, 2);
       spot.position.set(x, 0.6, 2.1);
       const target = new THREE.Object3D();
       target.position.set(x, -0.5, 40);
@@ -122,8 +121,24 @@ export class Car {
   }
 
   public getCameraTransform() {
-    const offset = new THREE.Vector3(Math.sin(this.angle) * -14, 4.5, Math.cos(this.angle) * -14);
-    const lookTarget = this.mesh.position.clone().add(new THREE.Vector3(Math.sin(this.angle) * 8, 1.5, Math.cos(this.angle) * 8));
+    // 35mm Chase-Car Camera: Handheld shake + Tracking offset
+    const time = Date.now() * 0.01;
+    const shake = new THREE.Vector3(
+        Math.sin(time * 0.7) * 0.03,
+        Math.cos(time * 0.8) * 0.03,
+        0
+    );
+
+    const offset = new THREE.Vector3(
+        Math.sin(this.angle) * -16, 
+        4.0, 
+        Math.cos(this.angle) * -16
+    ).add(shake);
+
+    const lookTarget = this.mesh.position.clone().add(
+        new THREE.Vector3(Math.sin(this.angle) * 12, 1.0, Math.cos(this.angle) * 12)
+    );
+    
     return { position: this.mesh.position.clone().add(offset), lookTarget };
   }
 }

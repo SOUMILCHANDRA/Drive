@@ -204,13 +204,11 @@ export class RoadManager {
     geometry.computeVertexNormals();
 
     const roadMat = new THREE.MeshStandardMaterial({
-        color: 0x0a0a0a, // Near-black asphalt
-        roughness: 0.9,
-        metalness: 0.1,
-        emissive: 0x000000,
+        color: 0x020205, // Deep Indigo shadows
+        roughness: 0.1,  // Wet look (low roughness)
+        metalness: 0.8,  // High metalness for reflections
         polygonOffset: true,
         polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1,
         transparent: true,
     });
 
@@ -251,24 +249,24 @@ export class RoadManager {
             `
             #include <emissivemap_fragment>
             
-            // 1. Stochastic Asphalt Grain
-            float n = noise(vUv * 50.0) * 0.1;
-            n += noise(vUv * 200.0) * 0.05;
-            diffuseColor.rgb += vec3(n);
+            // 1. Wet Look Specular Noise
+            float spec = noise(vUv * 100.0) * 0.5;
+            diffuseColor.rgb += vec3(0.0, 0.5, 0.5) * spec; // Teal road highlights
 
-            // 2. Center Dash Lines (Spline-Aligned)
-            float dash = step(0.7, fract(vUv.x * 0.1)); // 10m intervals
+            // 2. Center Dash Lines (Amber Glow)
+            float dash = step(0.7, fract(vUv.x * 0.1));
             float center = 1.0 - step(0.015, abs(vUv.y - 0.5));
-            totalEmissiveRadiance += vec3(0.8, 0.8, 0.8) * dash * center * 3.0;
+            totalEmissiveRadiance += vec3(1.0, 0.84, 0.0) * dash * center * 4.0; // Amber/Gold
 
-            // 3. Edge Stitch (Blend into terrain)
+            // 3. Edge Stitch
             float edgeMask = smoothstep(0.5, 0.45, abs(vUv.y - 0.5));
             diffuseColor.a *= edgeMask;
 
-            // 4. Exponential Height Fog (Drive Aesthetic)
+            // 4. Exponential Fog + Magenta Horizon Afterglow
             float dist = length(vWorldPosition - cameraPosition);
-            float fogFactor = 1.0 - exp(-dist * 0.004);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.04, 0.04, 0.06), clamp(fogFactor, 0.0, 1.0));
+            float fogFactor = 1.0 - exp(-dist * 0.003);
+            vec3 fogColor = mix(vec3(0.04, 0.04, 0.06), vec3(0.5, 0.0, 0.5), clamp((dist-800.0)/1200.0, 0.0, 1.0));
+            diffuseColor.rgb = mix(diffuseColor.rgb, fogColor, clamp(fogFactor, 0.0, 1.0));
             `
         );
     };
