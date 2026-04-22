@@ -96,8 +96,8 @@ export class RoadManager {
       }
     }
 
-    if (playerZ > (this.points.length - 10) * this.chunkSize) {
-        this.generateMorePoints(5);
+    if (playerZ > (this.points.length - 40) * this.chunkSize) {
+        this.generateMorePoints(20);
         this.updateSpline();
     }
   }
@@ -165,24 +165,15 @@ export class RoadManager {
     addSideMarkers(1, 0xFF2D95);  // Hot Pink
     addSideMarkers(-1, 0x00E5FF); // Electric Blue
 
-    if (index % 5 === 0) { // Every 5 chunks (50 units)
+    // Streetlight poles removed for debug clarity
+    if (index % 10 === 0) { 
         const lightPos = localCurve.getPoint(0.5);
-        const sideOffset = new THREE.Vector3(10, 0, 0); // Moved further back
+        const sideOffset = new THREE.Vector3(12, 0, 0); 
         const poleWorldPos = lightPos.clone().add(sideOffset);
-        const terrainH = this.getRoadHeight(poleWorldPos.x, poleWorldPos.z);
         
-        // FIX: Use warm streetlight orange from breakdown
-        const light = new THREE.PointLight(0xFFB347, 4.0, 100, 1.5);
+        const light = new THREE.PointLight(0xFFB347, 5.0, 100, 1.5);
         light.position.set(poleWorldPos.x, lightPos.y + 12, poleWorldPos.z);
         chunkGroup.add(light);
-        
-        const poleHeight = (lightPos.y + 12) - terrainH;
-        const pole = new THREE.Mesh(
-          new THREE.BoxGeometry(0.3, poleHeight, 0.3),
-          new THREE.MeshStandardMaterial({ color: 0x080808, metalness: 1, roughness: 0.1 })
-        );
-        pole.position.set(poleWorldPos.x, terrainH + poleHeight / 2, poleWorldPos.z);
-        chunkGroup.add(pole);
     }
 
     // Removed flat terrain plane to prevent clipping with WorldManager procedural terrain
