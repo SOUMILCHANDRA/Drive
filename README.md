@@ -8,6 +8,16 @@ Inspired by **Slow Roads** and the atmospheric minimalism of **Drive (2011)**. T
 ![Status](https://img.shields.io/badge/Status-Infinite_Zen-green?style=for-the-badge)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-black?style=for-the-badge&logo=vercel)](https://drive-xi-nine.vercel.app/)
 
+### 🎬 Cinematic Manifesto
+
+This project is a high-fidelity simulation of the *Drive* (2011) nocturnal mountain pass sequence. The technical implementation is guided by three core pillars:
+
+1.  **Orange & Teal Depth**: The rendering pipeline uses a selective 0.15 mix-amount orange/teal color grade to separate the blue-hour mountain silhouettes from the high-intensity sodium streetlights.
+2.  **Sodium Glow (Neon Realism)**: All light sources use multi-layered `drop-shadow` and `screen` blend modes to simulate gas-discharge volumetric spill on wet asphalt.
+3.  **Kinetic Handling**: Physics are tuned for "heavy" muscle car handling (1970 Chevelle SS), prioritizing angular damping and spring-arm stability over hyper-realistic arcade movement.
+
+---
+
 ## 🎥 Cinematic Vision
 This project prioritizes **Atmosphere over Mechanics**. It captures the isolation of a midnight drive:
 - **Restrained Lighting**: 70-80% darkness. Deep black and indigo shadows contrasted by warm halogen highlights.
