@@ -85,16 +85,17 @@ canvas {
 }
 
 .hud-item {
-  color: #fff;
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0.1rem;
+  color: #FFB347;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.15rem;
   font-family: 'Inter', sans-serif;
   text-transform: uppercase;
 }
 
 #speed-val, #dist-val {
-  font-weight: 700;
+  color: #fff;
+  margin-left: 5px;
 }
 
 .screen-flash {
