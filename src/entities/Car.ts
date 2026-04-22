@@ -44,8 +44,8 @@ export class Car {
   private attachLights() {
     const headlightColor = 0xFFB347; // Drive 2011 Warm Halogen
     const createHeadlight = (x: number) => {
-      // Sharper falloff (penumbra 0.3) and higher decay (2) to highlight road walls
-      const spot = new THREE.SpotLight(headlightColor, 350, 120, 0.5, 0.3, 2);
+      // Wider cone (0.7) and softer falloff (0.5) to reveal road bed walls
+      const spot = new THREE.SpotLight(headlightColor, 350, 150, 0.7, 0.5, 2);
       spot.position.set(x, 0.6, 2.1);
       const target = new THREE.Object3D();
       target.position.set(x, -0.5, 40);
@@ -53,7 +53,7 @@ export class Car {
       spot.target = target;
       this.mesh.add(spot);
 
-      const glow = new THREE.PointLight(headlightColor, 15, 8, 2);
+      const glow = new THREE.PointLight(headlightColor, 15, 10, 2);
       glow.position.set(x, 0.6, 2.1);
       this.mesh.add(glow);
     };
