@@ -45,13 +45,14 @@ body {
   margin: 0;
 }
 
-.splash-cta {
+.splash-cta, .splash-controls {
   font-family: 'Inter', sans-serif;
-  font-size: 1rem;
-  letter-spacing: 0.8rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.5rem;
   color: #fff;
   opacity: 0.4;
   text-transform: uppercase;
+  margin: 10px 0;
 }
 
 canvas {

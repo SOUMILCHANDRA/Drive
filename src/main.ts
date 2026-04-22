@@ -16,7 +16,7 @@ async function bootstrap() {
     engine.scene.add(car.mesh);
 
     let distance = 0;
-    let autopilot = true;
+    let autopilot = false; // Manual by default
 
     engine.render((delta) => {
         // Core Logic
@@ -55,6 +55,13 @@ async function bootstrap() {
             if (hud) hud.style.display = 'block';
         });
     }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'a') {
+            autopilot = !autopilot;
+            console.log("Autopilot:", autopilot);
+        }
+    });
 }
 
 bootstrap();
