@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { Noise } from '../utils/Noise';
 import { CONFIG } from '../config';
-import { BiomeManager } from './BiomeManager';
 
 export class RoadManager {
   private roadGroup: THREE.Group;
@@ -29,9 +28,14 @@ export class RoadManager {
       side: THREE.DoubleSide
     });
 
-    this.points.push(new THREE.Vector3(0, this.noise.get(0, -10) * 50, -10));
-    this.points.push(new THREE.Vector3(0, this.noise.get(0, 0) * 50, 0));
-    this.points.push(new THREE.Vector3(0, this.noise.get(0, 10) * 50, 10));
+    const planet = CONFIG.PLANETS.EARTH;
+    const h0 = this.noise.fbm(0, -10, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
+    const h1 = this.noise.fbm(0, 0, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
+    const h2 = this.noise.fbm(0, 10, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
+
+    this.points.push(new THREE.Vector3(0, h0, -10));
+    this.points.push(new THREE.Vector3(0, h1, 0));
+    this.points.push(new THREE.Vector3(0, h2, 10));
     
     this.generateMorePoints(100);
   }
@@ -41,8 +45,6 @@ export class RoadManager {
     let lastDir = new THREE.Vector3().subVectors(lastPoint, this.points[this.points.length - 2]).normalize();
 
     for (let i = 0; i < count; i++) {
-        const params = BiomeManager.getParams(lastPoint.z);
-        
         // 1. "Scouting" Logic: Test 3 directions (Left, Straight, Right)
         const angles = [-0.4, 0, 0.4];
         let bestDir = lastDir.clone();
@@ -53,7 +55,8 @@ export class RoadManager {
             const testPos = lastPoint.clone().add(testDir.clone().multiplyScalar(this.chunkSize));
             
             // Sample height ahead
-            const h = this.noise.get(testPos.x, testPos.z) * params.ELEVATION_SCALE;
+            const planet = CONFIG.PLANETS.EARTH;
+            const h = this.noise.fbm(testPos.x, testPos.z, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
             const gradient = Math.abs(h - lastPoint.y);
             
             // 2. Self-Intersection Check: Repulsion from history
@@ -74,7 +77,8 @@ export class RoadManager {
         }
 
         const newPoint = lastPoint.clone().add(bestDir.multiplyScalar(this.chunkSize));
-        newPoint.y = this.noise.get(newPoint.x, newPoint.z) * params.ELEVATION_SCALE;
+        const planet = CONFIG.PLANETS.EARTH;
+        newPoint.y = this.noise.fbm(newPoint.x, newPoint.z, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
         
         // 3. 9-Point Smoothing Retroactively
         this.points.push(newPoint);
@@ -105,7 +109,8 @@ export class RoadManager {
   }
 
   public getRoadHeight(x: number, z: number): number {
-    return this.noise.get(x, z) * 50;
+    const planet = CONFIG.PLANETS.EARTH;
+    return this.noise.fbm(x, z, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
   }
 
   public getRoadX(z: number): number {

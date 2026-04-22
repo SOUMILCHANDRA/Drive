@@ -26,17 +26,18 @@ export class Chunk {
       const vx = vertices[i] + x + size / 2;
       const vz = vertices[i + 2] + z - size / 2;
       
-      const planet = CONFIG.PLANETS.EARTH; // Currently defaulted to Earth
-      
+      const planet = CONFIG.PLANETS.EARTH; 
       const noiseH = noise.fbm(vx, vz, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
       
       const roadX = getRoadX ? getRoadX(vz) : 0;
       const distToRoad = Math.abs(vx - roadX);
       const roadWidth = 14;
-      const carveRadius = 45; // Increased for natural embankments
+      const carveRadius = 50; 
       
-      const carveFactor = 1.0 - Math.min(Math.max((distToRoad - roadWidth / 2) / carveRadius, 0), 1);
-      // "Sinking" and "Lifting" the terrain to meet the road midline
+      // Use smoothstep for natural "Trench and Mound" falloff
+      const t = Math.min(Math.max((distToRoad - roadWidth / 2) / carveRadius, 0), 1);
+      const carveFactor = 1.0 - (t * t * (3 - 2 * t)); // Smoothstep(0, 1, t) inverted
+      
       const roadHeight = noise.fbm(roadX, vz, planet.OCTAVES, planet.PERSISTENCE, planet.SCALE) * planet.ELEVATION;
       const h = THREE.MathUtils.lerp(noiseH, roadHeight, carveFactor);
 
