@@ -73,7 +73,12 @@ body {
   width: 260px; /* Cinematic scale */
   background: transparent;
   display: block;
-  mix-blend-mode: screen;
+  /* 
+   * Mix-Blend-Mode: Screen
+   * Essential for environmental integration. Allows the pink neon glow to 
+   * additively blend with the wet asphalt reflections of the background image.
+   */
+  mix-blend-mode: screen; 
   
   /* Quad-Layer Halo Pipeline (with White Inner Core) */
   filter:
