@@ -49,7 +49,7 @@ const ROAD_FRAGMENT_SHADER = `
 
 export class RoadManager {
   private roadGroup: THREE.Group;
-  private scene: THREE.Scene;
+  private scene: THREE.Object3D;
   private noise: Noise;
   
   private points: THREE.Vector3[] = [];
@@ -57,7 +57,7 @@ export class RoadManager {
   private chunkSize: number = 10;
   private renderDistance: number = 60;
 
-  constructor(scene: THREE.Scene, noise: Noise) {
+  constructor(scene: THREE.Object3D, noise: Noise) {
     this.scene = scene;
     this.noise = noise;
     this.roadGroup = new THREE.Group();

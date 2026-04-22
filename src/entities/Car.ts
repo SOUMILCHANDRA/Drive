@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -11,12 +10,8 @@ RectAreaLightUniformsLib.init();
  */
 export class Car {
   public mesh: THREE.Group;
-  public velocity: THREE.Vector3 = new THREE.Vector3();
-  public acceleration: number = CONFIG.CAR.ACCELERATION;
-  public deceleration: number = 0.98;
-  public maxSpeed: number = CONFIG.CAR.MAX_SPEED;
-  public steeringAmount: number = CONFIG.CAR.STEERING;
-  public angle: number = 0;
+  public inputX: number = 0; // Visual steering
+  public currentSpeed: number = 0; // Just for UI/Autopilot logic
 
   private keys: Record<string, boolean> = {};
   private brakeLights: THREE.Mesh[] = [];
@@ -84,20 +79,13 @@ export class Car {
   }
 
   private attachLights() {
-    const headlightLeft = new THREE.SpotLight(0xffe6b0, 40, 120, Math.PI / 6, 0.5);
-    headlightLeft.position.set(-0.6, 0.3, 1.5);
-    headlightLeft.target.position.set(-0.6, 0.2, 10);
-    headlightLeft.castShadow = true;
+    const headlight = new THREE.SpotLight(0xffcc88, 20, 80);
+    headlight.position.set(0, 1, 2);
+    headlight.target.position.set(0, 0, 10);
+    headlight.castShadow = true;
 
-    const headlightRight = headlightLeft.clone();
-    headlightRight.position.set(0.6, 0.3, 1.5);
-    headlightRight.target.position.set(0.6, 0.2, 10);
-    headlightRight.castShadow = true;
-
-    this.mesh.add(headlightLeft);
-    this.mesh.add(headlightRight);
-    this.mesh.add(headlightLeft.target);
-    this.mesh.add(headlightRight.target);
+    this.mesh.add(headlight);
+    this.mesh.add(headlight.target);
 
     // GROUNDING SHADOW: Final Lock Physical Anchor
     const shadowGeo = new THREE.CircleGeometry(1.5, 32);
@@ -132,87 +120,68 @@ export class Car {
   }
 
   public get velocityValue(): number {
-    return this.velocity.z;
+    return this.currentSpeed;
   }
 
   /**
    * Main update loop for manual driving.
    */
-  public update(delta: number, getHeight: (x: number, z: number) => number, getTangent: (z: number) => THREE.Vector3) {
+  /**
+   * Main update loop for visual driving.
+   */
+  public update(delta: number) {
     const isBraking = this.keys['s'] || this.keys['arrowdown'];
     this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 10 : 3);
 
-    if (this.keys['w'] || this.keys['arrowup']) this.velocity.z += this.acceleration * delta;
-    else if (isBraking) this.velocity.z -= this.acceleration * delta;
-
-    if (Math.abs(this.velocity.z) > 0.1) {
-      if (this.keys['a'] || this.keys['arrowleft']) this.angle += this.steeringAmount * Math.sign(this.velocity.z);
-      if (this.keys['d'] || this.keys['arrowright']) this.angle -= this.steeringAmount * Math.sign(this.velocity.z);
+    // Speed logic is purely scalar for distance calculation in main.ts
+    if (this.keys['w'] || this.keys['arrowup']) {
+        this.currentSpeed = Math.min(this.currentSpeed + 50 * delta, 200);
+    } else if (isBraking) {
+        this.currentSpeed = Math.max(this.currentSpeed - 100 * delta, 0);
+    } else {
+        this.currentSpeed = Math.max(this.currentSpeed - 20 * delta, 0);
     }
 
-    this.velocity.z *= this.deceleration;
+    // Input X Logic
+    if (this.currentSpeed > 0) {
+      if (this.keys['a'] || this.keys['arrowleft']) this.inputX += 0.5 * delta;
+      if (this.keys['d'] || this.keys['arrowright']) this.inputX -= 0.5 * delta;
+    }
     
-    // POSITION UPDATE: 1D Forward Progress + Steering Offset
-    this.mesh.position.z += Math.cos(this.angle) * this.velocity.z * delta;
-    this.mesh.position.x += Math.sin(this.angle) * this.velocity.z * delta;
+    // Auto-center steering
+    if (!this.keys['a'] && !this.keys['arrowleft'] && !this.keys['d'] && !this.keys['arrowright']) {
+        this.inputX = THREE.MathUtils.lerp(this.inputX, 0, 0.1);
+    }
+    
+    this.inputX = THREE.MathUtils.clamp(this.inputX, -2, 2);
 
-    // STABLE SPLINE LOCK: Height sampling + Negative Offset (-0.6)
-    const roadHeight = Math.max(getHeight(this.mesh.position.x, this.mesh.position.z), 0);
+    // PURE VISUAL LERP: Car stays at Z=0.
+    this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, this.inputX * 5, 0.1);
+    this.mesh.rotation.z = -this.mesh.position.x * 0.05; // Fake tilt
+    this.mesh.rotation.y = this.inputX * 0.2; // Fake steering visually
+    
+    // Fixed height offset (-0.6)
     const time = Date.now() * 0.003;
-    const bobbing = Math.sin(time) * 0.01; // Zen stability
-    
-    // Final Physics Lock: Snap directly to road surface (-0.6 pivot correction)
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, roadHeight - 0.6 + bobbing, 0.1);
-    
-    // KINETIC ROTATION: Slerp toward road tangent (0.1 damping)
-    const tangent = getTangent(this.mesh.position.z);
-    const targetRot = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      tangent.clone().normalize()
-    );
-    
-    // Combine road curvature with manual steering
-    const steeringQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.angle);
-    targetRot.multiply(steeringQuat);
-    
-    this.mesh.quaternion.slerp(targetRot, 0.1);
+    const bobbing = Math.sin(time) * 0.01; 
+    this.mesh.position.y = -0.6 + bobbing;
   }
 
   /**
    * Logic for autonomous spline following.
    */
-  public autopilot(targetX: number, targetZ: number, targetAngle: number, targetY: number) {
-    this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, targetX, 0.1);
-    this.mesh.position.z = targetZ;
-    this.angle = targetAngle;
-    this.velocity.z = 25;
-    
-    // Vertical stabilization (-0.25 pivot correction)
-    this.mesh.position.y = THREE.MathUtils.lerp(this.mesh.position.y, targetY - 0.25, 0.2);
-    
-    // KINETIC STEERING: Heavy weight damping (0.03)
-    this.mesh.rotation.y = THREE.MathUtils.lerp(this.mesh.rotation.y, this.angle, 0.03);
+  public autopilot() {
+    this.currentSpeed = 100;
+    this.mesh.position.x = THREE.MathUtils.lerp(this.mesh.position.x, 0, 0.1);
+    this.mesh.position.y = -0.6;
+    this.mesh.rotation.z = 0;
+    this.mesh.rotation.y = 0;
   }
 
-  /**
-   * Calculates the camera's world position and look-at target based on vehicle state.
-   * Decoupled Spring-Arm: Absorbs car jitter via 0.08 damping.
-   */
   public getCameraTransform() {
-    const cameraOffset = new THREE.Vector3(0, 2, -6);
-    
-    // Calculate desired position in world space
-    const desiredPosition = this.mesh.position.clone().add(
-      cameraOffset.clone().applyQuaternion(this.mesh.quaternion)
-    );
+    const targetCamPos = new THREE.Vector3(0, 2, -6);
+    this.currentCameraPos.lerp(targetCamPos, 0.08);
 
-    // Smooth Follow (0.08 Damping)
-    this.currentCameraPos.lerp(desiredPosition, 0.08);
-
-    // Look ahead logic for cinematic weight
-    const lookTarget = this.mesh.position.clone().add(
-        new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion).multiplyScalar(15)
-    );
+    const lookTarget = new THREE.Vector3(0, 1, 5);
     
     return { position: this.currentCameraPos.clone(), lookTarget };
   }

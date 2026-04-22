@@ -8,9 +8,9 @@ export class WorldManager {
   private chunkSize: number = 200;
   private renderDistance: number = 3;
   private noise: Noise;
-  private scene: THREE.Scene;
+  private scene: THREE.Object3D;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Object3D) {
     this.scene = scene;
     this.noise = new Noise(Math.random() * 1000000);
   }

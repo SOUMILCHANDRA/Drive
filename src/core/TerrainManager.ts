@@ -8,7 +8,7 @@ import { RoadManager } from './RoadManager';
  * Implements nested LOD chunks and road-terrain stitching.
  */
 export class TerrainManager {
-  private scene: THREE.Scene;
+  private scene: THREE.Object3D;
   private noise: Noise;
   private roadManager: RoadManager;
   private chunks: Map<string, THREE.Mesh> = new Map();
@@ -16,7 +16,7 @@ export class TerrainManager {
   private resolution: number = 32; // Resolution per chunk
   private terrainMaterial: THREE.MeshStandardMaterial;
 
-  constructor(scene: THREE.Scene, noise: Noise, roadManager: RoadManager) {
+  constructor(scene: THREE.Object3D, noise: Noise, roadManager: RoadManager) {
     this.scene = scene;
     this.noise = noise;
     this.roadManager = roadManager;

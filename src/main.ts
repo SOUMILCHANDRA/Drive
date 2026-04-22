@@ -1,17 +1,21 @@
 import './style.css';
+import * as THREE from 'three';
 import { Engine } from './core/Engine';
 import { Car } from './entities/Car';
 import { RoadManager } from './core/RoadManager';
 import { WorldManager } from './core/WorldManager';
 import { TerrainManager } from './core/TerrainManager';
 
-console.log("Drive: PHASE 3 RECONSTRUCTION - ADDING TERRAIN");
+console.log("Drive: PHASE 1 RECONSTRUCTION - INFINITE RUNNER LOOP");
 
 const engine = new Engine();
+const worldGroup = new THREE.Group();
+engine.scene.add(worldGroup);
+
 const car = new Car();
-const world = new WorldManager(engine.scene);
-const road = new RoadManager(engine.scene, world.getNoise());
-const terrain = new TerrainManager(engine.scene, world.getNoise(), road);
+const world = new WorldManager(worldGroup);
+const road = new RoadManager(worldGroup, world.getNoise());
+const terrain = new TerrainManager(worldGroup, world.getNoise(), road);
 
 async function bootstrap() {
     await car.init();
@@ -27,21 +31,25 @@ async function bootstrap() {
         
         while (fixedTimeAccumulator >= fixedDelta) {
             // FIXED PHYSICS UPDATE (60Hz)
-            world.update(car.mesh.position, (z) => road.getRoadX(z), (x, z) => road.getRoadHeight(x, z));
-            terrain.update(car.mesh.position);
-            road.update(car.mesh.position.z);
-            
             if (autopilot) {
-                const targetZ = car.mesh.position.z + car.velocityValue * fixedDelta;
-                const target = road.getAutopilotTarget(targetZ);
-                car.autopilot(target.x, target.z, target.angle, target.y);
+                car.autopilot();
             } else {
-                car.update(
-                    fixedDelta, 
-                    (x, z) => road.getRoadHeight(x, z),
-                    (z) => road.getTangent(z)
-                );
+                car.update(fixedDelta);
             }
+            
+            distance += car.velocityValue * fixedDelta;
+
+            // VIRTUAL WORLD GENERATION
+            // The world managers generate geometry at virtual absolute coordinates
+            const virtualPos = new THREE.Vector3(car.mesh.position.x, 0, distance);
+            
+            world.update(virtualPos, (z) => road.getRoadX(z), (x, z) => road.getRoadHeight(x, z));
+            terrain.update(virtualPos);
+            road.update(distance);
+
+            // INFINITE RUNNER ILLUSION
+            // The entire world group moves backward as we travel forward
+            worldGroup.position.z = -distance;
             
             fixedTimeAccumulator -= fixedDelta;
         }
@@ -50,7 +58,6 @@ async function bootstrap() {
         if (Math.random() < 0.01) console.log("Car Y:", car.mesh.position.y);
         
         const speedKmh = Math.floor(car.velocityValue * 3.6);
-        distance += car.velocityValue * delta;
         const speedVal = document.getElementById('speed-val');
         const distVal = document.getElementById('dist-val');
         if (speedVal) speedVal.innerText = speedKmh.toString();

@@ -16,7 +16,7 @@ export class Engine {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050508);
     // STABLE ATMOSPHERE: High-Density Haze
-    this.scene.fog = new THREE.FogExp2(0x050508, 0.015); 
+    this.scene.fog = new THREE.FogExp2(0x050508, 0.02); 
     
     this.camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 2000);
     
@@ -29,7 +29,7 @@ export class Engine {
     (this.renderer as any).useLegacyLights = false; // For newer Three.js versions
     
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.2; // increase from default to fix underexposure
+    this.renderer.toneMappingExposure = 1.5; // High exposure for visibility
     this.renderer.outputColorSpace = THREE.SRGBColorSpace; 
     this.renderer.shadowMap.enabled = true; 
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -43,21 +43,12 @@ export class Engine {
   }
 
   /**
-   * Configures the environmental lighting (Moonlight, Rim lights, and Ambient Presence).
+   * Configures the environmental lighting. Minimalist setup.
    */
   private setupLights() {
-    // MOONLIGHT FEEL: Subtle directional rim
-    const dir = new THREE.DirectionalLight(0x0a0a2e, 0.1);
-    dir.position.set(5, 10, 2);
-    this.scene.add(dir);
-
-    // BASE LIGHT: Visibility first
-    const ambient = new THREE.AmbientLight(0x111122, 0.2);
+    // BASE LIGHT: Minimalist visibility
+    const ambient = new THREE.AmbientLight(0x111122, 0.3);
     this.scene.add(ambient);
-
-    // SOFT GLOBAL VISIBILITY: Blue Hour Fill
-    const hemi = new THREE.HemisphereLight(0x111133, 0x000000, 0.2);
-    this.scene.add(hemi);
   }
 
   /**
