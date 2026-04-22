@@ -2,6 +2,50 @@ import * as THREE from 'three';
 import { Noise } from '../utils/Noise';
 import { CONFIG } from '../config';
 
+const ROAD_SHADER_COMMON = `
+    #include <common>
+    varying vec2 vUv;
+    varying vec3 vWorldPosition;
+
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p) {
+        vec2 i = floor(p); vec2 f = fract(p);
+        vec2 u = f*f*(3.0-2.0*f);
+        return mix(mix(hash(i + vec2(0,0)), hash(i + vec2(1,0)), u.x),
+                   mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);
+    }
+`;
+
+const ROAD_VERTEX_SHADER = `
+    #include <worldpos_vertex>
+    vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+    vUv = uv;
+`;
+
+const ROAD_FRAGMENT_SHADER = `
+    #include <emissivemap_fragment>
+    
+    // 1. Wet Look Specular Streaks (Sodium Orange/Teal Mix)
+    float roughnessNoise = noise(vUv * 500.0);
+    float spec = pow(noise(vUv * vec2(1.0, 400.0)) * 0.5 + 0.5, 8.0);
+    diffuseColor.rgb += vec3(0.0, 0.4, 0.4) * spec * roughnessNoise;
+
+    // 2. Center Dash Lines
+    float dash = step(0.7, fract(vUv.x * 0.1));
+    float center = 1.0 - step(0.015, abs(vUv.y - 0.5));
+    totalEmissiveRadiance += vec3(1.0, 0.84, 0.0) * dash * center * 4.0;
+
+    // 3. Edge Stitch
+    float edgeMask = smoothstep(0.5, 0.45, abs(vUv.y - 0.5));
+    diffuseColor.a *= edgeMask;
+
+    // 4. Fog + Horizon
+    float dist = length(vWorldPosition - cameraPosition);
+    float fogFactor = 1.0 - exp(-dist * 0.003);
+    vec3 fogColor = mix(vec3(0.04, 0.04, 0.06), vec3(0.5, 0.0, 0.5), clamp((dist-800.0)/1200.0, 0.0, 1.0));
+    diffuseColor.rgb = mix(diffuseColor.rgb, fogColor, clamp(fogFactor, 0.0, 1.0));
+`;
+
 export class RoadManager {
   private roadGroup: THREE.Group;
   private scene: THREE.Scene;
@@ -217,63 +261,10 @@ export class RoadManager {
     });
 
     roadMat.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader.replace(
-            '#include <common>',
-            `
-            #include <common>
-            varying vec2 vUv;
-            varying vec3 vWorldPosition;
-
-            float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-            float noise(vec2 p) {
-                vec2 i = floor(p); vec2 f = fract(p);
-                vec2 u = f*f*(3.0-2.0*f);
-                return mix(mix(hash(i + vec2(0,0)), hash(i + vec2(1,0)), u.x),
-                           mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);
-            }
-            `
-        );
-        shader.vertexShader = shader.vertexShader.replace(
-            '#include <common>',
-            `
-            #include <common>
-            varying vec2 vUv;
-            varying vec3 vWorldPosition;
-            `
-        ).replace(
-            '#include <worldpos_vertex>',
-            `
-            #include <worldpos_vertex>
-            vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-            vUv = uv;
-            `
-        );
-        shader.fragmentShader = shader.fragmentShader.replace(
-            '#include <emissivemap_fragment>',
-            `
-            #include <emissivemap_fragment>
-            
-            // 1. Wet Look Specular Streaks (Sodium Orange/Teal Mix)
-            float roughnessNoise = noise(vUv * 500.0);
-            float spec = pow(noise(vUv * vec2(1.0, 400.0)) * 0.5 + 0.5, 8.0);
-            diffuseColor.rgb += vec3(0.0, 0.4, 0.4) * spec * roughnessNoise;
-
-            // 2. Center Dash Lines
-            float dash = step(0.7, fract(vUv.x * 0.1));
-            float center = 1.0 - step(0.015, abs(vUv.y - 0.5));
-            totalEmissiveRadiance += vec3(1.0, 0.84, 0.0) * dash * center * 4.0;
-
-            // 3. Edge Stitch
-            float edgeMask = smoothstep(0.5, 0.45, abs(vUv.y - 0.5));
-            diffuseColor.a *= edgeMask;
-
-            // 4. Fog + Horizon
-            float dist = length(vWorldPosition - cameraPosition);
-            float fogFactor = 1.0 - exp(-dist * 0.003);
-            vec3 fogColor = mix(vec3(0.04, 0.04, 0.06), vec3(0.5, 0.0, 0.5), clamp((dist-800.0)/1200.0, 0.0, 1.0));
-            diffuseColor.rgb = mix(diffuseColor.rgb, fogColor, clamp(fogFactor, 0.0, 1.0));
-            `
-        );
+        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', ROAD_SHADER_COMMON);
+        shader.vertexShader = shader.vertexShader.replace('#include <common>', ROAD_SHADER_COMMON);
+        shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', ROAD_VERTEX_SHADER);
+        shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', ROAD_FRAGMENT_SHADER);
     };
 
     const roadMesh = new THREE.Mesh(geometry, roadMat);
