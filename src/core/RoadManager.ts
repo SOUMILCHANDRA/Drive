@@ -257,17 +257,13 @@ export class RoadManager {
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
 
-    const roadMat = new THREE.MeshPhysicalMaterial({
-        color: 0x020205, // Deep desaturated indigo
-        roughness: 0.15, // Sharp wet-look streaks
-        metalness: 0.8,  // High sheen for Halogen catch
-        clearcoat: 1.0,  
-        reflectivity: 1.0,
-        emissive: 0x000000,
-        emissiveIntensity: 0.0,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
+    const roadMat = new THREE.MeshStandardMaterial({
+        color: 0x050508,
+        roughness: 0.25,
+        metalness: 0.6,
         transparent: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -1
     });
 
     roadMat.onBeforeCompile = (shader) => {

@@ -24,7 +24,7 @@ export class Engine {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.2;
+    this.renderer.toneMappingExposure = 1;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace; 
     this.renderer.shadowMap.enabled = true; 
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -46,14 +46,13 @@ export class Engine {
     dir.position.set(5, 10, 2);
     this.scene.add(dir);
 
-    // SOFT GLOBAL VISIBILITY: Blue Hour Fill
-    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.15);
-    this.scene.add(hemi);
+    // BASE LIGHT: Visibility first
+    const ambient = new THREE.AmbientLight(0x111122, 0.2);
+    this.scene.add(ambient);
 
-    // THE "DRIVER" RIM LIGHT: Pink silhouette definition
-    const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.05);
-    rimLight.position.set(0, 2, -10);
-    this.scene.add(rimLight);
+    // SOFT GLOBAL VISIBILITY: Blue Hour Fill
+    const hemi = new THREE.HemisphereLight(0x0a0a2e, 0x000000, 0.25);
+    this.scene.add(hemi);
   }
 
   /**

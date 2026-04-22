@@ -64,9 +64,9 @@ export class Car {
             if (child instanceof THREE.Mesh) {
                 child.geometry.computeVertexNormals(); 
                 child.material = new THREE.MeshStandardMaterial({
-                    color: child.material.color || 0x050505,
-                    roughness: 0.2, // High-gloss finish
-                    metalness: 0.7  // Reflective catch for Sodium/Neon
+                    color: 0xaaaaaa,
+                    roughness: 0.4,
+                    metalness: 0.6
                 });
                 child.castShadow = true;
                 child.receiveShadow = true;
@@ -84,21 +84,16 @@ export class Car {
   }
 
   private attachLights() {
-    const headlightColor = 0xffd27f; // Stable Amber Sodium
-    const createHeadlight = (x: number) => {
-      // REAL SPOTLIGHTS: 60m range, 0.5 penumbra
-      const spot = new THREE.SpotLight(headlightColor, 5, 60, Math.PI / 6, 0.5);
-      spot.position.set(x, 0.2, 1.5);
-      spot.castShadow = true;
+    const headlightLeft = new THREE.SpotLight(0xffd27f, 15, 80, Math.PI / 5, 0.6);
+    headlightLeft.position.set(-0.6, 0.3, 1.8);
+    headlightLeft.castShadow = true;
 
-      const target = new THREE.Object3D();
-      target.position.set(x, 0, 10);
-      this.mesh.add(target);
-      spot.target = target;
-      this.mesh.add(spot);
-    };
-    createHeadlight(0.7);
-    createHeadlight(-0.7);
+    const headlightRight = headlightLeft.clone();
+    headlightRight.position.set(0.6, 0.3, 1.8);
+    headlightRight.castShadow = true;
+
+    this.mesh.add(headlightLeft);
+    this.mesh.add(headlightRight);
 
     // GROUNDING SHADOW: Final Lock Physical Anchor
     const shadowGeo = new THREE.CircleGeometry(1.5, 32);
