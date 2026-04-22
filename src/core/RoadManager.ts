@@ -204,9 +204,11 @@ export class RoadManager {
     geometry.computeVertexNormals();
 
     const roadMat = new THREE.MeshStandardMaterial({
-        color: 0x020205, // Deep Indigo shadows
-        roughness: 0.1,  // Wet look (low roughness)
-        metalness: 0.8,  // High metalness for reflections
+        color: 0x020205, 
+        roughness: 0.1,  // Wet look
+        metalness: 0.5,  // Reflective
+        emissive: 0x020205, // 0.02 "felt" boost
+        emissiveIntensity: 1.0,
         polygonOffset: true,
         polygonOffsetFactor: -1,
         transparent: true,
@@ -249,20 +251,20 @@ export class RoadManager {
             `
             #include <emissivemap_fragment>
             
-            // 1. Wet Look Specular Noise
-            float spec = noise(vUv * 100.0) * 0.5;
-            diffuseColor.rgb += vec3(0.0, 0.5, 0.5) * spec; // Teal road highlights
+            // 1. Wet Look Specular Noise (Teal Highlights)
+            float spec = noise(vUv * 100.0) * 0.4;
+            diffuseColor.rgb += vec3(0.0, 0.4, 0.4) * spec;
 
             // 2. Center Dash Lines (Amber Glow)
             float dash = step(0.7, fract(vUv.x * 0.1));
             float center = 1.0 - step(0.015, abs(vUv.y - 0.5));
-            totalEmissiveRadiance += vec3(1.0, 0.84, 0.0) * dash * center * 4.0; // Amber/Gold
+            totalEmissiveRadiance += vec3(1.0, 0.84, 0.0) * dash * center * 4.0;
 
             // 3. Edge Stitch
             float edgeMask = smoothstep(0.5, 0.45, abs(vUv.y - 0.5));
             diffuseColor.a *= edgeMask;
 
-            // 4. Exponential Fog + Magenta Horizon Afterglow
+            // 4. Exponential Fog + Magenta Horizon
             float dist = length(vWorldPosition - cameraPosition);
             float fogFactor = 1.0 - exp(-dist * 0.003);
             vec3 fogColor = mix(vec3(0.04, 0.04, 0.06), vec3(0.5, 0.0, 0.5), clamp((dist-800.0)/1200.0, 0.0, 1.0));
@@ -272,18 +274,11 @@ export class RoadManager {
     };
 
     const roadMesh = new THREE.Mesh(geometry, roadMat);
+    roadMesh.frustumCulled = false; // Prevent segment flickering
     roadMesh.receiveShadow = true;
     
     const chunkGroup = new THREE.Group();
     chunkGroup.add(roadMesh);
-
-    // 2. VECTOR VIZ: Keep for math confirmation
-    for (let i = 0; i <= 2; i++) {
-        const t = 1/3 + (i / 2) * (1/3);
-        const p = curve.getPoint(t);
-        const upArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), p, 1.5, 0x00ff00);
-        chunkGroup.add(upArrow);
-    }
 
     if (index % 10 === 0) { 
         const lightPos = curve.getPoint(0.5);

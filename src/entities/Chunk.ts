@@ -68,9 +68,12 @@ export class Chunk {
       roughness: 0.9,
       metalness: 0.1,
       flatShading: true,
+      emissive: 0x020205, // 0.02 boost
+      emissiveIntensity: 1.0,
     });
 
     this.terrain = new THREE.Mesh(geometry, material);
+    this.terrain.frustumCulled = false;
     this.terrain.receiveShadow = true;
     this.mesh.add(this.terrain);
     

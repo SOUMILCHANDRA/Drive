@@ -19,24 +19,32 @@ export class Engine {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.2;
+    this.renderer.toneMappingExposure = 1.5;
     document.getElementById('app')?.appendChild(this.renderer.domElement);
 
     this.clock = new THREE.Clock();
+    this.setupLights();
     this.setupPostProcessing();
     this.setupResize();
+  }
+
+  private setupLights() {
+    // 10-degree Rim Light for mountains
+    const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.1);
+    rimLight.position.set(100, 20, -100);
+    this.scene.add(rimLight);
   }
 
   private setupPostProcessing() {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-    // 1. SELECTIVE BLOOM: Halogen Glow
+    // SELECTIVE BLOOM: High sensitivity (0.1) for amber pop
     const bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
         1.2, 0.4, 0.85
     );
-    bloomPass.threshold = 0.6;
+    bloomPass.threshold = 0.1; 
     this.composer.addPass(bloomPass);
 
     // 2. FILM GRAIN: 35mm Texture
