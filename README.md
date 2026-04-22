@@ -1,59 +1,40 @@
-# 🏎️ Drive: Next-Gen Procedural Racer
+# 🎬 Drive | Midnight Procedural Road
 
-![Drive Splash](public/splash_bg.png)
+A moody, restrained cinematic driving experience inspired by the 2011 film **DRIVE**. Explore an infinite, procedurally generated nocturnal landscape designed with a focus on atmosphere, lighting, and tension over arcade speed.
 
-A high-performance, procedural 3D racing experience built for the browser. Inspired by *Slow Roads* and *WipEout*, **Drive** offers an infinite journey through a synthwave-inspired neon landscape with anti-gravity mechanics and smooth spline-based generation.
+![Drive Aesthetic](https://img.shields.io/badge/Aesthetic-DRIVE_(2011)-black?style=for-the-badge)
+![Tech](https://img.shields.io/badge/Powered_by-Three.js-blueviolet?style=for-the-badge)
 
-## 🌟 Next-Gen Features
+## 🌌 Cinematic Vision
+This project deviates from typical "Neon" racing games. Instead, it captures the grit and isolation of a midnight drive through Los Angeles:
+- **Restrained Lighting**: Deep blacks and cold blue-grey environments contrasted by warm halogen headlights.
+- **Atmospheric Depth**: Procedural sodium-orange streetlights creating islands of warmth in a vast nocturnal void.
+- **Film Grain & Texture**: 35mm celluloid film grain and soft vignettes emulate a high-end cinematic experience.
+- **Documentary HUD**: A minimalist, low-profile text overlay replacing traditional arcade gauges.
 
-- **Infinite Spline Generation**: Transitioned to a `CatmullRomCurve3` system for perfectly smooth curves and infinite track chunks.
-- **Anti-Gravity Physics**:
-  - **Gravity-Flip Tunnels**: Enclosed hexagonal tubes where physics inverts and you drive on the ceiling.
-  - **Wall-Riding**: Natural banking and vertical loops integrated into the procedural generation.
-- **Advanced Car Controls**:
-  - **Drift System**: Hold `Space` to slide through corners with dynamic trail effects.
-  - **Barrel Rolls**: Double-tap `A/D` to perform cinematic rotations.
-  - **Boost Bursts**: Floating rings that grant speed boosts and screen flash effects.
-- **Visual Excellence**:
-  - **Professional Post-Processing**: `UnrealBloomPass` + `ChromaticAberrationShader` for a premium cinematic look.
-  - **Animated Road Shader**: Custom GLSL road material with speed-synced neon grid scrolling.
-  - **Dynamic Elements**: Speed-lines, neon ribbons (trails), and orbital camera intros.
-- **Pro HUD & Audio**:
-  - **Procedural Engine Sounds**: Web Audio API oscillator that modulates frequency based on car speed.
-  - **Glassmorphic HUD**: Real-time SVG gauge, boost bar, and a live minimap projection.
+## ⚙️ Technical Features
+- **Procedural Spline Generation**: High-performance CatmullRom splines create a smooth, infinite roadway that maps to a "Wet Look" asphalt material.
+- **Dynamic Post-Processing Stack**:
+  - **ACESFilmic Tone Mapping**: Industry-standard color grading for consistent exposure.
+  - **UnrealBloom**: Calibrated to catch only high-intensity specular highlights (headlights/brake lights).
+  - **Color Grading**: Cold shadow hues and warm highlight shifts for the LA night-film look.
+- **Handheld Camera Logic**: A soft, "breathing" camera follow-system that simulates a handheld rig on the chase vehicle.
+- **Advanced Headlight Optics**: Dual-stage SpotLights with inner/outer cones for realistic road-surface illumination spread.
+
+## 🕹️ Controls
+- **WASD / ARROWS**: Drive & Steering
+- **SPACE**: Drift (Cuts grip and adds lateral slide)
+- **DOUBLE TAP A/D**: Trigger a cinematic Barrel Roll
+- **CLICK SPLASH**: Initialize Cinematic Audio & Engine
 
 ## 🛠️ Tech Stack
+- **Engine**: Three.js (WebGL)
+- **Physics**: Custom procedural spline-alignment system
+- **Environment**: Custom GLSL Color Grading & Post-processing
+- **Asset Pipeline**: Minimalist procedural geometry (No heavy meshes)
 
-- **Core**: [Three.js](https://threejs.org/) (WebGL)
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Audio**: Web Audio API
-- **Build Tool**: [Vite](https://vitejs.dev/)
+## 🏁 Development State
+Currently tuned for **Visual Immersion**. The system is optimized for a 1.8 exposure/0.006 fog density ratio to maintain visibility while preserving the deep nocturnal mood.
 
-## 🚀 Getting Started
-
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/SOUMILCHANDRA/Drive.git
-    cd Drive
-    ```
-2.  **Install dependencies**:
-    ```bash
-    npm install
-    ```
-3.  **Run development server**:
-    ```bash
-    npm run dev
-    ```
-
-## 🎮 Controls
-
-| Key | Action |
-| :--- | :--- |
-| **W / Arrow Up** | Accelerate |
-| **S / Arrow Down** | Brake / Reverse |
-| **A / D** | Steer (Double tap for Barrell Roll) |
-| **Space** | Drift |
-| **Mouse Click** | Start Game / Initial Cinematic |
-
-## 📄 License
-MIT License
+---
+*Created with focus on visual excellence and cinematic restraint.*
