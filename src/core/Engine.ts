@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, AfterimagePass } from 'three-stdlib';
 
+/**
+ * The core rendering engine.
+ * Orchestrates the Three.js scene, camera, renderer, and post-processing pipeline.
+ */
 export class Engine {
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
@@ -31,6 +35,9 @@ export class Engine {
     this.setupResize();
   }
 
+  /**
+   * Configures the environmental lighting (Moonlight, Rim lights, and Ambient Presence).
+   */
   private setupLights() {
     const moonlight = new THREE.DirectionalLight(0x050510, 0.1);
     moonlight.position.set(0, 100, -200);
@@ -45,6 +52,9 @@ export class Engine {
     this.scene.add(rimLight);
   }
 
+  /**
+   * Initializes the post-processing stack including Bloom, Afterimage, and Film Grain.
+   */
   private setupPostProcessing() {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -134,6 +144,10 @@ export class Engine {
     });
   }
 
+  /**
+   * Starts the main render loop.
+   * @param updateFn Callback for per-frame logic updates
+   */
   public render(updateFn: (delta: number) => void) {
     const loop = () => {
       requestAnimationFrame(loop);
@@ -141,7 +155,7 @@ export class Engine {
       updateFn(delta);
       
       // Update grain noise
-      const grainPass = this.composer.passes[2] as any;
+      const grainPass = this.composer.passes[this.composer.passes.length - 1] as any;
       if (grainPass && grainPass.uniforms) {
           grainPass.uniforms.time.value += delta;
       }
