@@ -31,14 +31,19 @@ export class Chunk {
       
       const roadX = getRoadX ? getRoadX(vz) : 0;
       const distToRoad = Math.abs(vx - roadX);
-      const roadWidth = 14;
-      const carveRadius = 50; 
       
-      // Use smoothstep for natural "Trench and Mound" falloff
-      const t = Math.min(Math.max((distToRoad - roadWidth / 2) / carveRadius, 0), 1);
-      const carveFactor = 1.0 - (t * t * (3 - 2 * t)); // Smoothstep(0, 1, t) inverted
+      // Multi-Zone Carving: 0-7m Core (Flat), 7-25m Shoulder (Embankment)
+      const roadWidth = 7; // Precise core width
+      const embankmentWidth = 18; // 7 to 25m
       
-      // MASTER FIX: Use the actual smoothed spline height
+      let carveFactor = 0;
+      if (distToRoad <= roadWidth) {
+        carveFactor = 1.0; // 100% flat road bed
+      } else if (distToRoad <= roadWidth + embankmentWidth) {
+        const t = (distToRoad - roadWidth) / embankmentWidth;
+        carveFactor = 1.0 - (t * t * (3 - 2 * t)); // Smoothstep falloff
+      }
+      
       const targetHeight = getRoadHeight ? getRoadHeight(roadX, vz) : noiseH;
       const h = THREE.MathUtils.lerp(noiseH, targetHeight, carveFactor);
 
