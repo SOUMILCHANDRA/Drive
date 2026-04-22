@@ -104,13 +104,13 @@ export class Car {
     // THE "RED RIM" BEACONS - Decoupled to prevent internal bleed
     const tailColor = 0xFF0000;
     const createTailLight = (x: number) => {
-        const light = new THREE.PointLight(tailColor, 80, 25, 2); 
+        const light = new THREE.PointLight(tailColor, 40, 20, 2); 
         light.position.set(x, 0.6, -2.8); // Shifted behind bumper
         this.mesh.add(light);
         
         const lens = new THREE.Mesh(
             new THREE.BoxGeometry(0.5, 0.2, 0.1),
-            new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0xff0000, emissiveIntensity: 5 })
+            new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0xff0000, emissiveIntensity: 3 })
         );
         lens.position.set(x, 0.6, -2.6);
         this.mesh.add(lens);
@@ -136,7 +136,7 @@ export class Car {
    */
   public update(delta: number, getHeight: (x: number, z: number) => number) {
     const isBraking = this.keys['s'] || this.keys['arrowdown'];
-    this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 10 : 5);
+    this.brakeLights.forEach(bl => (bl.material as THREE.MeshStandardMaterial).emissiveIntensity = isBraking ? 10 : 3);
 
     if (this.keys['w'] || this.keys['arrowup']) this.velocity.z += this.acceleration * delta;
     else if (isBraking) this.velocity.z -= this.acceleration * delta;

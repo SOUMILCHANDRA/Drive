@@ -15,9 +15,9 @@ export class Engine {
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0a0a0f); // Drive 2011 Near-Black
-    this.scene.fog = new THREE.FogExp2(0x0a0a0f, 0.005); 
+    this.scene.fog = new THREE.FogExp2(0x050508, 0.02); 
     
-    this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 2000);
+    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
     
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -57,8 +57,9 @@ export class Engine {
     lift.position.set(0, 100, 0);
     this.scene.add(lift);
 
-    const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.03);
-    rimLight.position.set(100, 10, -100);
+    // THE "DRIVER" RIM LIGHT: Pink silhouette definition
+    const rimLight = new THREE.DirectionalLight(0xFF2D95, 0.05);
+    rimLight.position.set(0, 2, -10);
     this.scene.add(rimLight);
   }
 
@@ -69,17 +70,44 @@ export class Engine {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-    // 1. AFTERIMAGE: Temporarily disabled for motion verification
-    // const afterimage = new AfterimagePass(0.7);
-    // this.composer.addPass(afterimage);
-
-    // 2. SELECTIVE BLOOM
+    // 1. SELECTIVE BLOOM
     const bloomPass = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        1.5, 0.4, 0.85
+        1.2, 0.5, 0.9 // Tightened for housing glow
     );
-    bloomPass.threshold = 0.1; 
+    bloomPass.threshold = 0.2; 
     this.composer.addPass(bloomPass);
+
+    // 2. ORANGE & TEAL COLOR GRADE
+    const colorGradeShader = {
+        uniforms: {
+            "tDiffuse": { value: null },
+            "teal": { value: new THREE.Color(0x00ffff) },
+            "orange": { value: new THREE.Color(0xff8800) },
+            "mixAmount": { value: 0.15 }
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D tDiffuse;
+            uniform vec3 teal;
+            uniform vec3 orange;
+            uniform float mixAmount;
+            varying vec2 vUv;
+            void main() {
+                vec4 texel = texture2D(tDiffuse, vUv);
+                float lum = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+                vec3 grade = mix(teal * lum, orange * lum, lum);
+                gl_FragColor = vec4(mix(texel.rgb, grade, mixAmount), texel.a);
+            }
+        `
+    };
+    this.composer.addPass(new ShaderPass(colorGradeShader));
 
     // 3. VIGNETTE: Dark Indigo Tint
     const vignetteShader = {

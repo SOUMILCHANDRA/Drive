@@ -25,10 +25,11 @@ const ROAD_VERTEX_SHADER = `
 const ROAD_FRAGMENT_SHADER = `
     #include <emissivemap_fragment>
     
-    // 1. Wet Look Specular Streaks (Sodium Orange/Teal Mix)
+    // 1. Wet Look Specular Streaks + KINETIC GRAIN
     float roughnessNoise = noise(vUv * 500.0);
+    float grain = noise(vUv * 1000.0) * 0.05;
     float spec = pow(noise(vUv * vec2(1.0, 400.0)) * 0.5 + 0.5, 8.0);
-    diffuseColor.rgb += vec3(0.0, 0.4, 0.4) * spec * roughnessNoise;
+    diffuseColor.rgb += (vec3(0.0, 0.4, 0.4) * spec * roughnessNoise) + grain;
 
     // 2. Center Dash Lines
     float dash = step(0.7, fract(vUv.x * 0.1));
@@ -39,10 +40,10 @@ const ROAD_FRAGMENT_SHADER = `
     float edgeMask = smoothstep(0.5, 0.45, abs(vUv.y - 0.5));
     diffuseColor.a *= edgeMask;
 
-    // 4. Fog + Horizon
+    // 4. Fog + Horizon (Nightcall Grade)
     float dist = length(vWorldPosition - cameraPosition);
-    float fogFactor = 1.0 - exp(-dist * 0.003);
-    vec3 fogColor = mix(vec3(0.04, 0.04, 0.06), vec3(0.5, 0.0, 0.5), clamp((dist-800.0)/1200.0, 0.0, 1.0));
+    float fogFactor = 1.0 - exp(-dist * 0.02); // 0.02 density
+    vec3 fogColor = vec3(0.01, 0.01, 0.03); // Deep Indigo
     diffuseColor.rgb = mix(diffuseColor.rgb, fogColor, clamp(fogFactor, 0.0, 1.0));
 `;
 
@@ -300,7 +301,7 @@ export class RoadManager {
         const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
         const sodiumColor = 0xFF9500;
-        const streetLight = new THREE.PointLight(sodiumColor, 50, 100, 2);
+        const streetLight = new THREE.PointLight(sodiumColor, 25, 100, 2);
         streetLight.position.copy(lightPos).add(normal.clone().multiplyScalar(12)).add(new THREE.Vector3(0, 15, 0));
         streetLight.castShadow = true;
         chunkGroup.add(streetLight);
@@ -322,7 +323,7 @@ export class RoadManager {
             blending: THREE.AdditiveBlending
         });
         const corona = new THREE.Sprite(coronaMat);
-        corona.scale.set(6, 6, 1);
+        corona.scale.set(4, 4, 1);
         corona.position.copy(streetLight.position);
         chunkGroup.add(corona);
 
