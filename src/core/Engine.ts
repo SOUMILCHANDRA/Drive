@@ -187,22 +187,24 @@ export class Engine {
    * Ramps exposure and FOV to simulate a camera lens focusing and headlights powering on.
    */
   public ignite() {
+    const TARGET_EXPOSURE = 1.2;
+    const IGNITION_DURATION = 2000; // 2s ramp
+    const FOV_SNAP_AMOUNT = 3;
+
     this.renderer.toneMappingExposure = 0;
-    const targetExposure = 1.2;
-    const duration = 2000; // 2s ramp
     const start = performance.now();
 
     const animateIgnition = (time: number) => {
       const elapsed = time - start;
-      const progress = Math.min(elapsed / duration, 1);
+      const progress = Math.min(elapsed / IGNITION_DURATION, 1);
       
       // Easing: Quad Out
       const ease = 1 - (1 - progress) * (1 - progress);
       
-      this.renderer.toneMappingExposure = ease * targetExposure;
+      this.renderer.toneMappingExposure = ease * TARGET_EXPOSURE;
       
       // Subtle lens snap: Start slightly zoomed and pull back
-      this.camera.fov = 48 - (ease * 3); 
+      this.camera.fov = (45 + FOV_SNAP_AMOUNT) - (ease * FOV_SNAP_AMOUNT); 
       this.camera.updateProjectionMatrix();
 
       if (progress < 1) {
