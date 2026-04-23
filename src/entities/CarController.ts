@@ -44,12 +44,12 @@ export class CarController {
         }
       });
 
-      // Correct orientation if needed (Ferrari model is often reversed)
-      this.model.rotation.y = Math.PI;
+      // Correct orientation for local Chevelle model
+      this.model.rotation.y = 0; 
       this.model.scale.set(1, 1, 1);
       
       this.scene.add(this.model);
-      console.log('Car model loaded and PBR materials enforced');
+      console.log('Local car model loaded and PBR materials enforced');
     } catch (error) {
       console.error('Failed to load car model:', error);
     }

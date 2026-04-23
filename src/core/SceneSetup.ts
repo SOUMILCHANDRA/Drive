@@ -14,7 +14,7 @@ export class SceneSetup {
     
     // Environment setup
     this.scene.background = new THREE.Color(0x020205);
-    this.scene.fog = new THREE.FogExp2(0x020205, 0.015);
+    this.scene.fog = new THREE.FogExp2(0x020205, 0.008);
 
     // Camera setup
     this.camera = new THREE.PerspectiveCamera(
@@ -40,7 +40,7 @@ export class SceneSetup {
     (this.renderer as any).useLegacyLights = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.2;
+    this.renderer.toneMappingExposure = 1.6;
     
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;

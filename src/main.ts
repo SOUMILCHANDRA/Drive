@@ -15,9 +15,9 @@ async function init() {
   const road = new RoadManager(sceneSetup.scene);
   const car = new CarController(sceneSetup.scene);
 
-  // Asset URLs (Using Three.js official examples)
+  // Asset URLs (Using local Chevelle model)
   const HDR_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/equirectangular/venice_sunset_1k.hdr';
-  const CAR_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Ferrari.glb';
+  const CAR_URL = '/models/car/chevelle.glb';
 
   // Load assets
   console.log('Loading assets...');
@@ -52,15 +52,14 @@ async function init() {
 
     // 3. Camera Follow Logic
     const carPos = car.getPosition();
-    const cameraOffset = new THREE.Vector3(0, 1.8, -4);
-    const cameraTarget = new THREE.Vector3(carPos.x * 0.5, 0.5, 10); // Look ahead
+    const cameraOffset = new THREE.Vector3(0, 2.5, -6); // Further back and higher
+    const cameraTarget = new THREE.Vector3(0, 0.8, 15); // Look further ahead
 
     // Position camera behind car
-    const idealOffset = cameraOffset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), car.rotationY);
-    const targetCamPos = carPos.clone().add(idealOffset);
+    const targetCamPos = carPos.clone().add(cameraOffset);
     
     sceneSetup.camera.position.lerp(targetCamPos, 0.1);
-    sceneSetup.camera.lookAt(cameraTarget);
+    sceneSetup.camera.lookAt(carPos.x, 0.8, 15);
 
     // 4. Update HUD
     const speedKmh = Math.floor(road.speed * 3.6);

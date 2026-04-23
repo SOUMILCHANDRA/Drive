@@ -43,13 +43,13 @@ export class LightingManager {
   }
 
   private setupHeadlights(): void {
-    const intensity = 50;
-    const distance = 100;
-    const angle = Math.PI / 6;
-    const penumbra = 0.5;
+    const intensity = 150;
+    const distance = 150;
+    const angle = Math.PI / 4;
+    const penumbra = 0.3;
 
-    this.leftHeadlight = this.createHeadlight(-0.8, intensity, distance, angle, penumbra);
-    this.rightHeadlight = this.createHeadlight(0.8, intensity, distance, angle, penumbra);
+    this.leftHeadlight = this.createHeadlight(-1.0, intensity, distance, angle, penumbra);
+    this.rightHeadlight = this.createHeadlight(1.0, intensity, distance, angle, penumbra);
 
     this.headlights.add(this.leftHeadlight);
     this.headlights.add(this.rightHeadlight);
