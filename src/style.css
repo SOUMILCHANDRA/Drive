@@ -1,14 +1,20 @@
 :root {
-  font-family: 'Inter', sans-serif;
-  color-scheme: dark;
-  background-color: #000;
+  --neon-pink: #FF2D78;
+  --neon-cyan: #00FFEF;
+  --sodium-yellow: #F4B942;
+  --void-black: #0A0A0F;
+  --asphalt-gray: #1C1C24;
+  --font-display: 'Bebas Neue', cursive;
+  --font-technical: 'IBM Plex Mono', monospace;
+  --font-script: 'Mr Dafoe', cursive;
 }
 
 body {
   margin: 0;
   overflow: hidden;
-  background: #050508;
-  font-family: 'Inter', sans-serif;
+  background: var(--void-black);
+  color: #fff;
+  font-family: var(--font-technical);
 }
 
 #app {
@@ -17,236 +23,156 @@ body {
   position: relative;
 }
 
-/* 
- * 🎬 Cinematic Start Screen (Halo Polish) 
- * Design Philosophy:
- * - Asymmetry: Left-weighted UI balances the right-weighted vehicle subject.
- * - Asymptotic Drift: Slow horizontal translation simulates an 'alive' camera breathing.
- * - Neon Realism: White core + pink halo drop-shadows emulate gas-discharge light spill.
- */
+/* 🎥 Letterbox Bars (2.39:1 Cinematic) */
+.letterbox {
+  position: fixed;
+  left: 0;
+  width: 100%;
+  height: 12vh;
+  background: #000;
+  z-index: 500;
+  pointer-events: none;
+}
+.letterbox.top { top: 0; }
+.letterbox.bottom { bottom: 0; }
+
+/* 🎬 Start Screen */
 #startScreen {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 1000;
   cursor: pointer;
-  transition: opacity 1.5s ease-in-out, transform 1s ease-in-out;
-  overflow: hidden;
   background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 1.5s ease-in-out;
 }
 
-/* 🕯️ Ambient Neon Reflection: Tying UI to Scene */
-#startScreen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    circle at 35% 60%,
-    rgba(255, 45, 149, 0.08),
-    transparent 50%
-  );
-  z-index: 1;
-}
-
-/* 🎥 Background (Horizontal Cinematic Drift) */
-.bg {
-  position: absolute;
-  inset: 0;
-  background: url("/bg.jpg") center/cover no-repeat;
-  filter: brightness(0.95) contrast(1.05);
-  transform: scale(1.02);
-  animation: drift 20s ease-in-out infinite alternate;
-}
-
-/* 🎯 Asymmetric Composition Layer */
 .content {
-  position: absolute;
-  top: 45%;
-  left: 40%;
-  transform: translate(-50%, -50%);
   text-align: center;
   z-index: 10;
 }
 
-/* 🔥 Iconic Neon Logo (White Core Polish) */
-#logo {
-  width: 260px; /* Cinematic scale */
-  background: transparent;
-  display: block;
-  /* 
-   * Mix-Blend-Mode: Screen
-   * Essential for environmental integration. Allows the pink neon glow to 
-   * additively blend with the wet asphalt reflections of the background image.
-   */
-  mix-blend-mode: screen; 
-  
-  /* Quad-Layer Halo Pipeline (with White Inner Core) */
-  filter:
-    brightness(1.8)
-    saturate(1.8)
-    drop-shadow(0 0 4px rgba(255, 255, 255, 0.9))  /* WHITE CORE REALISM */
-    drop-shadow(0 0 10px rgba(255, 45, 149, 1))
-    drop-shadow(0 0 25px rgba(255, 45, 149, 0.9))
-    drop-shadow(0 0 50px rgba(255, 45, 149, 0.6))
-    drop-shadow(0 0 90px rgba(255, 45, 149, 0.3));
-    
+/* 💖 NIGHTCALL Neon Logo */
+.neon-logo {
+  font-family: var(--font-script);
+  font-size: 8rem;
+  color: #fff;
   margin: 0;
-  animation: 
-    logoFadeIn 1.2s ease forwards,
-    neonFlicker 3s infinite;
+  text-shadow: 
+    0 0 5px #fff,
+    0 0 10px #fff,
+    0 0 20px var(--neon-pink),
+    0 0 40px var(--neon-pink),
+    0 0 80px var(--neon-pink),
+    0 0 120px var(--neon-pink);
+  animation: flicker 4s infinite alternate;
 }
 
-/* Text Hierarchy (Asymmetric Shift) */
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.8; }
+}
+
 .start-text {
-  margin-top: 30px;
-  margin-left: 10px; /* Cinematic offset */
-  font-size: 13px;
-  letter-spacing: 5px;
-  color: rgba(255, 255, 255, 0.85);
-  text-transform: uppercase;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  letter-spacing: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 2rem;
   animation: pulse 2s infinite;
-  opacity: 0;
-  animation: textFadeIn 2s ease forwards, pulse 2s infinite;
-  animation-delay: 0.8s, 0s;
 }
 
 .controls-text {
-  margin-top: 15px;
-  margin-left: 10px; /* Cinematic offset */
-  font-size: 10px;
-  letter-spacing: 3px;
-  color: rgba(255, 255, 255, 0.5);
-  text-transform: uppercase;
-  opacity: 0;
-  animation: textFadeIn 2.5s ease forwards;
-  animation-delay: 1.2s;
+  font-family: var(--font-technical);
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 1rem;
+  letter-spacing: 0.2rem;
 }
 
-@keyframes drift {
-  from { transform: scale(1.02) translateX(0); }
-  to { transform: scale(1.04) translateX(-10px); }
-}
-
-@keyframes logoFadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes textFadeIn {
-  to { opacity: 1; }
-}
-
-@keyframes neonFlicker {
-  0%, 100% { opacity: 1; }
-  48% { opacity: 0.9; }
-  50% { opacity: 0.7; }
-  52% { opacity: 0.95; }
-}
-
-@keyframes pulse {
-  0%,100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-/* 🎥 Global Post-Processing Overlays Preserved */
+/* 📺 Film Grain Overlay */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(circle, transparent 75%, rgba(0,0,0,0.5));
-  z-index: 50;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.1;
-  background:
-    linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.1) 50%),
-    linear-gradient(90deg, rgba(255,0,0,0.02), rgba(0,255,0,0.01), rgba(0,0,255,0.02));
-  background-size: 100% 3px, 3px 100%;
-  z-index: 60;
-}
-
-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1;
-}
-
-/* Minimal HUD: Bottom-Left Overlay */
-.hud {
-  position: absolute;
-  bottom: 2rem;
-  left: 2rem;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 1.5s ease-in-out;
-}
-
-.hud.visible {
-  opacity: 0.6;
-}
-
-.hud-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.hud-item {
-  color: #FFB347;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.15rem;
-  font-family: 'Inter', sans-serif;
-  text-transform: uppercase;
-}
-
-#speed-val, #dist-val {
-  color: #fff;
-  margin-left: 5px;
-}
-
-.screen-flash {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: #fff;
-  z-index: 2000;
-  pointer-events: none;
-  opacity: 0;
-}
-
-/* KINETIC GRAIN: Dynamic Reaction to Sodium Lighting */
-#app::after {
-  content: "";
-  position: fixed;
-  top: -100%;
-  left: -100%;
-  width: 300%;
-  height: 300%;
   background-image: url('https://grainy-gradients.vercel.app/noise.svg');
   opacity: 0.08;
-  pointer-events: none;
-  z-index: 10;
-  animation: noise 0.2s infinite steps(4);
-  mix-blend-mode: overlay; /* Reacts to lighting */
+  z-index: 600;
+  mix-blend-mode: overlay;
+  animation: grain 0.2s infinite steps(4);
 }
 
-@keyframes noise {
+@keyframes grain {
   0% { transform: translate(0, 0); }
-  25% { transform: translate(1%, 1%); }
-  50% { transform: translate(-1%, -1%); }
-  75% { transform: translate(1%, -1%); }
-  100% { transform: translate(0, 0); }
+  50% { transform: translate(-1%, 1%); }
+  100% { transform: translate(1%, -1%); }
+}
+
+/* 📊 Minimal HUD */
+.hud {
+  position: absolute;
+  bottom: 15vh;
+  left: 5vw;
+  z-index: 100;
+  pointer-events: none;
+  font-family: var(--font-technical);
+  opacity: 0;
+  transition: opacity 1s;
+}
+.hud.visible { opacity: 0.8; }
+
+.hud-item {
+  color: var(--sodium-yellow);
+  font-size: 0.8rem;
+  margin: 0.5rem 0;
+  letter-spacing: 0.1rem;
+}
+.hud-item span { color: #fff; font-weight: bold; }
+
+/* 🕯️ Pause Menu (Neon Translucent) */
+.pause-menu {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 15, 0.85); /* Deep Void Black with alpha */
+  backdrop-filter: blur(10px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-technical);
+}
+
+.neon-text {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  color: #fff;
+  letter-spacing: 1rem;
+  text-shadow: 0 0 20px var(--neon-cyan);
+  margin-bottom: 1rem;
+}
+
+.pause-hint {
+  color: var(--neon-pink);
+  font-size: 0.8rem;
+  letter-spacing: 0.3rem;
+  animation: pulse 1.5s infinite;
+}
+
+/* ⚡ Cinematic Flash */
+.screen-flash {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  z-index: 3000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease-out;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }

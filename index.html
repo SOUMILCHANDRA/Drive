@@ -4,20 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Drive | Night Drive</title>
-    <!-- Google Fonts -->
+    <title>Nightcall | Neon-Noir</title>
+    <!-- Google Fonts: Geometric & Technical -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;700&family=Mr+Dafoe&display=swap" rel="stylesheet">
   </head>
   <body>
+    <div class="letterbox top"></div>
+    <div class="letterbox bottom"></div>
     <div id="flash" class="screen-flash"></div>
+    <div id="pauseMenu" class="pause-menu" style="display: none;">
+      <div class="pause-content">
+        <h1 class="neon-text">SYSTEM PAUSED</h1>
+        <p class="pause-hint">ESC TO RESUME ENGINE</p>
+      </div>
+    </div>
     <div id="app">
       <!-- 🎬 Final Frontend Start Screen -->
       <div id="startScreen">
-        <div class="bg"></div>
         <div class="content">
-          <img src="/logo.png" id="logo" alt="Drive Logo" />
+          <h1 class="neon-logo">NIGHTCALL</h1>
           <p class="start-text">CLICK TO IGNITE</p>
           <p class="controls-text">WASD / ARROWS TO STEER</p>
         </div>
