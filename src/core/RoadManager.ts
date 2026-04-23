@@ -9,7 +9,7 @@ export class RoadManager {
   private roadGroup: THREE.Group;
   private roadMaterial: THREE.MeshStandardMaterial;
   private roadMesh: THREE.Mesh;
-  public speed: number = 40;
+  public speed: number = 0;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;

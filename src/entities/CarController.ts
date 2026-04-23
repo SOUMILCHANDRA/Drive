@@ -40,8 +40,8 @@ export class CarController {
       this.model.position.y = -box.min.y * scale;
       this.model.position.z = 0;
       
-      // Orientation (Most models face +Z or -Z)
-      this.model.rotation.y = 0; 
+      // Orientation (Rotate 180 deg to face forward)
+      this.model.rotation.y = Math.PI; 
       
       this.scene.add(this.model);
 

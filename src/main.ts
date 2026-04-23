@@ -70,20 +70,36 @@ async function init() {
   }
 
   let inputX = 0;
+  let currentSpeed = 0;
+  const maxSpeed = 60;
+  const acceleration = 20;
+  const friction = 10;
   const lerpInput = 0.1;
 
   // Main Render Loop
   sceneSetup.render((delta) => {
-    // 1. Process Input (A/D or Arrows)
+    // 1. Process Input
     const targetInputX = (keys.a || keys.arrowleft ? -1 : 0) + (keys.d || keys.arrowright ? 1 : 0);
     inputX = THREE.MathUtils.lerp(inputX, targetInputX, lerpInput);
 
-    // 2. Update Systems
+    // 2. Acceleration / Braking
+    const accelInput = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0);
+    if (accelInput > 0) {
+        currentSpeed += acceleration * delta;
+    } else if (accelInput < 0) {
+        currentSpeed -= acceleration * 2 * delta; // Faster braking
+    } else {
+        currentSpeed -= friction * delta; // Natural deceleration
+    }
+    currentSpeed = Math.max(0, Math.min(currentSpeed, maxSpeed));
+    road.speed = currentSpeed;
+
+    // 3. Update Systems
     car.update(delta, inputX);
     road.update(delta);
 
     // Move props backward
-    propGroup.position.z -= road.speed * delta;
+    propGroup.position.z -= currentSpeed * delta;
     if (propGroup.position.z < -propSpacing) {
         propGroup.position.z += propSpacing;
     }
@@ -93,19 +109,18 @@ async function init() {
         lighting.updateHeadlights(car.model.position, car.rotationY);
     }
 
-    // 3. Camera Follow Logic
+    // 4. Camera Follow Logic (Dynamic FOV based on speed)
     const carPos = car.getPosition();
-    const cameraOffset = new THREE.Vector3(0, 2.5, -6); // Further back and higher
-    const cameraTarget = new THREE.Vector3(0, 0.8, 15); // Look further ahead
+    const cameraOffset = new THREE.Vector3(0, 2.5, -6);
+    sceneSetup.camera.fov = 50 + (currentSpeed / maxSpeed) * 15; // Speed stretch effect
+    sceneSetup.camera.updateProjectionMatrix();
 
-    // Position camera behind car
     const targetCamPos = carPos.clone().add(cameraOffset);
-    
     sceneSetup.camera.position.lerp(targetCamPos, 0.1);
     sceneSetup.camera.lookAt(carPos.x, 0.8, 15);
 
-    // 4. Update HUD
-    const speedKmh = Math.floor(road.speed * 3.6);
+    // 5. Update HUD
+    const speedKmh = Math.floor(currentSpeed * 3.6);
     const speedVal = document.getElementById('speed-val');
     if (speedVal) speedVal.innerText = speedKmh.toString();
   });
