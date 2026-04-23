@@ -24,32 +24,45 @@ export class CarController {
       const gltf = await loader.loadAsync(url);
       this.model = gltf.scene;
       
-      // Enforce PBR Materials
+      // Robust Centering and Scaling
+      const box = new THREE.Box3().setFromObject(this.model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+
+      // Scale to a standard size (e.g., 4 units long)
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 4 / maxDim;
+      this.model.scale.set(scale, scale, scale);
+
+      // Lift car so bottom is at y=0
+      this.model.position.y = -box.min.y * scale;
+      this.model.position.z = 0;
+      
+      // Orientation (Most models face +Z or -Z)
+      this.model.rotation.y = 0; 
+      
+      this.scene.add(this.model);
+
+      // Re-enforce PBR Materials
       this.model.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           const mesh = child as THREE.Mesh;
-          const originalMaterial = mesh.material as THREE.MeshStandardMaterial;
-          
+          const mat = mesh.material as THREE.MeshStandardMaterial;
           mesh.material = new THREE.MeshStandardMaterial({
-            color: originalMaterial.color,
-            map: originalMaterial.map,
+            color: mat.color,
+            map: mat.map,
             metalness: 0.8,
-            roughness: 0.25,
-            envMapIntensity: 1.5,
-            name: originalMaterial.name
+            roughness: 0.2,
+            envMapIntensity: 1.5
           });
-          
           mesh.castShadow = true;
           mesh.receiveShadow = true;
         }
       });
 
-      // Correct orientation for local Chevelle model
-      this.model.rotation.y = 0; 
-      this.model.scale.set(1, 1, 1);
-      
-      this.scene.add(this.model);
-      console.log('Local car model loaded and PBR materials enforced');
+      console.log(`Car loaded. Size: ${size.x},${size.y},${size.z} | Applied Scale: ${scale}`);
     } catch (error) {
       console.error('Failed to load car model:', error);
     }

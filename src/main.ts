@@ -15,17 +15,26 @@ async function init() {
   const road = new RoadManager(sceneSetup.scene);
   const car = new CarController(sceneSetup.scene);
 
-  // Asset URLs (Using local Chevelle model)
+  // Asset URLs (Using local model with fallback)
   const HDR_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/equirectangular/venice_sunset_1k.hdr';
   const CAR_URL = '/models/car/chevelle.glb';
+  const FALLBACK_CAR = '/models/car/car.glb';
 
   // Load assets
   console.log('Loading assets...');
-  await Promise.all([
-    lighting.loadEnvironment(HDR_URL),
-    car.loadModel(CAR_URL)
-  ]);
-  console.log('Assets loaded.');
+  try {
+    await lighting.loadEnvironment(HDR_URL);
+  } catch (e) { console.warn("HDR failed", e); }
+
+  try {
+    await car.loadModel(CAR_URL);
+  } catch (e) {
+    console.warn("Chevelle failed, trying generic car...", e);
+    try {
+        await car.loadModel(FALLBACK_CAR);
+    } catch (ee) { console.error("All car models failed", ee); }
+  }
+  console.log('Asset loading phase complete.');
 
   // Input handling
   const keys = { w: false, a: false, s: false, d: false };
