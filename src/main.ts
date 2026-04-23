@@ -111,13 +111,13 @@ async function init() {
 
     // 4. Camera Follow Logic (Dynamic FOV based on speed)
     const carPos = car.getPosition();
-    const cameraOffset = new THREE.Vector3(0, 2.5, -6);
-    sceneSetup.camera.fov = 50 + (currentSpeed / maxSpeed) * 15; // Speed stretch effect
+    const cameraOffset = new THREE.Vector3(0, 3.5, -8); // Higher and further back
+    sceneSetup.camera.fov = 50 + (currentSpeed / maxSpeed) * 15; 
     sceneSetup.camera.updateProjectionMatrix();
 
     const targetCamPos = carPos.clone().add(cameraOffset);
     sceneSetup.camera.position.lerp(targetCamPos, 0.1);
-    sceneSetup.camera.lookAt(carPos.x, 0.8, 15);
+    sceneSetup.camera.lookAt(carPos.x, 1.2, 20); // Look higher and further ahead
 
     // 5. Update HUD
     const speedKmh = Math.floor(currentSpeed * 3.6);

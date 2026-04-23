@@ -40,8 +40,8 @@ export class CarController {
       this.model.position.y = -box.min.y * scale;
       this.model.position.z = 0;
       
-      // Orientation (Rotate 180 deg to face forward)
-      this.model.rotation.y = Math.PI; 
+      // Orientation (Face the road, away from camera)
+      this.model.rotation.y = 0; 
       
       this.scene.add(this.model);
 
@@ -80,7 +80,7 @@ export class CarController {
     
     // Smooth lerp for rotation
     this.rotationY = THREE.MathUtils.lerp(this.rotationY, this.targetRotationY, this.lerpSpeed);
-    this.model.rotation.y = Math.PI + this.rotationY; // Apply to base rotation
+    this.model.rotation.y = this.rotationY; // Apply to base rotation (0)
 
     // Slight lean effect
     this.model.rotation.z = THREE.MathUtils.lerp(this.model.rotation.z, -inputX * 0.05, 0.1);
