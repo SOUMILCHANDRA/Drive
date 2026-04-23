@@ -36,23 +36,57 @@ async function init() {
   }
   console.log('Asset loading phase complete.');
 
-  // Input handling
-  const keys = { w: false, a: false, s: false, d: false };
-  window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() in keys) (keys as any)[e.key.toLowerCase()] = true; });
-  window.addEventListener('keyup', (e) => { if (e.key.toLowerCase() in keys) (keys as any)[e.key.toLowerCase()] = false; });
+  // Input handling (Include Arrow Keys)
+  const keys = { 
+    w: false, a: false, s: false, d: false, 
+    arrowup: false, arrowdown: false, arrowleft: false, arrowright: false 
+  };
+  window.addEventListener('keydown', (e) => { 
+    const key = e.key.toLowerCase();
+    if (key in keys) (keys as any)[key] = true; 
+  });
+  window.addEventListener('keyup', (e) => { 
+    const key = e.key.toLowerCase();
+    if (key in keys) (keys as any)[key] = false; 
+  });
+
+  // Speed Reference Props
+  const propGroup = new THREE.Group();
+  sceneSetup.scene.add(propGroup);
+  const props: THREE.Mesh[] = [];
+  const propCount = 20;
+  const propSpacing = 50;
+
+  const propGeo = new THREE.BoxGeometry(0.2, 3, 0.2);
+  const propMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8, roughness: 0.2 });
+
+  for (let i = 0; i < propCount; i++) {
+    const leftProp = new THREE.Mesh(propGeo, propMat);
+    const rightProp = new THREE.Mesh(propGeo, propMat);
+    leftProp.position.set(-6, 1.5, i * propSpacing);
+    rightProp.position.set(6, 1.5, i * propSpacing);
+    propGroup.add(leftProp, rightProp);
+    props.push(leftProp, rightProp);
+  }
 
   let inputX = 0;
   const lerpInput = 0.1;
 
   // Main Render Loop
   sceneSetup.render((delta) => {
-    // 1. Process Input
-    const targetInputX = (keys.a ? -1 : 0) + (keys.d ? 1 : 0);
+    // 1. Process Input (A/D or Arrows)
+    const targetInputX = (keys.a || keys.arrowleft ? -1 : 0) + (keys.d || keys.arrowright ? 1 : 0);
     inputX = THREE.MathUtils.lerp(inputX, targetInputX, lerpInput);
 
     // 2. Update Systems
     car.update(delta, inputX);
     road.update(delta);
+
+    // Move props backward
+    propGroup.position.z -= road.speed * delta;
+    if (propGroup.position.z < -propSpacing) {
+        propGroup.position.z += propSpacing;
+    }
     
     // Sync headlights with car
     if (car.model) {

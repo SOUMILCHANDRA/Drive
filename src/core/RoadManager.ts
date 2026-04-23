@@ -9,7 +9,7 @@ export class RoadManager {
   private roadGroup: THREE.Group;
   private roadMaterial: THREE.MeshStandardMaterial;
   private roadMesh: THREE.Mesh;
-  public speed: number = 20;
+  public speed: number = 40;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -19,14 +19,14 @@ export class RoadManager {
     this.roadMaterial = new THREE.MeshStandardMaterial({
       color: 0x050505,
       metalness: 0.5,
-      roughness: 0.25,
+      roughness: 0.2,
     });
 
     // Create a large plane for the road
-    const geometry = new THREE.PlaneGeometry(10, 1000, 1, 1);
+    const geometry = new THREE.PlaneGeometry(12, 1000, 1, 1);
     this.roadMesh = new THREE.Mesh(geometry, this.roadMaterial);
     this.roadMesh.rotation.x = -Math.PI / 2;
-    this.roadMesh.position.z = 450; // Extend far ahead
+    this.roadMesh.position.z = 450; 
     this.roadMesh.receiveShadow = true;
     
     this.roadGroup.add(this.roadMesh);
@@ -47,16 +47,16 @@ export class RoadManager {
       
       // Dashed line in middle
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 10;
-      ctx.setLineDash([40, 40]);
+      ctx.lineWidth = 15;
+      ctx.setLineDash([60, 60]); // Longer dashes for high speed
       ctx.beginPath();
       ctx.moveTo(256, 0);
       ctx.lineTo(256, 1024);
       ctx.stroke();
 
-      // Side lines
+      // Side lines (continuous)
       ctx.setLineDash([]);
-      ctx.lineWidth = 15;
+      ctx.lineWidth = 20;
       ctx.beginPath();
       ctx.moveTo(20, 0); ctx.lineTo(20, 1024);
       ctx.moveTo(492, 0); ctx.lineTo(492, 1024);
@@ -66,7 +66,7 @@ export class RoadManager {
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(1, 20); // Repeat many times along length
+    texture.repeat.set(1, 40); // More frequent repeats for speed reference
     
     this.roadMaterial.map = texture;
     this.roadMaterial.needsUpdate = true;
