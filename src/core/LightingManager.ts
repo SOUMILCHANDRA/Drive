@@ -18,10 +18,10 @@ export class LightingManager {
   }
 
   private setupEnvironmentalLights(): void {
-    const ambient = new THREE.AmbientLight(0x4040ff, 0.05);
+    const ambient = new THREE.AmbientLight(0x4040ff, 0.15); // Increased for silhouette visibility
     this.scene.add(ambient);
 
-    const hemi = new THREE.HemisphereLight(0x000022, 0x000000, 0.1);
+    const hemi = new THREE.HemisphereLight(0x000022, 0x000000, 0.2);
     this.scene.add(hemi);
   }
 
@@ -37,9 +37,9 @@ export class LightingManager {
   }
 
   private setupHeadlights(): void {
-    const intensity = 120;
-    const distance = 150;
-    const angle = Math.PI / 5;
+    const intensity = 250;
+    const distance = 200;
+    const angle = Math.PI / 4.5;
 
     this.leftLight = this.createSpotlight(-1, intensity, distance, angle);
     this.rightLight = this.createSpotlight(1, intensity, distance, angle);

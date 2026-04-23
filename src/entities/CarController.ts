@@ -34,9 +34,9 @@ export class CarController {
         mesh.material = new THREE.MeshStandardMaterial({
           color: mat.color,
           map: mat.map,
-          metalness: 0.75, // SPECIFIED: 0.6 - 0.8
-          roughness: 0.35, // SPECIFIED: 0.3 - 0.4
-          envMapIntensity: 1.5 // SPECIFIED: 1.5
+          metalness: 1.0, 
+          roughness: 0.2, 
+          envMapIntensity: 2.5 
         });
         mesh.castShadow = true;
       }
