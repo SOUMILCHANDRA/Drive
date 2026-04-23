@@ -1,83 +1,53 @@
 import * as THREE from 'three';
 
 /**
- * RoadManager creates and animates the road to simulate motion.
- * Uses texture offsetting and segment recycling for stability.
+ * RoadManager: Dark PBR Asphalt and Infinite Texture Flow.
  */
 export class RoadManager {
   private scene: THREE.Scene;
-  private roadGroup: THREE.Group;
   private roadMaterial: THREE.MeshStandardMaterial;
-  private roadMesh: THREE.Mesh;
   public speed: number = 0;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-    this.roadGroup = new THREE.Group();
-    
-    // Create Road Material (Dark, slightly reflective)
+
+    // Dark Asphalt PBR (Calibrated for headlights)
     this.roadMaterial = new THREE.MeshStandardMaterial({
-      color: 0x050505,
-      metalness: 0.5,
-      roughness: 0.2,
+      color: 0x050505, 
+      metalness: 0.4, // Lowered for less mirror-like reflection
+      roughness: 0.5, // Increased for realistic asphalt texture
     });
 
-    // Create a large plane for the road
-    const geometry = new THREE.PlaneGeometry(12, 1000, 1, 1);
-    this.roadMesh = new THREE.Mesh(geometry, this.roadMaterial);
-    this.roadMesh.rotation.x = -Math.PI / 2;
-    this.roadMesh.position.z = 450; 
-    this.roadMesh.receiveShadow = true;
-    
-    this.roadGroup.add(this.roadMesh);
-    this.scene.add(this.roadGroup);
+    const geometry = new THREE.PlaneGeometry(16, 2000); // Extended for better horizon
+    const mesh = new THREE.Mesh(geometry, this.roadMaterial);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.z = 950; // Centered for long view distance
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
 
-    // Add road markings or texture if needed
-    this.addMarkings();
+    this.setupMarkings();
   }
 
-  private addMarkings(): void {
+  private setupMarkings(): void {
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 1024;
+    canvas.width = 512; canvas.height = 1024;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.fillStyle = '#050505';
-      ctx.fillRect(0, 0, 512, 1024);
-      
-      // Dashed line in middle
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 15;
-      ctx.setLineDash([60, 60]); // Longer dashes for high speed
-      ctx.beginPath();
-      ctx.moveTo(256, 0);
-      ctx.lineTo(256, 1024);
-      ctx.stroke();
-
-      // Side lines (continuous)
-      ctx.setLineDash([]);
-      ctx.lineWidth = 20;
-      ctx.beginPath();
-      ctx.moveTo(20, 0); ctx.lineTo(20, 1024);
-      ctx.moveTo(492, 0); ctx.lineTo(492, 1024);
-      ctx.stroke();
+      ctx.fillStyle = '#030303'; ctx.fillRect(0, 0, 512, 1024);
+      ctx.strokeStyle = '#555555'; ctx.lineWidth = 15;
+      ctx.setLineDash([40, 60]);
+      ctx.beginPath(); ctx.moveTo(256, 0); ctx.lineTo(256, 1024); ctx.stroke();
+      ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(20, 1024); ctx.moveTo(492, 0); ctx.lineTo(492, 1024); ctx.stroke();
     }
-
     const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(1, 40); // More frequent repeats for speed reference
-    
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(1, 40);
     this.roadMaterial.map = texture;
-    this.roadMaterial.needsUpdate = true;
   }
 
-  /**
-   * Animates the road by offsetting the texture.
-   */
   public update(delta: number): void {
     if (this.roadMaterial.map) {
-      this.roadMaterial.map.offset.y += (this.speed * delta) / 50;
+      this.roadMaterial.map.offset.y += (this.speed * delta) / 40;
     }
   }
 }
