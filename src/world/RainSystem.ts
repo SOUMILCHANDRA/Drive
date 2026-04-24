@@ -1,91 +1,77 @@
 import * as THREE from 'three';
 
 /**
- * RainSystem: 15,000 streak particles with speed-driven lean and neon color picking.
+ * RainSystem: 12,000 streak particles with speed-driven lean and localized recycling.
  */
 export class RainSystem {
     private scene: THREE.Scene;
-    private particles!: THREE.Points;
-    private geometry!: THREE.BufferGeometry;
-    private material!: THREE.ShaderMaterial;
-    private count: number = 15000;
-    private boxSize: number = 200;
+    private particles: THREE.Points;
+    private geometry: THREE.BufferGeometry;
+    private velocities: Float32Array;
+    private count: number = 12000;
+    private spread: number = 150;
 
-    constructor(scene: THREE.Scene, initialCount: number) {
+    constructor(scene: THREE.Scene, initialCount: number = 12000) {
         this.scene = scene;
         this.count = initialCount;
-        this.init(this.count);
-    }
 
-    private init(count: number): void {
-        if (this.particles) this.scene.remove(this.particles);
-        if (count === 0) return;
+        const positions = new Float32Array(this.count * 3);
+        this.velocities = new Float32Array(this.count);
+
+        for (let i = 0; i < this.count; i++) {
+            positions[i * 3 + 0] = (Math.random() - 0.5) * this.spread;
+            positions[i * 3 + 1] = Math.random() * 80;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * this.spread;
+            this.velocities[i] = 20 + Math.random() * 15;
+        }
 
         this.geometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(count * 3);
-        const velocities = new Float32Array(count);
-
-        for (let i = 0; i < count; i++) {
-            positions[i * 3] = (Math.random() - 0.5) * this.boxSize;
-            positions[i * 3 + 1] = Math.random() * this.boxSize;
-            positions[i * 3 + 2] = (Math.random() - 0.5) * this.boxSize;
-            velocities[i] = 100 + Math.random() * 50;
-        }
-
         this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        this.geometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 1));
 
-        if (!this.material) {
-            this.material = new THREE.ShaderMaterial({
-                uniforms: {
-                    uTime: { value: 0 },
-                    uSpeed: { value: 0 },
-                    uCarPos: { value: new THREE.Vector3() },
-                    uNeonColor: { value: new THREE.Color(0xffffff) },
-                    uNeonPos: { value: new THREE.Vector3(0, 0, 0) }
-                },
-                transparent: true,
-                depthWrite: false,
-                vertexShader: `
-                    uniform float uTime;
-                    uniform float uSpeed;
-                    uniform vec3 uCarPos;
-                    attribute float velocity;
-                    varying float vOpacity;
-                    
-                    void main() {
-                        vec3 pos = position;
-                        pos.y = mod(pos.y - uTime * velocity, 200.0);
-                        float lean = (uSpeed / 40.0) * 15.0;
-                        pos.z += lean;
-                        vec4 mvPosition = modelViewMatrix * vec4(pos + uCarPos - vec3(0, 100, 0), 1.0);
-                        gl_Position = projectionMatrix * mvPosition;
-                        gl_PointSize = 2.0;
-                        vOpacity = 0.15;
-                    }
-                `,
-                fragmentShader: `
-                    varying float vOpacity;
-                    void main() {
-                        gl_FragColor = vec4(1.0, 1.0, 1.0, vOpacity);
-                    }
-                `
-            });
-        }
+        const material = new THREE.PointsMaterial({
+            color: 0x99aacc,
+            size: 0.1,
+            transparent: true,
+            opacity: 0.35,
+            sizeAttenuation: true,
+        });
 
-        this.particles = new THREE.Points(this.geometry, this.material);
+        this.particles = new THREE.Points(this.geometry, material);
         this.particles.frustumCulled = false;
         this.scene.add(this.particles);
     }
 
-    public updateQuality(count: number): void {
-        this.count = count;
-        this.init(count);
+    public updateQuality(_count: number): void {
+        // Dynamic resizing could be added here later if needed
     }
 
-    public update(delta: number, carPos: THREE.Vector3, speed: number): void {
-        this.material.uniforms.uTime.value += delta;
-        this.material.uniforms.uSpeed.value = speed;
-        this.material.uniforms.uCarPos.value.copy(carPos);
+    public update(delta: number, carPos: THREE.Vector3, carSpeed: number): void {
+        const pos = this.geometry.attributes.position.array as Float32Array;
+        
+        for (let i = 0; i < this.count; i++) {
+            // 1. Gravity Fall
+            pos[i * 3 + 1] -= this.velocities[i] * delta;
+            
+            // 2. Speed Lean (Simulates air drag)
+            pos[i * 3 + 2] -= carSpeed * delta * 0.4;
+            
+            // 3. Vertical Wrapping
+            if (pos[i * 3 + 1] < carPos.y - 5) {
+                pos[i * 3 + 1] = carPos.y + 75;
+            }
+
+            // 4. Horizontal Spacing (Keep centered on car with wrapping)
+            const dx = pos[i * 3 + 0] - carPos.x;
+            const dz = pos[i * 3 + 2] - carPos.z;
+
+            if (Math.abs(dx) > this.spread / 2) {
+                pos[i * 3 + 0] = carPos.x - Math.sign(dx) * (this.spread / 2);
+            }
+            if (Math.abs(dz) > this.spread / 2) {
+                pos[i * 3 + 2] = carPos.z - Math.sign(dz) * (this.spread / 2);
+            }
+        }
+        
+        this.geometry.attributes.position.needsUpdate = true;
     }
 }
