@@ -116,8 +116,8 @@ async function init() {
   const showBiome = (name: string) => {
       if (!biomeLabel) return;
       biomeLabel.innerText = name;
-      biomeLabel.classList.add('active');
-      setTimeout(() => biomeLabel.classList.remove('active'), 4000);
+      biomeLabel.classList.add('visible');
+      setTimeout(() => biomeLabel.classList.remove('visible'), 4000);
   };
 
   const startDrive = () => {
@@ -137,6 +137,8 @@ async function init() {
     cameraManager.setMode('CHASE');
     sound.playAll();
     showBiome("DOWNTOWN");
+
+    // Letterbox handover handled by CSS
   };
 
   window.addEventListener('keydown', (e) => { 
@@ -152,8 +154,20 @@ async function init() {
   // Asset Loading
   await Promise.all([
     car.load('/models/car/chevelle.glb').catch(() => car.load('/models/car/car.glb')),
-    sound.loadBGM('/audio/bgm.webm').catch(() => {})
+    sound.loadBGM('/bgm.webm').catch(() => {})
   ]);
+
+  if (car.model) {
+      lighting.setupCarLight(car.model);
+  }
+
+  // 🛠️ Diagnostic Ground Truth: Test Sphere
+  const testSphere = new THREE.Mesh(
+    new THREE.SphereGeometry(2),
+    new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 2 })
+  );
+  testSphere.position.set(0, 2, -15);
+  renderer.scene.add(testSphere);
 
   // Cinematic Title Reveal
   setTimeout(() => {
@@ -172,10 +186,10 @@ async function init() {
     if (!gameStarted) {
         idleTime += delta;
         if (idleTime > 3) cameraManager.setMode('CINEMATIC');
-        road.update(0, 0, delta, currentConfig);
+        road.update(0, new THREE.Vector3(0,0,0), 0, delta, currentConfig);
         lighting.update(new THREE.Vector3(0,0,0), 0);
         sky.update(new THREE.Vector3(0,0,0));
-        if (car.model) cameraManager.update(delta, car.model, 0, 0);
+        if (car.model) cameraManager.update(delta, car.model, 0);
         renderer.render(delta, 0);
         return;
     }
@@ -194,9 +208,10 @@ async function init() {
     const throttleTarget = controls.pause ? 0 : controls.throttle;
     const brakeTarget = controls.pause ? 0 : controls.brake;
 
-    car.update(delta, { steer: steerTarget, throttle: throttleTarget, brake: brakeTarget }, roadInfo.position.x);
+    car.update(delta, { steer: steerTarget, throttle: throttleTarget, brake: brakeTarget }, roadInfo.position.x, road.getRoadMeshes());
     
-    road.update(carZ, car.speed, delta, currentConfig);
+    road.update(carZ, car.position, car.speed, delta, currentConfig);
+    renderer.updateRoadMirror(car.position);
     lighting.update(car.position, biomeParams.ambientIntensity);
     sky.update(car.position);
     rain.update(delta, car.position, car.speed);
@@ -205,7 +220,7 @@ async function init() {
     sound.update(car.speed, delta);
     traffic.update(delta, carZ, (z) => road.getRoadPositionAt(z).position.x);
     
-    if (car.model) cameraManager.update(delta, car.model, car.speed, steerTarget);
+    if (car.model) cameraManager.update(delta, car.model, car.speed);
 
     if (renderer.scene.fog instanceof THREE.FogExp2) {
         renderer.scene.fog.density = THREE.MathUtils.lerp(renderer.scene.fog.density, biomeParams.fogDensity, 0.05);

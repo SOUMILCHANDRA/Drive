@@ -1,17 +1,34 @@
 import * as THREE from 'three';
 
 export type CameraMode = 'CHASE' | 'HOOD' | 'CINEMATIC';
-
 export const CameraModes: CameraMode[] = ['CHASE', 'HOOD', 'CINEMATIC'];
 
 /**
- * CameraManager: Orchestrates cinematic perspectives, shake, and Dutch tilts.
+ * CameraManager: Orchestrates cinematic perspectives and lens calibration.
  */
 export class CameraManager {
     private camera: THREE.PerspectiveCamera;
     public mode: CameraMode = 'CHASE';
+    
+    private targetPos: THREE.Vector3 = new THREE.Vector3();
+    private currentLookAt: THREE.Vector3 = new THREE.Vector3();
+    
+    // Cinematic Offsets
+    private readonly CHASE_OFFSET = new THREE.Vector3(0, 3.5, -10);
+    private readonly CHASE_LOOK_OFFSET = new THREE.Vector3(0, 1, 5);
+    private readonly HOOD_OFFSET = new THREE.Vector3(0, 1.1, 0.8);
+    private readonly HOOD_LOOK_OFFSET = new THREE.Vector3(0, 1.1, 50);
 
-    public setMode(mode: any): void {
+    constructor(camera: THREE.PerspectiveCamera) {
+        this.camera = camera;
+        
+        // Lens Calibration
+        this.camera.near = 0.5;
+        this.camera.far = 3000;
+        this.camera.updateProjectionMatrix();
+    }
+
+    public setMode(mode: CameraMode | number): void {
         if (typeof mode === 'number') {
             this.mode = CameraModes[mode % CameraModes.length];
         } else {
@@ -19,103 +36,82 @@ export class CameraManager {
         }
     }
 
-    public getModeIndex(): number {
-        return CameraModes.indexOf(this.mode);
-    }
-    private targetPos: THREE.Vector3 = new THREE.Vector3();
-    private currentLookAt: THREE.Vector3 = new THREE.Vector3();
-    
-    private shakeIntensity: number = 0;
-    private dutchTilt: number = 0;
-    private cinematicTimer: number = 0;
-    private cinematicShot: 'ORBIT' | 'SIDE' = 'ORBIT';
-
-    constructor(camera: THREE.PerspectiveCamera) {
-        this.camera = camera;
-    }
-
     public cycleMode(): void {
         const idx = CameraModes.indexOf(this.mode);
         this.mode = CameraModes[(idx + 1) % CameraModes.length];
-        this.cinematicTimer = 0; // Reset for new mode
     }
 
-    public update(delta: number, car: THREE.Group, speed: number, steer: number): void {
-        const speedFactor = speed / 40;
+    public update(delta: number, car: THREE.Group, speed: number): void {
+        const speedFactor = speed / 45;
         
-        // 1. Perspective Selection
+        // 1. Perspective Execution
         switch (this.mode) {
             case 'CHASE':
-                this.updateChaseCam(car, speedFactor);
+                this.updateChaseCam(car, delta);
                 break;
             case 'HOOD':
-                this.updateHoodCam(car);
+                this.updateHoodCam(car, delta);
                 break;
             case 'CINEMATIC':
-                this.updateCinematicCam(delta, car);
+                this.updateCinematicCam(car);
                 break;
         }
 
-        // 2. Cinematic Artifacts
-        // FOV Breathing
-        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, 55 + speedFactor * 7, 0.1);
+        // 2. Visual Artifacts
+        // FOV Breathing (Dynamic Lens Compression)
+        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, 55 + speedFactor * 10, 0.1);
         this.camera.updateProjectionMatrix();
 
-        // Dutch Tilt on Cornering
-        this.dutchTilt = THREE.MathUtils.lerp(this.dutchTilt, -steer * 0.04, 0.05);
-        this.camera.rotation.z = this.dutchTilt;
-
-        // Speed-based Shake
-        if (speed > 10) {
-            this.shakeIntensity = speedFactor * 0.05;
-            this.camera.position.x += (Math.random() - 0.5) * this.shakeIntensity;
-            this.camera.position.y += (Math.random() - 0.5) * this.shakeIntensity;
+        // Speed-based vibration
+        if (speed > 15) {
+            const shake = speedFactor * 0.04;
+            this.camera.position.x += (Math.random() - 0.5) * shake;
+            this.camera.position.y += (Math.random() - 0.5) * shake;
         }
     }
 
-    private updateChaseCam(car: THREE.Group, _speedFactor: number): void {
-        const back = new THREE.Vector3(0, 3, -10).applyQuaternion(car.quaternion);
-        this.targetPos.copy(car.position).add(back);
-        this.camera.position.lerp(this.targetPos, 0.08);
+    private updateChaseCam(car: THREE.Group, _delta: number): void {
+        // Position: Behind and Above
+        const worldOffset = this.CHASE_OFFSET.clone().applyQuaternion(car.quaternion);
+        this.targetPos.copy(car.position).add(worldOffset);
         
-        const lookPos = car.position.clone().add(new THREE.Vector3(0, 1, 5).applyQuaternion(car.quaternion));
-        this.currentLookAt.lerp(lookPos, 0.1);
+        // Look Target: Slightly Ahead
+        const lookTarget = car.position.clone().add(
+            this.CHASE_LOOK_OFFSET.clone().applyQuaternion(car.quaternion)
+        );
+
+        // Smooth Follow
+        this.camera.position.lerp(this.targetPos, 0.08);
+        this.currentLookAt.lerp(lookTarget, 0.1);
         this.camera.lookAt(this.currentLookAt);
     }
 
-    private updateHoodCam(car: THREE.Group): void {
-        const hood = new THREE.Vector3(0, 1.3, 1).applyQuaternion(car.quaternion);
-        this.camera.position.lerp(car.position.clone().add(hood), 0.2);
+    private updateHoodCam(car: THREE.Group, _delta: number): void {
+        // Position: On the Hood
+        const worldOffset = this.HOOD_OFFSET.clone().applyQuaternion(car.quaternion);
+        this.targetPos.copy(car.position).add(worldOffset);
         
-        const lookPos = car.position.clone().add(new THREE.Vector3(0, 1.2, 50).applyQuaternion(car.quaternion));
-        this.camera.lookAt(lookPos);
+        // Look Target: Far Ahead
+        const lookTarget = car.position.clone().add(
+            this.HOOD_LOOK_OFFSET.clone().applyQuaternion(car.quaternion)
+        );
+
+        // Tighter Follow for Cockpit Stability
+        this.camera.position.lerp(this.targetPos, 0.2);
+        this.camera.lookAt(lookTarget);
     }
 
-    private updateCinematicCam(delta: number, car: THREE.Group): void {
-        this.cinematicTimer += delta;
-        
-        // Randomly cut between Orbit and Side shots every 4-6 seconds
-        if (this.cinematicTimer > 5) {
-            this.cinematicShot = Math.random() > 0.5 ? 'ORBIT' : 'SIDE';
-            this.cinematicTimer = 0;
-        }
-
-        if (this.cinematicShot === 'ORBIT') {
-            const time = Date.now() * 0.0005;
-            const orbitPos = new THREE.Vector3(
-                Math.sin(time) * 15,
-                4,
-                Math.cos(time) * 15
-            );
-            this.camera.position.lerp(car.position.clone().add(orbitPos), 0.05);
-            this.camera.lookAt(car.position);
-        } else {
-            // Low Angle Side Shot
-            const sidePos = new THREE.Vector3(12, 1, 5).applyQuaternion(car.quaternion);
-            this.camera.position.lerp(car.position.clone().add(sidePos), 0.05);
-            this.camera.lookAt(car.position);
-        }
+    private updateCinematicCam(car: THREE.Group): void {
+        // Slow Orbit Shot
+        const time = Date.now() * 0.0003;
+        const orbitPos = new THREE.Vector3(
+            Math.sin(time) * 18,
+            3,
+            Math.cos(time) * 18
+        );
+        this.camera.position.lerp(car.position.clone().add(orbitPos), 0.05);
+        this.camera.lookAt(car.position);
     }
 
-    public getMode(): CameraMode { return this.mode; }
+    public getModeIndex(): number { return CameraModes.indexOf(this.mode); }
 }
