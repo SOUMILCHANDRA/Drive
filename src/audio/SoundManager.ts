@@ -1,43 +1,75 @@
 import { Howl, Howler } from 'howler';
 
 /**
- * SoundManager: Orchestrates the sparse, cinematic audio landscape of Nightcall.
+ * SoundManager: Orchestrates procedural synthesis and cinematic BGM for Nightcall.
  */
 export class SoundManager {
     private bgm: Howl | null = null;
-    private engineHum: Howl | null = null;
-    private rainLoop: Howl | null = null;
-    private cityAmbiance: Howl | null = null;
-    
     public masterVolume: number = 0.5;
+
+    // Web Audio API components
+    private ctx: AudioContext | null = null;
+    private engineOsc!: OscillatorNode;
+    private engineGain!: GainNode;
+    private rainGain!: GainNode;
 
     constructor() {
         this.masterVolume = parseFloat(localStorage.getItem('nightcall_volume') || '0.5');
-        this.initEffects();
     }
 
-    private initEffects(): void {
-        // 1. Engine Hum (Low Frequency Pulse)
-        this.engineHum = new Howl({
-            src: ['/audio/engine_hum.webm'],
-            loop: true,
-            volume: 0.15,
-            rate: 0.6
-        });
+    private initWebAudio(): void {
+        if (this.ctx) return;
+        
+        this.ctx = new AudioContext();
+        
+        // 🏎️ 1. Procedural Engine Synthesis
+        this.engineOsc = this.ctx.createOscillator();
+        this.engineOsc.type = 'sawtooth';
+        this.engineOsc.frequency.value = 55; // Idle
+        
+        const engineFilter = this.ctx.createBiquadFilter();
+        engineFilter.type = 'lowpass';
+        engineFilter.frequency.value = 400;
+        engineFilter.Q.value = 8;
+        
+        this.engineGain = this.ctx.createGain();
+        this.engineGain.gain.value = 0; // Start silent
+        
+        this.engineOsc.connect(engineFilter);
+        engineFilter.connect(this.engineGain);
+        this.engineGain.connect(this.ctx.destination);
+        this.engineOsc.start();
 
-        // 2. Rain Ambience
-        this.rainLoop = new Howl({
-            src: ['/audio/rain_loop.webm'],
-            loop: true,
-            volume: 0.1
-        });
+        // 🌧️ 2. Procedural Rain Ambience
+        this.rainGain = this.createRainAmbience(this.ctx);
+    }
 
-        // 3. City Ambiance (Distant Sirens, Horns)
-        this.cityAmbiance = new Howl({
-            src: ['/audio/city_ambiance.webm'],
-            loop: true,
-            volume: 0.05
-        });
+    private createRainAmbience(ctx: AudioContext): GainNode {
+        const bufferSize = ctx.sampleRate * 4;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * 0.3;
+        }
+        
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1200;
+        filter.Q.value = 0.5;
+        
+        const gain = ctx.createGain();
+        gain.gain.value = 0; // Start silent
+        
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        source.start();
+        
+        return gain;
     }
 
     public async loadBGM(url: string): Promise<void> {
@@ -45,7 +77,7 @@ export class SoundManager {
             this.bgm = new Howl({
                 src: [url],
                 loop: true,
-                volume: 0, // Start silent for fade-in
+                volume: 0, 
                 onload: () => resolve(),
                 onloaderror: (_id, err) => reject(err)
             });
@@ -53,36 +85,45 @@ export class SoundManager {
     }
 
     public playAll(): void {
+        this.initWebAudio();
+        if (this.ctx) this.ctx.resume();
+
         if (this.bgm) {
             this.bgm.play();
-            this.bgm.fade(0, 0.4 * this.masterVolume, 8000); // 8-second cinematic fade
+            this.bgm.fade(0, 0.4 * this.masterVolume, 8000); 
         }
-        if (this.engineHum) this.engineHum.play();
-        if (this.rainLoop) this.rainLoop.play();
-        if (this.cityAmbiance) this.cityAmbiance.play();
+
+        // Fade in procedural elements
+        if (this.engineGain) {
+            this.engineGain.gain.setTargetAtTime(0.08 * this.masterVolume, this.ctx!.currentTime, 2);
+        }
+        if (this.rainGain) {
+            this.rainGain.gain.setTargetAtTime(0.04 * this.masterVolume, this.ctx!.currentTime, 4);
+        }
     }
 
     public update(speed: number, _delta: number): void {
-        const speedFactor = speed / 40;
+        if (!this.ctx || !this.engineOsc) return;
 
-        // Dynamic Engine Pitching (0.6x at idle, 1.4x at max)
-        if (this.engineHum) {
-            const targetRate = 0.6 + speedFactor * 0.8;
-            this.engineHum.rate(targetRate);
-            // Increase hum volume slightly with speed
-            this.engineHum.volume(0.1 + speedFactor * 0.1);
-        }
-
-        // Crossfade City Ambiance based on distance/speed (simulating highway isolation)
-        if (this.cityAmbiance) {
-            const ambianceVol = Math.max(0.01, 0.05 - speedFactor * 0.04);
-            this.cityAmbiance.volume(ambianceVol);
-        }
+        // Map speed 0–144 km/h to frequency 55Hz–220Hz
+        const speedKmh = speed * 3.6; // Convert m/s to km/h
+        const freq = 55 + (Math.min(speedKmh, 180) / 180) * 165;
+        
+        this.engineOsc.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.1);
+        
+        // Slightly increase gain with RPM
+        const targetGain = (0.06 + (speedKmh / 180) * 0.06) * this.masterVolume;
+        this.engineGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.1);
     }
 
     public setVolume(val: number): void {
         this.masterVolume = val;
         localStorage.setItem('nightcall_volume', val.toString());
         Howler.volume(val);
+        
+        if (this.ctx) {
+            if (this.engineGain) this.engineGain.gain.setTargetAtTime(0.08 * val, this.ctx.currentTime, 0.5);
+            if (this.rainGain) this.rainGain.gain.setTargetAtTime(0.04 * val, this.ctx.currentTime, 0.5);
+        }
     }
 }
