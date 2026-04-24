@@ -3,9 +3,7 @@ import * as THREE from 'three';
 import { Renderer } from './core/Renderer';
 import { Engine } from './core/Engine';
 import { LightingManager } from './world/LightingManager';
-import { Road, getWorldX } from './world/Road';
-import { TerrainManager } from './world/TerrainManager';
-import { PropManager } from './world/PropManager';
+import { Road } from './world/Road';
 import { Car } from './vehicle/Car';
 import { SoundManager } from './audio/SoundManager';
 
@@ -16,11 +14,9 @@ async function init() {
   const lighting = new LightingManager(renderer.scene);
   const road = new Road(renderer.scene);
   const car = new Car(renderer.scene);
-  const terrain = new TerrainManager(renderer.scene);
-  const props = new PropManager(renderer.scene);
   const sound = new SoundManager(renderer.camera);
 
-  // Add Starfield
+  // Starfield
   const starGeo = new THREE.BufferGeometry();
   const starCount = 5000;
   const starPos = new Float32Array(starCount * 3);
@@ -89,46 +85,44 @@ async function init() {
     if (!gameStarted || isPaused) return;
 
     let targetX = (keys.a || keys.arrowleft ? -1 : 0) + (keys.d || keys.arrowright ? 1 : 0);
-    if (Math.abs(inputX) > 1.1) {
-        targetX *= 0.5;
-        inputX = THREE.MathUtils.lerp(inputX, (inputX > 0 ? 1 : -1), 0.1);
-    }
     inputX = THREE.MathUtils.lerp(inputX, targetX, 0.05);
 
-    const drive = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0);
+    const isBraking = keys.s || keys.arrowdown;
+    const drive = (keys.w || keys.arrowup ? 1 : 0) - (isBraking ? 1 : 0);
+    
     if (drive > 0) currentSpeed += accel * delta;
     else if (drive < 0) currentSpeed -= accel * 2 * delta;
     else currentSpeed -= friction * delta;
     currentSpeed = Math.max(0, Math.min(currentSpeed, maxSpeed));
     totalDistance += currentSpeed * delta;
 
-    const curveAtCar = getWorldX(totalDistance);
-    const carVisualX = curveAtCar + (inputX * 8);
+    const roadInfo = road.getRoadPositionAt(totalDistance);
+    const tangent = roadInfo.tangent;
+    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    const carPos = roadInfo.position.clone().add(normal.multiplyScalar(inputX * 6));
     
     if (car.model) {
-      car.update(delta, inputX);
-      car.model.position.x = carVisualX;
-      lighting.update(car.model.position, car.rotationY);
+      car.update(delta, inputX, !!isBraking);
+      car.model.position.copy(carPos);
+      car.model.lookAt(carPos.clone().add(tangent));
+      // Simple ambient light follow
+      lighting.update(car.model.position, 0); 
     }
     
-    road.speed = currentSpeed;
     road.update(totalDistance, delta);
-    terrain.update(totalDistance);
-    props.update(totalDistance);
     
     renderer.camera.fov = 55 + (currentSpeed / maxSpeed) * 15;
     renderer.camera.updateProjectionMatrix();
 
     if (cameraMode === 'CHASE') {
-        const camX = getWorldX(totalDistance - 10) + (inputX * 3);
-        renderer.camera.position.lerp(new THREE.Vector3(camX, 2.5, -8), 0.1);
-        const lookX = getWorldX(totalDistance + 30);
-        renderer.camera.lookAt(lookX, 1, 30);
+        const camInfo = road.getRoadPositionAt(totalDistance - 10);
+        const camPos = camInfo.position.clone().add(new THREE.Vector3(0, 2.5, 0)).add(camInfo.tangent.clone().multiplyScalar(-8));
+        renderer.camera.position.lerp(camPos, 0.1);
+        renderer.camera.lookAt(roadInfo.position.clone().add(new THREE.Vector3(0, 1, 0)));
     } else {
-        const camX = carVisualX;
-        renderer.camera.position.lerp(new THREE.Vector3(camX, 1.2, 1), 0.2);
-        const lookX = getWorldX(totalDistance + 50);
-        renderer.camera.lookAt(lookX, 1.2, 50);
+        const hoodPos = carPos.clone().add(new THREE.Vector3(0, 1.2, 0)).add(tangent.clone().multiplyScalar(1));
+        renderer.camera.position.lerp(hoodPos, 0.2);
+        renderer.camera.lookAt(roadInfo.position.clone().add(tangent.clone().multiplyScalar(50)));
     }
 
     const speedVal = document.getElementById('speed-val');
