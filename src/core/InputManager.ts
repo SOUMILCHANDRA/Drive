@@ -32,7 +32,7 @@ export class InputManager {
         window.addEventListener('keydown', (e) => {
             this.keys[e.key] = true;
             if (e.key === 'Escape') this.state.pause = !this.state.pause;
-            if (e.key.toLowerCase() === 'c') this.state.cameraToggle = !this.state.cameraToggle;
+            if (e.key.toLowerCase() === 'c') this.state.cameraToggle = true;
         });
         window.addEventListener('keyup', (e) => this.keys[e.key] = false);
 
