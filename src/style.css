@@ -57,7 +57,7 @@ body {
 /* 💖 NIGHTCALL Neon Logo */
 .neon-logo {
   font-family: var(--font-script);
-  font-size: 8rem;
+  font-size: 10rem;
   color: #fff;
   margin: 0;
   text-shadow: 
@@ -65,31 +65,67 @@ body {
     0 0 10px #fff,
     0 0 20px var(--neon-pink),
     0 0 40px var(--neon-pink),
-    0 0 80px var(--neon-pink),
-    0 0 120px var(--neon-pink);
-  animation: flicker 4s infinite alternate;
+    0 0 80px var(--neon-pink);
+  animation: neon-flicker 3s infinite alternate;
+  user-select: none;
 }
 
-@keyframes flicker {
-  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
-  20%, 24%, 55% { opacity: 0.8; }
+@keyframes neon-flicker {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% {
+    text-shadow: 
+      0 0 4px #fff,
+      0 0 11px #fff,
+      0 0 19px #fff,
+      0 0 40px var(--neon-pink),
+      0 0 80px var(--neon-pink),
+      0 0 90px var(--neon-pink);
+    opacity: 1;
+  }
+  20%, 24%, 55% {        
+    text-shadow: none;
+    opacity: 0.5;
+  }
 }
 
-.start-text {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  letter-spacing: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: 2rem;
-  animation: pulse 2s infinite;
-}
-
-.controls-text {
+.title-subtext {
   font-family: var(--font-technical);
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.4rem;
   margin-top: 1rem;
-  letter-spacing: 0.2rem;
+}
+
+.pulse-text {
+  margin-top: 1.5rem;
+  color: #fff;
+  opacity: 1;
+  animation: title-pulse 2s infinite ease-in-out;
+}
+
+@keyframes title-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.vignette-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.8) 100%);
+  pointer-events: none;
+}
+
+.title-rain {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 2px 50px;
+  animation: rain-fall 0.5s infinite linear;
+  opacity: 0.3;
+}
+
+@keyframes rain-fall {
+  0% { transform: translateY(-50px); }
+  100% { transform: translateY(50px); }
 }
 
 /* 📺 Film Grain Overlay */
@@ -111,26 +147,261 @@ body::after {
   100% { transform: translate(1%, -1%); }
 }
 
-/* 📊 Minimal HUD */
-.hud {
-  position: absolute;
-  bottom: 15vh;
-  left: 5vw;
-  z-index: 100;
+/* 🎥 Letterbox Bars (Cinematic 2.39:1 Frame) */
+.letterbox {
+  position: fixed;
+  left: 0;
+  width: 100%;
+  height: 10.5vh;
+  background: #000;
+  z-index: 500;
   pointer-events: none;
-  font-family: var(--font-technical);
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.letterbox.top { top: 0; transform: translateY(-100%); }
+.letterbox.bottom { bottom: 0; transform: translateY(100%); }
+
+.game-active .letterbox.top,
+.game-active .letterbox.bottom {
+  transform: translateY(0);
+}
+
+/* 📊 Minimalist HUD Overlay */
+.hud-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  pointer-events: none;
   opacity: 0;
   transition: opacity 1s;
 }
-.hud.visible { opacity: 0.8; }
 
-.hud-item {
-  color: var(--sodium-yellow);
-  font-size: 0.8rem;
-  margin: 0.5rem 0;
-  letter-spacing: 0.1rem;
+.hud-overlay.visible { opacity: 1; }
+
+.speed-display {
+  position: absolute;
+  bottom: 11vh;
+  left: 3vw;
+  font-family: var(--font-technical);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.1em;
 }
-.hud-item span { color: #fff; font-weight: bold; }
+
+.speed-display span { font-weight: bold; }
+.speed-display .unit { font-size: 10px; margin-left: 0.2em; opacity: 0.5; }
+
+.biome-marker {
+  position: absolute;
+  bottom: 11vh;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: rgba(255, 45, 120, 0.6);
+  letter-spacing: 0.3em;
+  opacity: 0;
+  transition: opacity 1s;
+}
+
+.biome-marker.active { opacity: 1; }
+
+.rearview-mirror {
+  position: absolute;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 350px;
+  height: 65px;
+  background: #050505;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.5s, transform 0.5s;
+  pointer-events: none;
+}
+
+.rearview-mirror.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#mirror-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.mirror-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(0,0,0,0.2) 100%);
+  pointer-events: none;
+}
+
+.pause-indicator {
+  position: absolute;
+  top: 12vh;
+  right: 3vw;
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--neon-pink);
+  opacity: 0;
+  text-shadow: 0 0 10px var(--neon-pink);
+  transition: opacity 0.3s;
+}
+
+.pause-indicator.visible { opacity: 0.8; }
+
+/* 🎥 Aesthetic Title Screen */
+#title-screen {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 1.5s ease-in-out;
+}
+
+#title-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.press-enter {
+  margin-top: 2rem;
+  font-family: var(--font-technical);
+  color: var(--neon-pink);
+  letter-spacing: 0.5rem;
+  font-size: 0.9rem;
+  opacity: 0;
+  transition: opacity 0.5s;
+  text-shadow: 0 0 10px var(--neon-pink);
+  animation: pulse 2s infinite;
+}
+
+#title-screen.ready .press-enter { opacity: 1; }
+#title-screen.ready .loading-status { display: none; }
+
+.loading-backdrop {
+  position: absolute;
+  inset: 0;
+  background: url('/loading-bg.png') center/cover no-repeat;
+  filter: brightness(0.4) saturate(1.2) contrast(1.1);
+  opacity: 0.8;
+}
+
+.loading-content {
+  position: relative;
+  text-align: center;
+  z-index: 10;
+}
+
+.drive-logo-neon {
+  width: 400px;
+  max-width: 80vw;
+  /* Cinematic Trick: Invert + Hue Rotate to remove white background and preserve pink neon */
+  filter: invert(1) hue-rotate(180deg) brightness(1.5) drop-shadow(0 0 20px var(--neon-pink));
+  mix-blend-mode: screen;
+  animation: logo-flicker 4s infinite;
+}
+
+.loading-status {
+  margin-top: 2rem;
+  font-family: var(--font-technical);
+  color: #fff;
+  letter-spacing: 0.5rem;
+  font-size: 0.8rem;
+  opacity: 0.5;
+  animation: pulse 2s infinite;
+}
+
+@keyframes logo-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+  20%, 22%, 24%, 55% { opacity: 0.3; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+.overlay-notice {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-family: var(--font-technical);
+  color: #fff;
+  padding: 2rem;
+}
+
+.overlay-notice .neon-logo.small { font-size: 3rem; margin-bottom: 1rem; }
+.overlay-notice p { letter-spacing: 0.5rem; margin: 0.5rem 0; }
+.overlay-notice .small { font-size: 0.6rem; opacity: 0.5; letter-spacing: 0.2rem; }
+
+#orientation-notice { display: none; }
+
+@media (orientation: portrait) and (max-width: 1024px) {
+  #orientation-notice { display: flex; }
+}
+
+/* 🎮 Touch Controls */
+.touch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  .touch-overlay { display: flex; }
+}
+
+.steer-pad, .pedal-pad {
+  position: absolute;
+  bottom: 12vh;
+  display: flex;
+  gap: 20px;
+  pointer-events: auto;
+}
+
+.steer-pad { left: 5vw; }
+.pedal-pad { right: 5vw; flex-direction: row-reverse; }
+
+.pad-btn {
+  width: 70px;
+  height: 70px;
+  border: 1px solid var(--neon-pink);
+  border-radius: 50%;
+  background: rgba(255, 45, 120, 0.05);
+  color: var(--neon-pink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 24px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(5px);
+  transition: background 0.1s, transform 0.1s;
+}
+
+.pad-btn:active {
+  background: var(--neon-pink);
+  color: #000;
+  transform: scale(0.9);
+}
+
+.pad-btn.brake { border-color: #ff4444; color: #ff4444; background: rgba(255, 68, 68, 0.05); }
+.pad-btn.brake:active { background: #ff4444; color: #fff; }
 
 /* 🕯️ Pause Menu (Neon Translucent) */
 .pause-menu {
@@ -159,6 +430,115 @@ body::after {
   font-size: 0.8rem;
   letter-spacing: 0.3rem;
   animation: pulse 1.5s infinite;
+}
+
+.settings-panel {
+    width: 80%;
+    max-width: 800px;
+    padding: 3rem;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin: 2rem 0;
+    text-align: left;
+}
+
+.settings-section h3 {
+    font-family: var(--font-display);
+    color: var(--neon-cyan);
+    font-size: 1.2rem;
+    letter-spacing: 0.3rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(0, 255, 239, 0.2);
+    padding-bottom: 0.5rem;
+}
+
+.setting-item {
+    margin-bottom: 1.5rem;
+}
+
+.setting-item label {
+    display: block;
+    font-size: 0.7rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.6;
+}
+
+/* 🎚️ Custom Range Sliders */
+input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--neon-pink);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 10px var(--neon-pink);
+}
+
+/* 🔘 Toggle & Quality Buttons */
+.toggle-group, .quality-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.toggle-btn, .quality-btn {
+    flex: 1;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 0.4rem;
+    font-size: 0.7rem;
+    font-family: var(--font-technical);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toggle-btn.active, .quality-btn.active {
+    border-color: var(--neon-pink);
+    color: var(--neon-pink);
+    background: rgba(255, 45, 120, 0.1);
+}
+
+/* 📷 Camera Select */
+select {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 0.5rem;
+    font-family: var(--font-technical);
+    outline: none;
+}
+
+.resume-btn {
+    background: transparent;
+    border: 1px solid var(--neon-pink);
+    color: var(--neon-pink);
+    padding: 0.8rem 2rem;
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    letter-spacing: 0.3rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 1rem;
+}
+
+.resume-btn:hover {
+    background: var(--neon-pink);
+    color: #000;
+    box-shadow: 0 0 20px var(--neon-pink);
 }
 
 /* ⚡ Cinematic Flash */
