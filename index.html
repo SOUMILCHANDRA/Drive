@@ -2,9 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nightcall | Neon-Noir</title>
+    <title>NIGHTCALL | An Endless Noir Drive</title>
+    <meta name="description" content="An immersive, cinematic driving simulator inspired by the film Drive (2011). Experience a procedural neon-noir odyssey through the nocturnal streets of a digital LA." />
+    <meta name="theme-color" content="#000000" />
+
+    <!-- OpenGraph / Social Sharing -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="NIGHTCALL | An Endless Noir Drive" />
+    <meta property="og:description" content="Enter the void. An immersive, film-inspired driving odyssey." />
+    <meta property="og:image" content="/og-image.jpg" />
+    <meta property="twitter:card" content="summary_large_image" />
+
     <!-- Google Fonts: Geometric & Technical -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,27 +25,125 @@
     <div class="letterbox bottom"></div>
     <div id="flash" class="screen-flash"></div>
     <div id="pauseMenu" class="pause-menu" style="display: none;">
-      <div class="pause-content">
-        <h1 class="neon-text">SYSTEM PAUSED</h1>
-        <p class="pause-hint">ESC TO RESUME ENGINE</p>
+      <div class="pause-content settings-panel">
+        <h1 class="neon-text">SYSTEMS COMMAND</h1>
+        
+        <div class="settings-grid">
+            <!-- 🔊 AUDIO -->
+            <div class="settings-section">
+                <h3>AUDIO</h3>
+                <div class="setting-item">
+                    <label>MASTER</label>
+                    <input type="range" id="masterVol" min="0" max="100" value="50">
+                </div>
+                <div class="setting-item">
+                    <label>MUSIC</label>
+                    <input type="range" id="musicVol" min="0" max="100" value="40">
+                </div>
+            </div>
+
+            <!-- 🌧️ ATMOSPHERE -->
+            <div class="settings-section">
+                <h3>ATMOSPHERE</h3>
+                <div class="setting-item">
+                    <label>RAIN</label>
+                    <div class="toggle-group">
+                        <button class="toggle-btn" data-rain="0">OFF</button>
+                        <button class="toggle-btn" data-rain="8000">LIGHT</button>
+                        <button class="toggle-btn active" data-rain="15000">HEAVY</button>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>POST-FX</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" id="toggleGrain" checked> GRAIN</label>
+                        <label><input type="checkbox" id="toggleAberration" checked> ABERRATION</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 📺 VISION -->
+            <div class="settings-section">
+                <h3>VISION</h3>
+                <div class="setting-item">
+                    <label>CAMERA</label>
+                    <select id="camSelect">
+                        <option value="0">CHASE</option>
+                        <option value="1">HOOD</option>
+                        <option value="2">CINEMATIC</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>QUALITY</label>
+                    <div class="quality-buttons">
+                        <button class="quality-btn" data-tier="LOW">LOW</button>
+                        <button class="quality-btn" data-tier="MEDIUM">MED</button>
+                        <button class="quality-btn active" data-tier="HIGH">HIGH</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button class="resume-btn" onclick="document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))">RESUME DRIVE</button>
       </div>
     </div>
     <div id="app">
       <!-- 🎬 Final Frontend Start Screen -->
       <div id="startScreen">
+        <div class="vignette-overlay"></div>
+        <div class="title-rain"></div>
         <div class="content">
           <h1 class="neon-logo">NIGHTCALL</h1>
-          <p class="start-text">CLICK TO IGNITE</p>
-          <p class="controls-text">WASD / ARROWS TO STEER</p>
+          <div class="title-subtext">
+      <!-- 🎥 Aesthetic Title Screen (Combined Loading + Menu) -->
+      <div id="title-screen" style="background: url('/loading-bg.png') center/cover no-repeat;">
+        <div class="loading-backdrop"></div>
+        <div class="loading-content">
+          <img src="/loading-logo.png" alt="DRIVE" class="drive-logo-neon">
+          <div id="loading-status" class="loading-status">INITIALIZING SYSTEMS...</div>
+          <p class="press-enter">PRESS ENTER TO BEGIN</p>
+        </div>
+      </div>
+
+      <!-- 🚦 Incompatibility & Orientation Overlays -->
+      <div id="webgl-error" class="overlay-notice" style="display: none;">
+        <div class="content">
+          <h1 class="neon-logo small">ERROR</h1>
+          <p>WEBGL 2 NOT SUPPORTED</p>
+          <p class="small">PLEASE UPGRADE TO A MODERN BROWSER TO ENTER THE VOID</p>
+        </div>
+      </div>
+
+      <div id="orientation-notice" class="overlay-notice">
+        <div class="content">
+          <p>ROTATE DEVICE</p>
+          <p class="small">LANDSCAPE MODE REQUIRED FOR THE DRIVE</p>
+        </div>
+      </div>
+
+      <!-- 🎮 Mobile Touch Controls (Visible on Touch Only) -->
+      <div id="touch-controls" class="touch-overlay">
+        <div class="steer-pad">
+          <div id="touch-left" class="pad-btn">L</div>
+          <div id="touch-right" class="pad-btn">R</div>
+        </div>
+        <div class="pedal-pad">
+          <div id="touch-brake" class="pad-btn brake">B</div>
+          <div id="touch-accel" class="pad-btn accel">A</div>
         </div>
       </div>
 
       <!-- HUD Overlay (Minimal Documentary Style) -->
-      <div id="hud" class="hud" style="display: none;">
-        <div class="hud-content">
-          <div class="hud-item">KM/H: <span id="speed-val">0</span></div>
-          <div class="hud-item">DIST: <span id="dist-val">0</span>M</div>
+      <div id="hud" class="hud-overlay">
+        <div id="rearview" class="rearview-mirror">
+            <canvas id="mirror-canvas"></canvas>
+            <div class="mirror-overlay"></div>
         </div>
+        <div class="speed-display">
+            <span id="speed-val">000</span> <span class="unit">KM/H</span>
+        </div>
+        <div id="biome-label" class="biome-marker">DOWNTOWN</div>
+        <div id="pause-icon" class="pause-indicator">II</div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
