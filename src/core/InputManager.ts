@@ -68,10 +68,10 @@ export class InputManager {
     }
 
     private updateKeyboard(): void {
-        // Steering Target
+        // Steering Target (Inverted based on user feedback)
         this.targetSteer = 0;
-        if (this.keys['a'] || this.keys['ArrowLeft'] || this.touchStates.left) this.targetSteer -= 1;
-        if (this.keys['d'] || this.keys['ArrowRight'] || this.touchStates.right) this.targetSteer += 1;
+        if (this.keys['a'] || this.keys['ArrowLeft'] || this.touchStates.left) this.targetSteer += 1;
+        if (this.keys['d'] || this.keys['ArrowRight'] || this.touchStates.right) this.targetSteer -= 1;
 
         // Throttle & Brake
         this.state.throttle = (this.keys['w'] || this.keys['ArrowUp'] || this.touchStates.accel) ? 1 : 0;
