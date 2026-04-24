@@ -1,54 +1,47 @@
-# 🌌 Drive 
-### A Procedural Cinematic Experience
+# 🌌 NIGHTCALL 
+### An Endless Cinematic Noir Odyssey
 
-Inspired by **Slow Roads** and the atmospheric minimalism of **Drive (2011)**. This is an endless, nocturnal journey through a vast procedural landscape, guided only by your headlights and the rhythm of the road.
+Inspired by the atmospheric minimalism of **Drive (2011)**. An endless nocturnal journey through a procedural digital LA, guided by the rhythm of the road and the low-frequency rumble of a V8 engine.
 
 ![Aesthetic](https://img.shields.io/badge/Aesthetic-DRIVE_(2011)-black?style=for-the-badge)
 ![Tech](https://img.shields.io/badge/Powered_by-Three.js-blueviolet?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Infinite_Zen-green?style=for-the-badge)
+![Audio](https://img.shields.io/badge/Audio-Web_Audio_API-blue?style=for-the-badge)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-black?style=for-the-badge&logo=vercel)](https://drive-xi-nine.vercel.app/)
 
 ### 🎬 Cinematic Manifesto
 
-This project is a high-fidelity simulation of the *Drive* (2011) nocturnal mountain pass sequence. The technical implementation is guided by three core pillars:
+This project is a high-fidelity simulation of a film-inspired nocturnal drive. The technical implementation focuses on "Atmosphere over Mechanics," delivering a visceral sensory experience through three core pillars:
 
-1.  **Orange & Teal Depth**: The rendering pipeline uses a selective 0.15 mix-amount orange/teal color grade to separate the blue-hour mountain silhouettes from the high-intensity sodium streetlights.
-2.  **Sodium Glow (Neon Realism)**: All light sources use multi-layered `drop-shadow` and `screen` blend modes to simulate gas-discharge volumetric spill on wet asphalt.
-3.  **Kinetic Handling**: Physics are tuned for "heavy" muscle car handling (1970 Chevelle SS), prioritizing angular damping and spring-arm stability over hyper-realistic arcade movement.
+1.  **Nocturnal Depth**: A rendering pipeline calibrated for deep black/indigo shadows contrasted by high-intensity halogen flaring and Hot Pink neon branding.
+2.  **Synthetic Atmosphere**: Real-time procedural audio synthesis and 12,000-particle atmospheric systems that react dynamically to the vehicle's kinetic state.
+3.  **Metropolitan Scale**: A procedural cityscape that generates an infinite urban horizon, complete with distant skylines and dangerous oncoming traffic.
 
 ---
 
-## 🎥 Cinematic Vision
-This project prioritizes **Atmosphere over Mechanics**. It captures the isolation of a midnight drive:
-- **Restrained Lighting**: 70-80% darkness. Deep black and indigo shadows contrasted by warm halogen highlights.
-- **Isolated Pools of Light**: Sparse sodium-orange streetlights creating islands of safety in the void.
-- **Zen Driving**: No timers, no crashes, no traffic. Just you and the infinite path.
+## 🎥 Cinematic Features
 
-## ⚙️ Technical Architecture
-- **Scout Generation Engine**: A heuristic path-planner that sampling terrain gradients to ensure natural, drivable road curvature.
-- **Planetary fBM Noise**: Layered Fractal Brownian Motion with deterministic parameters for **Earth, Mars, and Moon** geologies.
-- **Conforming Terrain System**: A master-spline link that physically deforms mountain geometry to meet the road via **Smoothstep Carving**.
-- **Deterministic Seed (Alea)**: High-performance PRNG ensuring every world is reproducible from a single seed.
-- **Rhythmic Sodium Lighting**: Warm orange streetlights (#FF9500) spawned every 50m with volumetric gradients and Indigo rim-lights to reveal mountain silhouettes.
-- **High-Gloss "Wet" Asphalt**: Advanced MeshPhysicalMaterial with 0.8 Clearcoat and 0.7 Metalness, creating sharp specular streaks from the rhythmic streetlights.
-- **Cinematic Cockpit Rig**: A tight, lower camera perspective (4.5m behind, 1.8m above) designed to emphasize the sense of scale and the strobe-like effect of overhead lights.
-- **Treadmill LOD System**: High-detail near-player chunks with large-scale low-detail far grids for infinite visibility.
+- **Procedural V8 Synthesis**: Fully synthesized 1973 Malibu engine hum (Web Audio API). No samples—just pure, reactive mechanical rumble.
+- **Dynamic Oncoming Traffic**: High-intensity halogen billboards that "flare" and spike in bloom intensity as they pass the camera plane.
+- **Wet Look Asphalt**: Real-time road reflections utilizing an optimized 15Hz environment capture pass for cinematic puddle reflections.
+- **12,000 Particle Downpour**: High-density cinematic rain with speed-aware aerodynamic leaning and localized spatial recycling.
+- **Neon Branding**: Procedural neon signage with individual flicker state-machines and high-intensity emissive materials.
+- **Urban Skyline**: A 2000m radius procedural backdrop featuring building silhouettes with randomized lit windows.
 
 ## 🕹️ Controls
-- **WASD / ARROWS**: Manual Drive & Steering
-- **'A' KEY**: Toggle **Cinematic Autopilot** (Rail-Lock Spline Tracking)
-- **CLICK TO START**: Initialize Cinematic Engine & Physics
-- **ESC**: Pause / Reset View
 
-## 🛠️ Tech Stack
-- **Engine**: Three.js (WebGL)
-- **Physics**: Custom procedural spline-alignment system
-- **Environment**: Custom GLSL Color Grading & Post-processing
-- **Asset Pipeline**: Support for external GLTF/GLB models with procedural fallbacks.
-- **Wheel Animation**: Physically calculated wheel rotation mapped to vehicle velocity.
+- **WASD / ARROWS**: Drive & Steering
+- **ENTER**: Ignite Engine / Begin Drive
+- **TAB**: Toggle High-Fidelity Rearview Mirror
+- **'C' KEY**: Cycle Cinematic Cameras (Chase, Hood, Bumper)
+- **ESC**: Systems Command (Pause & Settings Menu)
 
-## 🏁 Development State
-Currently tuned for **Visual Immersion**. The system is optimized for a 1.8 exposure/0.006 fog density ratio to maintain visibility while preserving the deep nocturnal mood.
+## ⚙️ Technical Stack
+
+- **Engine**: Three.js (WebGL 2) with ACES Filmic Tone Mapping.
+- **Post-Processing**: Custom UnrealBloom, Film Grain, and Chromatic Aberration stack.
+- **Audio**: Procedural Web Audio API for engine and environmental ambience.
+- **Architecture**: Modular TypeScript engine with procedural chunk-based world generation.
+- **Vehicle Physics**: Custom raycasting-based road alignment and kinetic damping system.
 
 ---
-*Its litrelly me.*
+*There's something about you. It's hard to explain.*
