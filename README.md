@@ -12,7 +12,7 @@ Inspired by the atmospheric minimalism of **Drive (2011)**. An endless nocturnal
 
 This project is a high-fidelity simulation of a film-inspired nocturnal drive. The technical implementation focuses on "Atmosphere over Mechanics," delivering a visceral sensory experience through three core pillars:
 
-1.  **Nocturnal Depth**: A rendering pipeline calibrated for deep black/indigo shadows contrasted by high-intensity halogen flaring and Hot Pink neon branding.
+1.  **Optical Depth**: A rendering pipeline calibrated for deep black/indigo shadows contrasted by high-intensity halogen flaring and Hot Pink neon branding.
 2.  **Synthetic Atmosphere**: Real-time procedural audio synthesis and 12,000-particle atmospheric systems that react dynamically to the vehicle's kinetic state.
 3.  **Metropolitan Scale**: A procedural cityscape that generates an infinite urban horizon, complete with distant skylines and dangerous oncoming traffic.
 
@@ -20,6 +20,8 @@ This project is a high-fidelity simulation of a film-inspired nocturnal drive. T
 
 ## 🎥 Cinematic Features
 
+- **Diagnostic Resilience Layer**: Integrated global error handling and failsafe asset loading to ensure reliable "ignition" across all browser environments.
+- **Optical Restoration Pipeline**: High-fidelity ACES Filmic tone mapping resolved through a Gamma-calibrated post-processing stack for 3.0 peak exposure.
 - **Procedural V8 Synthesis**: Fully synthesized 1973 Malibu engine hum (Web Audio API). No samples—just pure, reactive mechanical rumble.
 - **Dynamic Oncoming Traffic**: High-intensity halogen billboards that "flare" and spike in bloom intensity as they pass the camera plane.
 - **Wet Look Asphalt**: Real-time road reflections utilizing an optimized 15Hz environment capture pass for cinematic puddle reflections.
@@ -29,16 +31,16 @@ This project is a high-fidelity simulation of a film-inspired nocturnal drive. T
 
 ## 🕹️ Controls
 
-- **WASD / ARROWS**: Drive & Steering
+- **WASD / ARROWS**: Drive & Steering (Optimized Kinetic Calibration)
 - **ENTER**: Ignite Engine / Begin Drive
 - **TAB**: Toggle High-Fidelity Rearview Mirror
-- **'C' KEY**: Cycle Cinematic Cameras (Chase, Hood, Bumper)
+- **'C' KEY**: Cycle Cinematic Cameras (Chase, Hood, Cinematic)
 - **ESC**: Systems Command (Pause & Settings Menu)
 
 ## ⚙️ Technical Stack
 
-- **Engine**: Three.js (WebGL 2) with ACES Filmic Tone Mapping.
-- **Post-Processing**: Custom UnrealBloom, Film Grain, and Chromatic Aberration stack.
+- **Engine**: Three.js (WebGL 2) with ACES Filmic Tone Mapping and Gamma Calibration.
+- **Post-Processing**: Custom UnrealBloom, Film Grain, and Chromatic Aberration stack resolved via EffectComposer.
 - **Audio**: Procedural Web Audio API for engine and environmental ambience.
 - **Architecture**: Modular TypeScript engine with procedural chunk-based world generation.
 - **Vehicle Physics**: Custom raycasting-based road alignment and kinetic damping system.
