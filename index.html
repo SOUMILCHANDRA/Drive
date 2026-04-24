@@ -21,28 +21,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;700&family=Mr+Dafoe&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div class="letterbox top"></div>
-    <div class="letterbox bottom"></div>
     <div id="flash" class="screen-flash"></div>
+    
+    <!-- 🕯️ Systems Command Menu -->
     <div id="pauseMenu" class="pause-menu" style="display: none;">
       <div class="pause-content settings-panel">
         <h1 class="neon-text">SYSTEMS COMMAND</h1>
         
         <div class="settings-grid">
-            <!-- 🔊 AUDIO -->
             <div class="settings-section">
                 <h3>AUDIO</h3>
                 <div class="setting-item">
                     <label>MASTER</label>
                     <input type="range" id="masterVol" min="0" max="100" value="50">
                 </div>
-                <div class="setting-item">
-                    <label>MUSIC</label>
-                    <input type="range" id="musicVol" min="0" max="100" value="40">
-                </div>
             </div>
 
-            <!-- 🌧️ ATMOSPHERE -->
             <div class="settings-section">
                 <h3>ATMOSPHERE</h3>
                 <div class="setting-item">
@@ -62,7 +56,6 @@
                 </div>
             </div>
 
-            <!-- 📺 VISION -->
             <div class="settings-section">
                 <h3>VISION</h3>
                 <div class="setting-item">
@@ -87,65 +80,61 @@
         <button class="resume-btn" onclick="document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))">RESUME DRIVE</button>
       </div>
     </div>
-    <div id="app">
-      <!-- 🎬 Final Frontend Start Screen -->
-      <div id="startScreen">
-        <div class="vignette-overlay"></div>
-        <div class="title-rain"></div>
-        <div class="content">
-          <h1 class="neon-logo">NIGHTCALL</h1>
-          <div class="title-subtext">
-      <!-- 🎥 Aesthetic Title Screen (Combined Loading + Menu) -->
-      <div id="title-screen" style="background: url('/loading-bg.png') center/cover no-repeat;">
-        <div class="loading-backdrop"></div>
-        <div class="loading-content">
-          <img src="/loading-logo.png" alt="DRIVE" class="drive-logo-neon">
-          <div id="loading-status" class="loading-status">INITIALIZING SYSTEMS...</div>
-          <p class="press-enter">PRESS ENTER TO BEGIN</p>
-        </div>
-      </div>
 
-      <!-- 🚦 Incompatibility & Orientation Overlays -->
-      <div id="webgl-error" class="overlay-notice" style="display: none;">
-        <div class="content">
-          <h1 class="neon-logo small">ERROR</h1>
-          <p>WEBGL 2 NOT SUPPORTED</p>
-          <p class="small">PLEASE UPGRADE TO A MODERN BROWSER TO ENTER THE VOID</p>
-        </div>
-      </div>
+    <!-- 🏎️ Main Rendering Container -->
+    <div id="app"></div>
 
-      <div id="orientation-notice" class="overlay-notice">
-        <div class="content">
-          <p>ROTATE DEVICE</p>
-          <p class="small">LANDSCAPE MODE REQUIRED FOR THE DRIVE</p>
-        </div>
-      </div>
-
-      <!-- 🎮 Mobile Touch Controls (Visible on Touch Only) -->
-      <div id="touch-controls" class="touch-overlay">
-        <div class="steer-pad">
-          <div id="touch-left" class="pad-btn">L</div>
-          <div id="touch-right" class="pad-btn">R</div>
-        </div>
-        <div class="pedal-pad">
-          <div id="touch-brake" class="pad-btn brake">B</div>
-          <div id="touch-accel" class="pad-btn accel">A</div>
-        </div>
-      </div>
-
-      <!-- HUD Overlay (Minimal Documentary Style) -->
-      <div id="hud" class="hud-overlay">
-        <div id="rearview" class="rearview-mirror">
-            <canvas id="mirror-canvas"></canvas>
-            <div class="mirror-overlay"></div>
-        </div>
-        <div class="speed-display">
-            <span id="speed-val">000</span> <span class="unit">KM/H</span>
-        </div>
-        <div id="biome-label" class="biome-marker">DOWNTOWN</div>
-        <div id="pause-icon" class="pause-indicator">II</div>
+    <!-- 🎥 Aesthetic Title Screen (Combined Loading + Menu) -->
+    <div id="title-screen">
+      <div class="loading-backdrop"></div>
+      <div class="loading-content">
+        <img src="/loading-logo.png" alt="DRIVE" class="drive-logo-neon">
+        <div id="loading-status" class="loading-status">INITIALIZING SYSTEMS...</div>
+        <p class="press-enter">PRESS ENTER TO BEGIN</p>
       </div>
     </div>
+
+    <!-- 🚦 Incompatibility & Orientation Overlays -->
+    <div id="webgl-error" class="overlay-notice" style="display: none;">
+      <div class="content">
+        <h1 class="neon-logo small">ERROR</h1>
+        <p>WEBGL 2 NOT SUPPORTED</p>
+        <p class="small">PLEASE UPGRADE TO A MODERN BROWSER TO ENTER THE VOID</p>
+      </div>
+    </div>
+
+    <div id="orientation-notice" class="overlay-notice">
+      <div class="content">
+        <p>ROTATE DEVICE</p>
+        <p class="small">LANDSCAPE MODE REQUIRED FOR THE DRIVE</p>
+      </div>
+    </div>
+
+    <!-- 🎮 Mobile Touch Controls -->
+    <div id="touch-controls" class="touch-overlay">
+      <div class="steer-pad">
+        <div id="touch-left" class="pad-btn">L</div>
+        <div id="touch-right" class="pad-btn">R</div>
+      </div>
+      <div class="pedal-pad">
+        <div id="touch-brake" class="pad-btn brake">B</div>
+        <div id="touch-accel" class="pad-btn accel">A</div>
+      </div>
+    </div>
+
+    <!-- 📊 Minimalist HUD -->
+    <div id="hud" class="hud-overlay">
+      <div id="rearview" class="rearview-mirror">
+          <canvas id="mirror-canvas"></canvas>
+          <div class="mirror-overlay"></div>
+      </div>
+      <div class="speed-display">
+          <span id="speed-val">000</span> <span class="unit">KM/H</span>
+      </div>
+      <div id="biome-label" class="biome-marker">DOWNTOWN</div>
+      <div id="pause-icon" class="pause-indicator">II</div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

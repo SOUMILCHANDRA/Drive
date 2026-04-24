@@ -23,18 +23,8 @@ body {
   position: relative;
 }
 
-/* 🎥 Letterbox Bars (2.39:1 Cinematic) */
-.letterbox {
-  position: fixed;
-  left: 0;
-  width: 100%;
-  height: 12vh;
-  background: #000;
-  z-index: 500;
-  pointer-events: none;
-}
-.letterbox.top { top: 0; }
-.letterbox.bottom { bottom: 0; }
+
+/* 🎬 Start Screen (Legacy - should be gone) */
 
 /* 🎬 Start Screen */
 #startScreen {
@@ -152,11 +142,11 @@ body::after {
   position: fixed;
   left: 0;
   width: 100%;
-  height: 10.5vh;
-  background: #000;
+  height: 7vh;
+  background: #000000;
   z-index: 500;
   pointer-events: none;
-  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .letterbox.top { top: 0; transform: translateY(-100%); }
 .letterbox.bottom { bottom: 0; transform: translateY(100%); }
@@ -180,31 +170,33 @@ body::after {
 
 .speed-display {
   position: absolute;
-  bottom: 11vh;
-  left: 3vw;
-  font-family: var(--font-technical);
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
+  bottom: 8.5vh;
+  left: 2vw;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
   letter-spacing: 0.1em;
+  z-index: 101;
 }
 
-.speed-display span { font-weight: bold; }
-.speed-display .unit { font-size: 10px; margin-left: 0.2em; opacity: 0.5; }
+.speed-display span { font-weight: normal; }
+.speed-display .unit { font-size: 9px; margin-left: 0.2em; opacity: 0.4; }
 
 .biome-marker {
   position: absolute;
-  bottom: 11vh;
+  bottom: 8.5vh;
   left: 50%;
   transform: translateX(-50%);
-  font-family: var(--font-display);
-  font-size: 14px;
-  color: rgba(255, 45, 120, 0.6);
-  letter-spacing: 0.3em;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 45, 120, 0.55);
+  letter-spacing: 0.4em;
+  z-index: 101;
   opacity: 0;
-  transition: opacity 1s;
+  transition: opacity 1s ease;
 }
 
-.biome-marker.active { opacity: 1; }
+.biome-marker.visible { opacity: 1; }
 
 .rearview-mirror {
   position: absolute;
