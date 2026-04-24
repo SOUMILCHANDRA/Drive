@@ -12,7 +12,18 @@ import { Road } from './world/Road';
 import { Car } from './vehicle/Car';
 import { SoundManager } from './audio/SoundManager';
 import { QualityManager } from './core/QualitySettings';
-import type { QualityTier } from './core/QualitySettings';
+
+// 🛑 Emergency Global Error Handlers for Headless Debugging
+window.onerror = (msg, _url, _line, _col, _error) => {
+    console.error('CRASH:', msg, 'at', _line, ':', _col, _error);
+    const status = document.getElementById('loading-status');
+    if (status) status.innerText = `CRASH: ${msg}`;
+};
+window.onunhandledrejection = (event) => {
+    console.error('PROMISE CRASH:', event.reason);
+    const status = document.getElementById('loading-status');
+    if (status) status.innerText = `PROMISE CRASH: ${event.reason}`;
+};
 
 async function init() {
   // 🚦 WebGL 2 Compatibility Check
@@ -49,69 +60,18 @@ async function init() {
 
   const titleScreen = document.getElementById('title-screen');
   const flash = document.getElementById('flash');
-  const pauseMenu = document.getElementById('pauseMenu');
   const hud = document.getElementById('hud');
-  const speedVal = document.getElementById('speed-val');
   const biomeLabel = document.getElementById('biome-label');
+  const pauseMenu = document.getElementById('pauseMenu');
   const pauseIcon = document.getElementById('pause-icon');
+  const camSelect = document.getElementById('camSelect') as HTMLSelectElement;
   const rearview = document.getElementById('rearview');
-  
+  const loadingStatus = document.getElementById('loading-status');
+
   let gameStarted = false;
   let idleTime = 0;
-  let hudUpdateTimer = 0;
-  let currentBiome = "HIGHWAY";
+  let currentBiome = "DOWNTOWN";
   let rearviewVisible = false;
-
-  // 🛠️ Settings UI
-  const qualityButtons = document.querySelectorAll('.quality-btn');
-  const rainButtons = document.querySelectorAll('.toggle-btn[data-rain]');
-  const masterSlider = document.getElementById('masterVol') as HTMLInputElement;
-  const camSelect = document.getElementById('camSelect') as HTMLSelectElement;
-  const grainCheck = document.getElementById('toggleGrain') as HTMLInputElement;
-  const aberrationCheck = document.getElementById('toggleAberration') as HTMLInputElement;
-
-  const updateUI = () => {
-      qualityButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tier') === currentConfig.tier));
-      rainButtons.forEach(btn => btn.classList.toggle('active', parseInt(btn.getAttribute('data-rain') || '0') === currentConfig.rainCount));
-      if (masterSlider) masterSlider.value = (sound.masterVolume * 100).toString();
-      if (camSelect) camSelect.value = cameraManager.getModeIndex().toString();
-  };
-  updateUI();
-
-  // Listeners
-  qualityButtons.forEach(btn => btn.addEventListener('click', () => {
-      const tier = btn.getAttribute('data-tier') as QualityTier;
-      qualityManager.setTier(tier);
-      currentConfig = qualityManager.getConfig();
-      renderer.updateQuality(currentConfig);
-      rain.updateQuality(currentConfig.rainCount);
-      updateUI();
-  }));
-
-  rainButtons.forEach(btn => btn.addEventListener('click', () => {
-      const count = parseInt(btn.getAttribute('data-rain') || '0');
-      currentConfig.rainCount = count;
-      rain.updateQuality(count);
-      updateUI();
-  }));
-
-  masterSlider?.addEventListener('input', (e) => {
-      const val = parseInt((e.target as HTMLInputElement).value) / 100;
-      sound.setVolume(val);
-  });
-
-  camSelect?.addEventListener('change', (e) => {
-      const modeIdx = parseInt((e.target as HTMLSelectElement).value);
-      cameraManager.setMode(modeIdx);
-  });
-
-  grainCheck?.addEventListener('change', (e) => {
-      renderer.grainPass.enabled = (e.target as HTMLInputElement).checked;
-  });
-
-  aberrationCheck?.addEventListener('change', (e) => {
-      renderer.aberrationPass.enabled = (e.target as HTMLInputElement).checked;
-  });
 
   const showBiome = (name: string) => {
       if (!biomeLabel) return;
@@ -131,16 +91,14 @@ async function init() {
     }
     
     if (titleScreen) titleScreen.classList.add('fade-out');
-    
     if (hud) hud.classList.add('visible');
     
     cameraManager.setMode('CHASE');
     sound.playAll();
     showBiome("DOWNTOWN");
-
-    // Letterbox handover handled by CSS
   };
 
+  // 🖱️ Event Orchestration
   window.addEventListener('keydown', (e) => { 
       if (e.key === 'Enter') startDrive(); 
       if (e.key === 'Tab') {
@@ -151,28 +109,33 @@ async function init() {
   });
   titleScreen?.addEventListener('click', startDrive);
 
-  // Asset Loading
-  await Promise.all([
-    car.load('/models/car/chevelle.glb').catch(() => car.load('/models/car/car.glb')),
-    sound.loadBGM('/bgm.webm').catch(() => {})
-  ]);
+  // 📦 Asset Loading (Failsafe)
+  try {
+      if (loadingStatus) loadingStatus.innerText = "LOADING METROPOLIS...";
+      
+      await Promise.all([
+        car.load('/models/car.glb').catch(() => {
+            console.warn('Primary model failed, attempting fallback...');
+            return car.load('/models/car/car.glb');
+        }).catch(() => {
+            console.error('All model loads failed, using geometric fallback.');
+        }),
+        sound.loadBGM('/audio/bgm.webm').catch(() => {
+            console.warn('BGM failed to load.');
+        })
+      ]);
 
-  if (car.model) {
-      lighting.setupCarLight(car.model);
+      if (car.model) lighting.setupCarLight(car.model);
+
+      if (loadingStatus) loadingStatus.innerText = "SYSTEMS ONLINE";
+      setTimeout(() => {
+          if (titleScreen) titleScreen.classList.add('ready');
+      }, 1000);
+
+  } catch (err) {
+      console.error('Initialization error:', err);
+      if (loadingStatus) loadingStatus.innerText = "ERROR INITIALIZING SYSTEMS";
   }
-
-  // 🛠️ Diagnostic Ground Truth: Test Sphere
-  const testSphere = new THREE.Mesh(
-    new THREE.SphereGeometry(2),
-    new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 2 })
-  );
-  testSphere.position.set(0, 2, -15);
-  renderer.scene.add(testSphere);
-
-  // Cinematic Title Reveal
-  setTimeout(() => {
-    if (titleScreen) titleScreen.classList.add('ready');
-  }, 1500);
 
   let lastCamToggle = false;
 
@@ -215,7 +178,6 @@ async function init() {
     lighting.update(car.position, biomeParams.ambientIntensity);
     sky.update(car.position);
     rain.update(delta, car.position, car.speed);
-    rain.updateQuality(Math.floor(biomeParams.rainIntensity * currentConfig.rainCount));
     
     sound.update(car.speed, delta);
     traffic.update(delta, carZ, (z) => road.getRoadPositionAt(z).position.x);
@@ -229,24 +191,16 @@ async function init() {
     renderer.render(delta, steerTarget);
     if (rearviewVisible && car.model) renderer.renderMirror(car.model);
 
-    // 📊 HUD Throttled Update (10Hz)
-    hudUpdateTimer += delta;
-    if (hudUpdateTimer > 0.1) {
-        if (speedVal) {
-            const speedKmh = Math.floor(car.speed * 3.6);
-            speedVal.innerText = speedKmh.toString().padStart(3, '0');
-        }
-        
-        if (biomeParams.name !== currentBiome) {
-            currentBiome = biomeParams.name;
-            showBiome(currentBiome);
-        }
-        
-        hudUpdateTimer = 0;
+    if (biomeParams.name !== currentBiome) {
+        currentBiome = biomeParams.name;
+        showBiome(currentBiome);
     }
   });
 
   engine.start();
 }
 
-init();
+init().catch(err => {
+    console.error('Fatal init error:', err);
+    alert('FATAL ERROR: ' + err.message);
+});
