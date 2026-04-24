@@ -1,67 +1,48 @@
 import * as THREE from 'three';
 
 /**
- * TrafficVehicle: A simple, performance-optimized silhouette car for oncoming traffic.
+ * TrafficVehicle: A high-intensity, performance-optimized oncoming light rig.
  */
 class TrafficVehicle {
     public mesh: THREE.Group;
     public active: boolean = false;
     public speed: number = 0;
     public currentZ: number = 0;
-    public laneX: number = -4; // Opposite lane
+    public laneX: number = -5; // Oncoming Lane
+
+    private billboard: THREE.Group;
+    private lights: THREE.PointLight[] = [];
+    private emissiveMaterials: THREE.MeshStandardMaterial[] = [];
 
     constructor() {
         this.mesh = new THREE.Group();
+        this.billboard = new THREE.Group();
         
-        // Silhouette Body
-        const body = new THREE.Mesh(
-            new THREE.BoxGeometry(2, 0.8, 4),
-            new THREE.MeshBasicMaterial({ color: 0x020202 })
-        );
-        body.position.y = 0.4;
-        this.mesh.add(body);
+        const geo = new THREE.PlaneGeometry(0.3, 0.15);
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0xfff8e7,
+            emissive: 0xfff8e7,
+            emissiveIntensity: 8,
+            toneMapped: false
+        });
+        this.emissiveMaterials.push(mat);
 
-        // Headlight Billboards (Front)
-        const hlMat = new THREE.SpriteMaterial({ 
-            color: 0xffffff, 
-            transparent: true, 
-            opacity: 0.8,
-            map: this.createGlowTexture()
-        });
-        [0.7, -0.7].forEach(x => {
-            const sprite = new THREE.Sprite(hlMat);
-            sprite.scale.set(1.5, 1.5, 1);
-            sprite.position.set(x, 0.5, 2.1);
-            this.mesh.add(sprite);
-        });
+        // Dual Headlights
+        const leftLight = new THREE.Mesh(geo, mat);
+        leftLight.position.x = -0.6;
+        const rightLight = new THREE.Mesh(geo, mat.clone());
+        rightLight.position.x = 0.6;
+        this.emissiveMaterials.push(rightLight.material as THREE.MeshStandardMaterial);
+        
+        this.billboard.add(leftLight, rightLight);
+        this.billboard.position.y = 0.6;
+        this.mesh.add(this.billboard);
 
-        // Taillight Billboards (Rear)
-        const tlMat = new THREE.SpriteMaterial({ 
-            color: 0xCC1A1A, 
-            transparent: true, 
-            opacity: 0.6,
-            map: this.createGlowTexture()
-        });
-        [0.7, -0.7].forEach(x => {
-            const sprite = new THREE.Sprite(tlMat);
-            sprite.scale.set(1, 1, 1);
-            sprite.position.set(x, 0.5, -2.1);
-            this.mesh.add(sprite);
-        });
-    }
-
-    private createGlowTexture(): THREE.Texture {
-        const canvas = document.createElement('canvas');
-        canvas.width = 64;
-        canvas.height = 64;
-        const ctx = canvas.getContext('2d')!;
-        const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-        grad.addColorStop(0, 'white');
-        grad.addColorStop(0.3, 'white');
-        grad.addColorStop(1, 'transparent');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 64, 64);
-        return new THREE.CanvasTexture(canvas);
+        // Ground Splash
+        const light = new THREE.PointLight(0xfff8e7, 3, 40);
+        light.position.set(0, 0.5, 0.5);
+        this.mesh.add(light);
+        this.lights.push(light);
     }
 
     public spawn(z: number, x: number, speed: number): void {
@@ -71,6 +52,20 @@ class TrafficVehicle {
         this.active = true;
         this.mesh.visible = true;
         this.mesh.position.set(x, 0, z);
+    }
+
+    public update(playerZ: number): void {
+        if (!this.active) return;
+        
+        const dist = this.currentZ - playerZ;
+        
+        // 1. Bloom Spike Effect (Brighter when close)
+        const spikeFactor = dist < 40 ? THREE.MathUtils.mapLinear(Math.max(0, dist), 0, 40, 15, 8) : 8;
+        this.emissiveMaterials.forEach(m => m.emissiveIntensity = spikeFactor);
+        
+        // 2. Point Light Proximity Fade
+        const intensity = dist < 2 ? 0 : 3; // Kill light as it passes to avoid "leaking" behind camera
+        this.lights.forEach(l => l.intensity = intensity);
     }
 
     public deactivate(): void {
@@ -86,7 +81,7 @@ export class TrafficManager {
     private scene: THREE.Scene;
     private pool: TrafficVehicle[] = [];
     private activeCars: TrafficVehicle[] = [];
-    private maxCars: number = 6;
+    private maxCars: number = 8;
     private lastSpawnZ: number = 0;
 
     constructor(scene: THREE.Scene) {
@@ -100,26 +95,29 @@ export class TrafficManager {
     }
 
     public update(delta: number, playerZ: number, getRoadX: (z: number) => number): void {
-        // 1. Spawning Logic
-        if (playerZ - this.lastSpawnZ > 150 && this.activeCars.length < this.maxCars) {
+        // 1. Spawning Logic (Oncoming)
+        if (playerZ - this.lastSpawnZ > 200 && this.activeCars.length < this.maxCars) {
             const car = this.pool.find(c => !c.active);
             if (car) {
-                const spawnZ = playerZ + 800 + Math.random() * 400;
+                const spawnZ = playerZ + 600 + Math.random() * 300;
                 const roadX = getRoadX(spawnZ);
-                car.spawn(spawnZ, roadX - 4, 25 + Math.random() * 10);
+                car.spawn(spawnZ, roadX - 5, 20 + Math.random() * 15);
                 this.activeCars.push(car);
                 this.lastSpawnZ = playerZ;
             }
         }
 
-        // 2. Movement & Recycling
+        // 2. Movement & Dynamics
         for (let i = this.activeCars.length - 1; i >= 0; i--) {
             const car = this.activeCars[i];
             car.currentZ -= car.speed * delta;
             
-            // Align with road curve as it moves
             const roadX = getRoadX(car.currentZ);
-            car.mesh.position.set(roadX - 4, 0, car.currentZ);
+            car.mesh.position.set(roadX - 5, 0, car.currentZ);
+            
+            car.update(playerZ);
+
+            // Whoosh Trigger Logic could go here for sound
 
             if (car.currentZ < playerZ - 50) {
                 car.deactivate();
