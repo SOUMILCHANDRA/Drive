@@ -197,9 +197,9 @@ export class Road {
     this.biomeManager = new BiomeManager();
     
     this.material = new THREE.MeshStandardMaterial({
-        color: 0x1a1a22,
+        color: 0x2a2a35,
         roughness: 0.75,
-        metalness: 0.0,
+        metalness: 0.1,
         envMapIntensity: 0.3,
     });
 

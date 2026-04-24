@@ -30,10 +30,11 @@ export class RainSystem {
 
         const material = new THREE.PointsMaterial({
             color: 0x99aacc,
-            size: 0.1,
+            size: 0.03,
             transparent: true,
-            opacity: 0.35,
+            opacity: 0.15,
             sizeAttenuation: true,
+            depthWrite: false
         });
 
         this.particles = new THREE.Points(this.geometry, material);
