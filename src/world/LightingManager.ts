@@ -13,16 +13,16 @@ export class LightingManager {
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    // 1. Ambient — raise from 0.08 to 0.25 so you can see the road
-    this.ambient = new THREE.AmbientLight(0x1a2040, 0.25);
+    // 1. Ambient — Super-boost for maximum visibility
+    this.ambient = new THREE.AmbientLight(0x1a2040, 1.5);
     this.scene.add(this.ambient);
 
-    // 2. Hemisphere — keep sky dark, make ground slightly visible
-    this.hemisphere = new THREE.HemisphereLight(0x0d1020, 0x080808, 0.3);
+    // 2. Hemisphere — Strong top-down fill
+    this.hemisphere = new THREE.HemisphereLight(0x1a2040, 0x080808, 0.8);
     this.scene.add(this.hemisphere);
 
-    // 3. Directional "moon" light — crucial for road surface to be visible
-    this.moon = new THREE.DirectionalLight(0xc8d4e8, 0.5);
+    // 3. Directional "moon" light — High intensity for road contrast
+    this.moon = new THREE.DirectionalLight(0xc8d4e8, 4.0);
     this.moon.position.set(-200, 400, -100);
     this.moon.castShadow = true;
     
