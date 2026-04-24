@@ -1,16 +1,13 @@
-import { Renderer } from './Renderer';
 import { Clock } from './Clock';
 
 /**
  * Engine: The main Game Loop orchestrator.
  */
 export class Engine {
-  private renderer: Renderer;
   private clock: Clock;
   private updateCallbacks: ((delta: number) => void)[] = [];
 
-  constructor(renderer: Renderer) {
-    this.renderer = renderer;
+  constructor() {
     this.clock = new Clock();
   }
 
@@ -25,9 +22,6 @@ export class Engine {
       
       // Execute all system updates
       this.updateCallbacks.forEach(cb => cb(delta));
-      
-      // Render frame
-      this.renderer.render();
     };
     loop();
   }
