@@ -2,133 +2,233 @@ import './style.css';
 import * as THREE from 'three';
 import { Renderer } from './core/Renderer';
 import { Engine } from './core/Engine';
+import { InputManager } from './core/InputManager';
+import { CameraManager } from './core/CameraManager';
 import { LightingManager } from './world/LightingManager';
+import { SkyManager } from './world/SkyManager';
+import { RainSystem } from './world/RainSystem';
+import { TrafficManager } from './world/TrafficManager';
 import { Road } from './world/Road';
 import { Car } from './vehicle/Car';
 import { SoundManager } from './audio/SoundManager';
+import { QualityManager } from './core/QualitySettings';
+import type { QualityTier } from './core/QualitySettings';
 
 async function init() {
-  const renderer = new Renderer('app');
-  const engine = new Engine(renderer);
+  // 🚦 WebGL 2 Compatibility Check
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl2');
+  if (!gl) {
+    const errorOverlay = document.getElementById('webgl-error');
+    if (errorOverlay) errorOverlay.style.display = 'flex';
+    return;
+  }
+
+  const qualityManager = new QualityManager();
+  
+  // 📱 Mobile Auto-Tiering
+  const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  if (isMobile) {
+      qualityManager.setTier('LOW');
+  }
+  
+  let currentConfig = qualityManager.getConfig();
+
+  const renderer = new Renderer('app', currentConfig);
+  const engine = new Engine();
+  const input = new InputManager();
+  const cameraManager = new CameraManager(renderer.camera);
   
   const lighting = new LightingManager(renderer.scene);
+  const sky = new SkyManager(renderer.scene);
   const road = new Road(renderer.scene);
   const car = new Car(renderer.scene);
-  const sound = new SoundManager(renderer.camera);
+  const rain = new RainSystem(renderer.scene, currentConfig.rainCount);
+  const traffic = new TrafficManager(renderer.scene);
+  const sound = new SoundManager();
 
-  // Starfield
-  const starGeo = new THREE.BufferGeometry();
-  const starCount = 5000;
-  const starPos = new Float32Array(starCount * 3);
-  for (let i = 0; i < starCount; i++) {
-    const i3 = i * 3;
-    starPos[i3] = (Math.random() - 0.5) * 2000;
-    starPos[i3+1] = (Math.random() * 800); 
-    starPos[i3+2] = (Math.random() - 0.5) * 2000;
-  }
-  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-  renderer.scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 1.5, color: 0xffffff, transparent: true, opacity: 0.8 })));
-
-  const start = document.getElementById('startScreen');
+  const titleScreen = document.getElementById('title-screen');
   const flash = document.getElementById('flash');
   const pauseMenu = document.getElementById('pauseMenu');
   const hud = document.getElementById('hud');
+  const speedVal = document.getElementById('speed-val');
+  const biomeLabel = document.getElementById('biome-label');
+  const pauseIcon = document.getElementById('pause-icon');
+  const rearview = document.getElementById('rearview');
   
   let gameStarted = false;
-  let isPaused = false;
-  let cameraMode: 'CHASE' | 'HOOD' = 'CHASE';
+  let idleTime = 0;
+  let hudUpdateTimer = 0;
+  let currentBiome = "HIGHWAY";
+  let rearviewVisible = false;
 
-  start?.addEventListener('click', () => {
-    if (gameStarted) return;
+  // 🛠️ Settings UI
+  const qualityButtons = document.querySelectorAll('.quality-btn');
+  const rainButtons = document.querySelectorAll('.toggle-btn[data-rain]');
+  const masterSlider = document.getElementById('masterVol') as HTMLInputElement;
+  const camSelect = document.getElementById('camSelect') as HTMLSelectElement;
+  const grainCheck = document.getElementById('toggleGrain') as HTMLInputElement;
+  const aberrationCheck = document.getElementById('toggleAberration') as HTMLInputElement;
+
+  const updateUI = () => {
+      qualityButtons.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tier') === currentConfig.tier));
+      rainButtons.forEach(btn => btn.classList.toggle('active', parseInt(btn.getAttribute('data-rain') || '0') === currentConfig.rainCount));
+      if (masterSlider) masterSlider.value = (sound.masterVolume * 100).toString();
+      if (camSelect) camSelect.value = cameraManager.getModeIndex().toString();
+  };
+  updateUI();
+
+  // Listeners
+  qualityButtons.forEach(btn => btn.addEventListener('click', () => {
+      const tier = btn.getAttribute('data-tier') as QualityTier;
+      qualityManager.setTier(tier);
+      currentConfig = qualityManager.getConfig();
+      renderer.updateQuality(currentConfig);
+      rain.updateQuality(currentConfig.rainCount);
+      updateUI();
+  }));
+
+  rainButtons.forEach(btn => btn.addEventListener('click', () => {
+      const count = parseInt(btn.getAttribute('data-rain') || '0');
+      currentConfig.rainCount = count;
+      rain.updateQuality(count);
+      updateUI();
+  }));
+
+  masterSlider?.addEventListener('input', (e) => {
+      const val = parseInt((e.target as HTMLInputElement).value) / 100;
+      sound.setVolume(val);
+  });
+
+  camSelect?.addEventListener('change', (e) => {
+      const modeIdx = parseInt((e.target as HTMLSelectElement).value);
+      cameraManager.setMode(modeIdx);
+  });
+
+  grainCheck?.addEventListener('change', (e) => {
+      renderer.grainPass.enabled = (e.target as HTMLInputElement).checked;
+  });
+
+  aberrationCheck?.addEventListener('change', (e) => {
+      renderer.aberrationPass.enabled = (e.target as HTMLInputElement).checked;
+  });
+
+  const showBiome = (name: string) => {
+      if (!biomeLabel) return;
+      biomeLabel.innerText = name;
+      biomeLabel.classList.add('active');
+      setTimeout(() => biomeLabel.classList.remove('active'), 4000);
+  };
+
+  const startDrive = () => {
+    if (gameStarted || !titleScreen?.classList.contains('ready')) return;
     gameStarted = true;
+    document.body.classList.add('game-active');
+    
     if (flash) {
         flash.style.opacity = '1';
         setTimeout(() => { flash.style.opacity = '0'; }, 300);
     }
-    if (start) start.style.opacity = '0';
-    setTimeout(() => { if (start) start.style.display = 'none'; }, 1500);
-    if (hud) {
-        hud.style.display = 'block';
-        setTimeout(() => hud.classList.add('visible'), 10);
-    }
-    sound.playBGM();
-  });
+    
+    if (titleScreen) titleScreen.classList.add('fade-out');
+    
+    if (hud) hud.classList.add('visible');
+    
+    cameraManager.setMode('CHASE');
+    sound.playAll();
+    showBiome("DOWNTOWN");
+  };
 
-  const keys: any = {};
-  window.addEventListener('keydown', (e) => {
-    keys[e.key.toLowerCase()] = 1;
-    if (e.key === 'Escape' && gameStarted) {
-        isPaused = !isPaused;
-        if (pauseMenu) pauseMenu.style.display = isPaused ? 'flex' : 'none';
-        if (hud) hud.style.opacity = isPaused ? '0' : '0.8';
-    }
-    if (e.key.toLowerCase() === 'c' && gameStarted) {
-        cameraMode = cameraMode === 'CHASE' ? 'HOOD' : 'CHASE';
-    }
+  window.addEventListener('keydown', (e) => { 
+      if (e.key === 'Enter') startDrive(); 
+      if (e.key === 'Tab') {
+          e.preventDefault();
+          rearviewVisible = !rearviewVisible;
+          if (rearview) rearview.classList.toggle('visible', rearviewVisible);
+      }
   });
-  window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = 0);
-
-  let inputX = 0, currentSpeed = 0, totalDistance = 0;
-  const maxSpeed = 40, accel = 10, friction = 6;
+  titleScreen?.addEventListener('click', startDrive);
 
   // Asset Loading
-  Promise.all([
+  await Promise.all([
     car.load('/models/car/chevelle.glb').catch(() => car.load('/models/car/car.glb')),
-    sound.loadBGM('/bgm.webm').catch(e => console.warn('BGM skipped', e))
-  ]).then(() => {
-    const startText = start?.querySelector('.start-text');
-    if (startText) startText.innerHTML = 'READY TO IGNITE';
-  });
+    sound.loadBGM('/audio/bgm.webm').catch(() => {})
+  ]);
+
+  // Cinematic Title Reveal
+  setTimeout(() => {
+    if (titleScreen) titleScreen.classList.add('ready');
+  }, 1500);
+
+  let lastCamToggle = false;
 
   // 🏎️ Main Engine Update Loop
   engine.onUpdate((delta) => {
-    if (!gameStarted || isPaused) return;
-
-    let targetX = (keys.a || keys.arrowleft ? -1 : 0) + (keys.d || keys.arrowright ? 1 : 0);
-    inputX = THREE.MathUtils.lerp(inputX, targetX, 0.05);
-
-    const isBraking = keys.s || keys.arrowdown;
-    const drive = (keys.w || keys.arrowup ? 1 : 0) - (isBraking ? 1 : 0);
+    const controls = input.update(delta);
     
-    if (drive > 0) currentSpeed += accel * delta;
-    else if (drive < 0) currentSpeed -= accel * 2 * delta;
-    else currentSpeed -= friction * delta;
-    currentSpeed = Math.max(0, Math.min(currentSpeed, maxSpeed));
-    totalDistance += currentSpeed * delta;
-
-    const roadInfo = road.getRoadPositionAt(totalDistance);
-    const tangent = roadInfo.tangent;
-    const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-    const carPos = roadInfo.position.clone().add(normal.multiplyScalar(inputX * 6));
+    if (pauseMenu) pauseMenu.style.display = controls.pause ? 'flex' : 'none';
+    if (pauseIcon) pauseIcon.classList.toggle('visible', controls.pause);
     
-    if (car.model) {
-      car.update(delta, inputX, !!isBraking);
-      car.model.position.copy(carPos);
-      car.model.lookAt(carPos.clone().add(tangent));
-      // Simple ambient light follow
-      lighting.update(car.model.position, 0); 
-    }
-    
-    road.update(totalDistance, delta);
-    
-    renderer.camera.fov = 55 + (currentSpeed / maxSpeed) * 15;
-    renderer.camera.updateProjectionMatrix();
-
-    if (cameraMode === 'CHASE') {
-        const camInfo = road.getRoadPositionAt(totalDistance - 10);
-        const camPos = camInfo.position.clone().add(new THREE.Vector3(0, 2.5, 0)).add(camInfo.tangent.clone().multiplyScalar(-8));
-        renderer.camera.position.lerp(camPos, 0.1);
-        renderer.camera.lookAt(roadInfo.position.clone().add(new THREE.Vector3(0, 1, 0)));
-    } else {
-        const hoodPos = carPos.clone().add(new THREE.Vector3(0, 1.2, 0)).add(tangent.clone().multiplyScalar(1));
-        renderer.camera.position.lerp(hoodPos, 0.2);
-        renderer.camera.lookAt(roadInfo.position.clone().add(tangent.clone().multiplyScalar(50)));
+    if (!gameStarted) {
+        idleTime += delta;
+        if (idleTime > 3) cameraManager.setMode('CINEMATIC');
+        road.update(0, 0, delta, currentConfig);
+        lighting.update(new THREE.Vector3(0,0,0), 0);
+        sky.update(new THREE.Vector3(0,0,0));
+        if (car.model) cameraManager.update(delta, car.model, 0, 0);
+        renderer.render(delta, 0);
+        return;
     }
 
-    const speedVal = document.getElementById('speed-val');
-    if (speedVal) speedVal.innerText = Math.floor(currentSpeed * 3.6).toString();
-    const distVal = document.getElementById('dist-val');
-    if (distVal) distVal.innerText = Math.floor(totalDistance).toString();
+    if (controls.cameraToggle && !lastCamToggle) {
+        cameraManager.cycleMode();
+        if (camSelect) camSelect.value = cameraManager.getModeIndex().toString();
+    }
+    lastCamToggle = controls.cameraToggle;
+
+    const carZ = car.model ? car.model.position.z : 0;
+    const roadInfo = road.getRoadPositionAt(carZ);
+    const biomeParams = road.biomeManager.getParamsAt(carZ);
+    
+    const steerTarget = controls.pause ? 0 : controls.steer;
+    const throttleTarget = controls.pause ? 0 : controls.throttle;
+    const brakeTarget = controls.pause ? 0 : controls.brake;
+
+    car.update(delta, { steer: steerTarget, throttle: throttleTarget, brake: brakeTarget }, roadInfo.position.x);
+    
+    road.update(carZ, car.speed, delta, currentConfig);
+    lighting.update(car.position, biomeParams.ambientIntensity);
+    sky.update(car.position);
+    rain.update(delta, car.position, car.speed);
+    rain.updateQuality(Math.floor(biomeParams.rainIntensity * currentConfig.rainCount));
+    
+    sound.update(car.speed, delta);
+    traffic.update(delta, carZ, (z) => road.getRoadPositionAt(z).position.x);
+    
+    if (car.model) cameraManager.update(delta, car.model, car.speed, steerTarget);
+
+    if (renderer.scene.fog instanceof THREE.FogExp2) {
+        renderer.scene.fog.density = THREE.MathUtils.lerp(renderer.scene.fog.density, biomeParams.fogDensity, 0.05);
+    }
+
+    renderer.render(delta, steerTarget);
+    if (rearviewVisible && car.model) renderer.renderMirror(car.model);
+
+    // 📊 HUD Throttled Update (10Hz)
+    hudUpdateTimer += delta;
+    if (hudUpdateTimer > 0.1) {
+        if (speedVal) {
+            const speedKmh = Math.floor(car.speed * 3.6);
+            speedVal.innerText = speedKmh.toString().padStart(3, '0');
+        }
+        
+        if (biomeParams.name !== currentBiome) {
+            currentBiome = biomeParams.name;
+            showBiome(currentBiome);
+        }
+        
+        hudUpdateTimer = 0;
+    }
   });
 
   engine.start();
