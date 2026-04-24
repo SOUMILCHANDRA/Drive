@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { EffectComposer, RenderPass, UnrealBloomPass, ShaderPass } from 'three-stdlib';
+import { EffectComposer, RenderPass, UnrealBloomPass, ShaderPass, GammaCorrectionShader } from 'three-stdlib';
 import { FilmGrainShader, ChromaticAberrationShader, VignetteShader } from '../shaders/PostProcessingShaders';
 
 import type { QualityConfig } from './QualitySettings';
@@ -37,7 +37,7 @@ export class Renderer {
     this.renderer.setPixelRatio(quality.tier === 'HIGH' ? Math.min(window.devicePixelRatio, 2) : 1);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.4; 
+    this.renderer.toneMappingExposure = 3.0; 
     
     this.renderer.shadowMap.enabled = quality.shadowSize > 0;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -46,7 +46,7 @@ export class Renderer {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x060608);
-    this.scene.fog = new THREE.FogExp2(0x0a0a14, 0.0012);
+    this.scene.fog = new THREE.FogExp2(0x1a2040, 0.0012);
 
     this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 3000);
     this.mirrorCamera = new THREE.PerspectiveCamera(45, 350 / 65, 0.1, 1000);
@@ -54,12 +54,12 @@ export class Renderer {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.5, 0.35);
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.7, 0.5, 0.6);
     this.bloomPass.enabled = quality.bloom;
     this.composer.addPass(this.bloomPass);
 
     this.grainPass = new ShaderPass(FilmGrainShader);
-    this.grainPass.uniforms.uIntensity.value = 0.025;
+    this.grainPass.uniforms.uIntensity.value = 0.005;
     this.grainPass.enabled = quality.postProcessing;
     this.composer.addPass(this.grainPass);
 
@@ -68,9 +68,13 @@ export class Renderer {
     this.composer.addPass(this.aberrationPass);
 
     this.vignettePass = new ShaderPass(VignetteShader);
-    this.vignettePass.uniforms.uDarkness.value = 0.5;
+    this.vignettePass.uniforms.uDarkness.value = 0.3;
     this.vignettePass.uniforms.uOffset.value = 0.3;
     this.composer.addPass(this.vignettePass);
+
+    // Gamma Correction is essential for toneMapping to resolve in EffectComposer
+    const gammaPass = new ShaderPass(GammaCorrectionShader);
+    this.composer.addPass(gammaPass);
 
     this.setupRoadMirror();
 
@@ -134,7 +138,7 @@ export class Renderer {
     this.renderer.clear();
     this.grainPass.uniforms.uTime.value += delta;
     
-    const targetAberration = 0.002 + Math.abs(steer) * 0.006;
+    const targetAberration = 0.001 + Math.abs(steer) * 0.003;
     this.aberrationPass.uniforms.uIntensity.value = THREE.MathUtils.lerp(
         this.aberrationPass.uniforms.uIntensity.value,
         targetAberration,
