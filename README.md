@@ -47,3 +47,7 @@ This project is a high-fidelity simulation of a film-inspired nocturnal drive. T
 
 ---
 *There's something about you. It's hard to explain.*
+
+## AUTHOR
+
+Soumil Chandra
