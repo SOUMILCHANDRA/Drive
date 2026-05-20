@@ -45,8 +45,8 @@ export class Renderer {
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x060608);
-    this.scene.fog = new THREE.FogExp2(0x1a2040, 0.0012);
+    this.scene.background = new THREE.Color(0x040200);
+    this.scene.fog = new THREE.FogExp2(0x0d0800, 0.0012);
 
     this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 3000);
     this.mirrorCamera = new THREE.PerspectiveCamera(45, 350 / 65, 0.1, 1000);
@@ -54,7 +54,7 @@ export class Renderer {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.7, 0.5, 0.6);
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.9, 0.6, 0.55);
     this.bloomPass.enabled = quality.bloom;
     this.composer.addPass(this.bloomPass);
 
