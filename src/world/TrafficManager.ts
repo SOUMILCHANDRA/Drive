@@ -38,20 +38,20 @@ class TrafficVehicle {
         this.billboard.position.y = 0.6;
         this.mesh.add(this.billboard);
 
-        // Ground Splash
-        const light = new THREE.PointLight(0xfff8e7, 3, 40);
+        // Ground Splash — sodium orange point light
+        const light = new THREE.PointLight(0xff9200, 3.5, 40);
         light.position.set(0, 0.5, 0.5);
         this.mesh.add(light);
         this.lights.push(light);
     }
 
-    public spawn(z: number, x: number, speed: number): void {
+    public spawn(z: number, x: number, y: number, speed: number): void {
         this.currentZ = z;
         this.laneX = x;
         this.speed = speed;
         this.active = true;
         this.mesh.visible = true;
-        this.mesh.position.set(x, 0, z);
+        this.mesh.position.set(x, y, z);
     }
 
     public update(playerZ: number): void {
@@ -94,14 +94,14 @@ export class TrafficManager {
         }
     }
 
-    public update(delta: number, playerZ: number, getRoadX: (z: number) => number): void {
+    public update(delta: number, playerZ: number, getRoadPos: (z: number) => { x: number; y: number }): void {
         // 1. Spawning Logic (Oncoming)
         if (playerZ - this.lastSpawnZ > 200 && this.activeCars.length < this.maxCars) {
             const car = this.pool.find(c => !c.active);
             if (car) {
                 const spawnZ = playerZ + 600 + Math.random() * 300;
-                const roadX = getRoadX(spawnZ);
-                car.spawn(spawnZ, roadX - 5, 20 + Math.random() * 15);
+                const roadData = getRoadPos(spawnZ);
+                car.spawn(spawnZ, roadData.x - 5, roadData.y, 20 + Math.random() * 15);
                 this.activeCars.push(car);
                 this.lastSpawnZ = playerZ;
             }
@@ -112,8 +112,8 @@ export class TrafficManager {
             const car = this.activeCars[i];
             car.currentZ -= car.speed * delta;
             
-            const roadX = getRoadX(car.currentZ);
-            car.mesh.position.set(roadX - 5, 0, car.currentZ);
+            const roadData = getRoadPos(car.currentZ);
+            car.mesh.position.set(roadData.x - 5, roadData.y, car.currentZ);
             
             car.update(playerZ);
 
