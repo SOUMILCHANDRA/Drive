@@ -179,12 +179,17 @@ async function init() {
     rain.update(delta, car.position, car.speed);
     
     sound.update(car.speed, delta);
-    traffic.update(delta, carZ, (z) => road.getRoadPositionAt(z).position.x);
+    traffic.update(delta, carZ, (z) => {
+        const pos = road.getRoadPositionAt(z).position;
+        return { x: pos.x, y: pos.y };
+    });
     
     if (car.model) cameraManager.update(delta, car.model, car.speed);
 
     if (renderer.scene.fog instanceof THREE.FogExp2) {
         renderer.scene.fog.density = THREE.MathUtils.lerp(renderer.scene.fog.density, biomeParams.fogDensity, 0.05);
+        renderer.scene.fog.color.lerp(new THREE.Color(biomeParams.fogColor), 0.04);
+        renderer.scene.background = renderer.scene.fog.color.clone().multiplyScalar(0.3);
     }
 
     renderer.render(delta, steerTarget);
