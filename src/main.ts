@@ -114,16 +114,15 @@ async function init() {
       if (loadingStatus) loadingStatus.innerText = "LOADING METROPOLIS...";
       
       await Promise.all([
-        car.load('/models/car.glb').catch(() => {
-            console.warn('Primary model failed, attempting fallback...');
-            return car.load('/models/car/car.glb');
-        }).catch(() => {
+        car.load('/models/car/car.glb').catch(() => {
             console.error('All model loads failed, using geometric fallback.');
-        }),
-        sound.loadBGM('/audio/bgm.webm').catch(() => {
-            console.warn('BGM failed to load.');
         })
       ]);
+
+      // Load BGM asynchronously without blocking the start of the game
+      sound.loadBGM('/bgm.webm').catch(() => {
+          console.warn('BGM failed to load.');
+      });
 
       if (car.model) lighting.setupCarLight(car.model);
 
