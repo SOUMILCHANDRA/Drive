@@ -77,6 +77,7 @@ export class SoundManager {
             this.bgm = new Howl({
                 src: [url],
                 loop: true,
+                html5: true,
                 volume: 0, 
                 onload: () => resolve(),
                 onloaderror: (_id, err) => reject(err)
