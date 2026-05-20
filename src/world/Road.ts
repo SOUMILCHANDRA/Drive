@@ -236,9 +236,17 @@ export class Road {
       }
   }
 
+  private ensureWaypointsFor(z: number): void {
+      const wpIndex = Math.floor(z / 500);
+      while (this.waypoints.length <= wpIndex + 4) {
+          this.addWaypoint(this.waypoints.length * 500);
+      }
+  }
+
   private spawnChunk(z: number, params: BiomeParams): void {
       const chunk = this.pool.pop();
       if (!chunk) return;
+      this.ensureWaypointsFor(z);
       const wpIndex = Math.floor(z / 500);
       const points = this.waypoints.slice(wpIndex, wpIndex + 4);
       chunk.activate(z, points, this.scene, params);
@@ -248,6 +256,7 @@ export class Road {
 
   public getRoadPositionAt(z: number): { position: THREE.Vector3, tangent: THREE.Vector3 } {
       const safeZ = Math.max(0, z);
+      this.ensureWaypointsFor(safeZ);
       const wpIndex = Math.max(0, Math.floor(safeZ / 500));
       const t = (safeZ % 500) / 500;
       const points = this.waypoints.slice(wpIndex, wpIndex + 4);
