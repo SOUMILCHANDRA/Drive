@@ -1,5 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
+import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { Renderer } from './core/Renderer';
 import { Engine } from './core/Engine';
 import { InputManager } from './core/InputManager';
@@ -46,6 +47,8 @@ async function init() {
   let currentConfig = qualityManager.getConfig();
 
   const renderer = new Renderer('app', currentConfig);
+  const stats = new Stats();
+  document.body.appendChild(stats.dom);
   const engine = new Engine();
   const input = new InputManager();
   const cameraManager = new CameraManager(renderer.camera);
@@ -109,6 +112,27 @@ async function init() {
   });
   titleScreen?.addEventListener('click', startDrive);
 
+  // ── Time-of-Day Switcher ──────────────────────────────────────────────
+  type ToD = 'midnight' | 'sunset' | 'dawn';
+  const todPresets: Record<ToD, { fogColor: number; ambientColor: number; ambientIntensity: number; bloomStrength: number }> = {
+      midnight: { fogColor: 0x0d0800, ambientColor: 0x3d1f05, ambientIntensity: 1.2, bloomStrength: 0.9 },
+      sunset:   { fogColor: 0x2a1005, ambientColor: 0x6b2a05, ambientIntensity: 2.2, bloomStrength: 1.4 },
+      dawn:     { fogColor: 0x0d0a12, ambientColor: 0x1a0d28, ambientIntensity: 0.8, bloomStrength: 0.7 },
+  };
+
+  document.querySelectorAll('.tod-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+          document.querySelectorAll('.tod-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const tod = (btn as HTMLElement).dataset.tod as ToD;
+          const preset = todPresets[tod];
+          if (preset && renderer.scene.fog instanceof THREE.FogExp2) {
+              renderer.scene.fog.color.set(preset.fogColor);
+          }
+          renderer.bloomPass.strength = preset.bloomStrength;
+      });
+  });
+
   // 📦 Asset Loading (Failsafe)
   try {
       if (loadingStatus) loadingStatus.innerText = "LOADING METROPOLIS...";
@@ -166,9 +190,24 @@ async function init() {
     const roadInfo = road.getRoadPositionAt(carZ);
     const biomeParams = road.biomeManager.getParamsAt(carZ);
     
-    const steerTarget = controls.pause ? 0 : controls.steer;
-    const throttleTarget = controls.pause ? 0 : controls.throttle;
-    const brakeTarget = controls.pause ? 0 : controls.brake;
+    const cruiseActive = (document.getElementById('cruiseToggle') as HTMLInputElement)?.checked ?? false;
+
+    // Cruise control: auto-throttle + gentle road-following steer
+    const rawSteer    = controls.pause ? 0 : controls.steer;
+    const rawThrottle = controls.pause ? 0 : controls.throttle;
+    const rawBrake    = controls.pause ? 0 : controls.brake;
+
+    let steerTarget    = rawSteer;
+    let throttleTarget = rawThrottle;
+    let brakeTarget    = rawBrake;
+
+    if (cruiseActive && !controls.pause) {
+        throttleTarget = 0.65; // gentle cruise throttle
+        brakeTarget    = 0;
+        // Nudge toward road center automatically
+        const lateralErr = (roadInfo.position.x - (car.model?.position.x ?? 0)) * 0.018;
+        steerTarget = THREE.MathUtils.clamp(lateralErr, -0.4, 0.4);
+    }
 
     car.update(delta, { steer: steerTarget, throttle: throttleTarget, brake: brakeTarget }, roadInfo.position.x, road.getRoadMeshes());
     
@@ -194,6 +233,13 @@ async function init() {
 
     renderer.render(delta, steerTarget);
     if (rearviewVisible && car.model) renderer.renderMirror(car.model);
+
+    stats.update();
+    console.log(renderer.info.render);
+
+    // ── Speed HUD ──────────────────────────────────────────────────────
+    const speedEl = document.getElementById('speed-val');
+    if (speedEl) speedEl.innerText = Math.floor(car.speed * 6).toString().padStart(3, '0');
 
     if (biomeParams.name !== currentBiome) {
         currentBiome = biomeParams.name;

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "jetro": {
+      "type": "stdio",
+      "command": "C:\\Users\\Admin\\.jetro\\runtime\\node-win32-x64.exe",
+      "args": [
+        "C:\\Users\\Admin\\.jetro\\mcp-server\\index.js"
+      ],
+      "env": {
+        "JET_WORKSPACE": "e:\\web game",
+        "JET_API_URL": "https://api.jetro.ai",
+        "PATH": "C:\\Users\\Admin\\.jetro\\runtime;C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\java8path;C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath;C:\\ProgramData\\Oracle\\Java\\javapath;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;D:\\mathlab\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\mingw64\\bin;C:\\Program Files\\Git\\usr\\bin;C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python313\\Scripts;C:\\Program Files\\nodejs\\;C:\\Program Files\\Docker\\Docker\\resources\\bin;$($env:PATH);E:\\MYSQL\\Server8.4\\bin;E:\\MYSQL\\Server8.4\\bin;C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\java8path;C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath;C:\\ProgramData\\Oracle\\Java\\javapath;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\;C:\\Windows\\System32\\OpenSSH\\;D:\\mathlab\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\mingw64\\bin;C:\\Program Files\\Git\\usr\\bin;C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python313\\Scripts;C:\\Program Files\\nodejs\\;C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\Program Files\\Pieces OS;C:\\Program Files\\MySQL\\MySQL Shell 8.0\\bin\\;C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Launcher\\;C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\Admin\\AppData\\Roaming\\npm;E:\\Antigravity\\bin;C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.0.1-full_build\\bin;C:\\Users\\Admin\\AppData\\Local\\Programs\\Ollama;E:\\Microsoft VS Code\\bin;E:\\MongoDB\\Server\\bin;E:\\MongoDB\\Shell\\bin;E:\\flutter\\flutter\\bin;D:\\Antigravity IDE\\bin;C:\\Users\\Admin\\AppData\\Local\\Programs\\Antigravity IDE\\bin"
+      }
+    }
+  }
+}

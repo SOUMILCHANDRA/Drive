@@ -4,87 +4,117 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <title>NIGHTCALL | An Endless Noir Drive</title>
-    <meta name="description" content="An immersive, cinematic driving simulator inspired by the film Drive (2011). Experience a procedural neon-noir odyssey through the nocturnal streets of a digital LA." />
-    <meta name="theme-color" content="#000000" />
+    <title>NIGHTCALL | An Endless Drive Through LA</title>
+    <meta name="description" content="An immersive, cinematic driving simulator inspired by Drive (2011). Endless winding roads through the sodium-vapor nights of Los Angeles." />
+    <meta name="theme-color" content="#040200" />
 
-    <!-- OpenGraph / Social Sharing -->
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="NIGHTCALL | An Endless Noir Drive" />
-    <meta property="og:description" content="Enter the void. An immersive, film-inspired driving odyssey." />
-    <meta property="og:image" content="/og-image.jpg" />
-    <meta property="twitter:card" content="summary_large_image" />
+    <!-- OpenGraph -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:title"       content="NIGHTCALL | An Endless Drive Through LA" />
+    <meta property="og:description" content="Enter the night. An immersive, film-inspired driving odyssey through Los Angeles." />
+    <meta property="og:image"       content="/og-image.jpg" />
+    <meta name="twitter:card"       content="summary_large_image" />
 
-    <!-- Google Fonts: Geometric & Technical -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;700&family=Mr+Dafoe&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="flash" class="screen-flash"></div>
-    
-    <!-- 🕯️ Systems Command Menu -->
+
+    <!-- ═══ CRT Systems Dashboard ═══ -->
     <div id="pauseMenu" class="pause-menu" style="display: none;">
       <div class="pause-content settings-panel">
+
         <h1 class="neon-text">SYSTEMS COMMAND</h1>
-        
+        <p class="crt-subline">// NIGHTCALL OS v1.0 — LOS ANGELES DIVISION //</p>
+
         <div class="settings-grid">
-            <div class="settings-section">
-                <h3>AUDIO</h3>
-                <div class="setting-item">
-                    <label>MASTER</label>
-                    <input type="range" id="masterVol" min="0" max="100" value="50">
-                </div>
-            </div>
 
-            <div class="settings-section">
-                <h3>ATMOSPHERE</h3>
-                <div class="setting-item">
-                    <label>RAIN</label>
-                    <div class="toggle-group">
-                        <button class="toggle-btn" data-rain="0">OFF</button>
-                        <button class="toggle-btn" data-rain="8000">LIGHT</button>
-                        <button class="toggle-btn active" data-rain="15000">HEAVY</button>
-                    </div>
-                </div>
-                <div class="setting-item">
-                    <label>POST-FX</label>
-                    <div class="checkbox-group">
-                        <label><input type="checkbox" id="toggleGrain" checked> GRAIN</label>
-                        <label><input type="checkbox" id="toggleAberration" checked> ABERRATION</label>
-                    </div>
-                </div>
+          <!-- AUDIO -->
+          <div class="settings-section">
+            <h3>AUDIO</h3>
+            <div class="setting-item">
+              <label>MASTER VOLUME</label>
+              <input type="range" id="masterVol" min="0" max="100" value="50">
             </div>
+          </div>
 
-            <div class="settings-section">
-                <h3>VISION</h3>
-                <div class="setting-item">
-                    <label>CAMERA</label>
-                    <select id="camSelect">
-                        <option value="0">CHASE</option>
-                        <option value="1">HOOD</option>
-                        <option value="2">CINEMATIC</option>
-                    </select>
-                </div>
-                <div class="setting-item">
-                    <label>QUALITY</label>
-                    <div class="quality-buttons">
-                        <button class="quality-btn" data-tier="LOW">LOW</button>
-                        <button class="quality-btn" data-tier="MEDIUM">MED</button>
-                        <button class="quality-btn active" data-tier="HIGH">HIGH</button>
-                    </div>
-                </div>
+          <!-- ATMOSPHERE -->
+          <div class="settings-section">
+            <h3>ATMOSPHERE</h3>
+            <div class="setting-item">
+              <label>RAIN INTENSITY</label>
+              <div class="toggle-group">
+                <button class="toggle-btn" data-rain="0">DRY</button>
+                <button class="toggle-btn" data-rain="8000">LIGHT</button>
+                <button class="toggle-btn active" data-rain="15000">HEAVY</button>
+              </div>
             </div>
+            <div class="setting-item">
+              <label>TIME OF DAY</label>
+              <div class="tod-group">
+                <button class="tod-btn active" id="tod-midnight" data-tod="midnight">MIDNIGHT</button>
+                <button class="tod-btn" id="tod-sunset"   data-tod="sunset">SUNSET</button>
+                <button class="tod-btn" id="tod-dawn"     data-tod="dawn">DAWN</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- VISION -->
+          <div class="settings-section">
+            <h3>VISION</h3>
+            <div class="setting-item">
+              <label>CAMERA</label>
+              <select id="camSelect">
+                <option value="0">CHASE</option>
+                <option value="1">HOOD</option>
+                <option value="2">CINEMATIC</option>
+              </select>
+            </div>
+            <div class="setting-item">
+              <label>QUALITY</label>
+              <div class="quality-buttons">
+                <button class="quality-btn" data-tier="LOW">LOW</button>
+                <button class="quality-btn" data-tier="MEDIUM">MED</button>
+                <button class="quality-btn active" data-tier="HIGH">HIGH</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- DRIVE -->
+          <div class="settings-section">
+            <h3>DRIVE</h3>
+            <div class="setting-item">
+              <label>CRUISE CONTROL</label>
+              <label class="cruise-toggle" for="cruiseToggle">
+                <input type="checkbox" id="cruiseToggle">
+                <span class="cruise-pill"></span>
+                <span class="cruise-label">AUTO DRIVE</span>
+              </label>
+            </div>
+            <div class="setting-item">
+              <label>POST-FX</label>
+              <div class="checkbox-group">
+                <label><input type="checkbox" id="toggleGrain" checked> FILM GRAIN</label>
+                <label><input type="checkbox" id="toggleAberration" checked> ABERRATION</label>
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        <button class="resume-btn" onclick="document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))">RESUME DRIVE</button>
+        <button class="resume-btn" onclick="document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))">
+          RESUME DRIVE
+        </button>
       </div>
     </div>
 
-    <!-- 🏎️ Main Rendering Container -->
+    <!-- ═══ Main WebGL Canvas ═══ -->
     <div id="app"></div>
 
-    <!-- 🎥 Aesthetic Title Screen (Combined Loading + Menu) -->
+    <!-- ═══ Title Screen ═══ -->
     <div id="title-screen">
       <div class="loading-backdrop"></div>
       <div class="loading-content">
@@ -94,12 +124,12 @@
       </div>
     </div>
 
-    <!-- 🚦 Incompatibility & Orientation Overlays -->
+    <!-- ═══ Error / Orientation Overlays ═══ -->
     <div id="webgl-error" class="overlay-notice" style="display: none;">
       <div class="content">
         <h1 class="neon-logo small">ERROR</h1>
         <p>WEBGL 2 NOT SUPPORTED</p>
-        <p class="small">PLEASE UPGRADE TO A MODERN BROWSER TO ENTER THE VOID</p>
+        <p class="small">PLEASE UPGRADE TO A MODERN BROWSER TO ENTER THE NIGHT</p>
       </div>
     </div>
 
@@ -110,10 +140,10 @@
       </div>
     </div>
 
-    <!-- 🎮 Mobile Touch Controls -->
+    <!-- ═══ Mobile Touch Controls ═══ -->
     <div id="touch-controls" class="touch-overlay">
       <div class="steer-pad">
-        <div id="touch-left" class="pad-btn">L</div>
+        <div id="touch-left"  class="pad-btn">L</div>
         <div id="touch-right" class="pad-btn">R</div>
       </div>
       <div class="pedal-pad">
@@ -122,14 +152,14 @@
       </div>
     </div>
 
-    <!-- 📊 Minimalist HUD -->
+    <!-- ═══ HUD ═══ -->
     <div id="hud" class="hud-overlay">
       <div id="rearview" class="rearview-mirror">
-          <canvas id="mirror-canvas"></canvas>
-          <div class="mirror-overlay"></div>
+        <canvas id="mirror-canvas"></canvas>
+        <div class="mirror-overlay"></div>
       </div>
       <div class="speed-display">
-          <span id="speed-val">000</span> <span class="unit">KM/H</span>
+        <span id="speed-val">000</span> <span class="unit">KM/H</span>
       </div>
       <div id="biome-label" class="biome-marker">DOWNTOWN</div>
       <div id="pause-icon" class="pause-indicator">II</div>

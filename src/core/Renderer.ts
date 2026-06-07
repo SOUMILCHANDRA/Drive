@@ -15,7 +15,7 @@ export class Renderer {
   
   public grainPass!: ShaderPass;
   public aberrationPass!: ShaderPass;
-  private bloomPass!: UnrealBloomPass;
+  public bloomPass!: UnrealBloomPass;
   private vignettePass!: ShaderPass;
   private mirrorCamera: THREE.PerspectiveCamera;
 
