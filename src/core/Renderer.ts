@@ -10,7 +10,7 @@ import type { QualityConfig } from './QualitySettings';
 export class Renderer {
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
-  private renderer: THREE.WebGLRenderer;
+  public renderer: THREE.WebGLRenderer;
   private composer: EffectComposer;
   
   public grainPass!: ShaderPass;
@@ -127,12 +127,19 @@ export class Renderer {
       this.aberrationPass.enabled = config.postProcessing;
   }
 
+  public toggleShadows(): boolean {
+      this.renderer.shadowMap.enabled = !this.renderer.shadowMap.enabled;
+      return this.renderer.shadowMap.enabled;
+  }
+
   private onWindowResize(): void {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.composer.setSize(window.innerWidth, window.innerHeight);
   }
+
+  public postProcessingEnabled: boolean = true;
 
   public render(delta: number, steer: number = 0): void {
     this.renderer.clear();
@@ -145,7 +152,11 @@ export class Renderer {
         0.1
     );
 
-    this.composer.render();
+    if (this.postProcessingEnabled) {
+        this.composer.render();
+    } else {
+        this.renderer.render(this.scene, this.camera);
+    }
   }
 
   public renderMirror(car: THREE.Group): void {

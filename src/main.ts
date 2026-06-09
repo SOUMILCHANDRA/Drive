@@ -109,6 +109,32 @@ async function init() {
           rearviewVisible = !rearviewVisible;
           if (rearview) rearview.classList.toggle('visible', rearviewVisible);
       }
+      if (e.key === '1') {
+          renderer.postProcessingEnabled = !renderer.postProcessingEnabled;
+          console.log('PostProcessing:', renderer.postProcessingEnabled);
+      }
+      if (e.key === '2') {
+          const enabled = renderer.toggleShadows();
+          renderer.scene.traverse((c: any) => {
+              if (c.isMesh) {
+                  if (c._origCast === undefined) c._origCast = c.castShadow;
+                  if (c._origReceive === undefined) c._origReceive = c.receiveShadow;
+                  c.castShadow = enabled ? c._origCast : false;
+                  c.receiveShadow = enabled ? c._origReceive : false;
+              }
+          });
+          console.log('Shadows:', enabled);
+      }
+      if (e.key === '3') {
+          if (renderer.scene.fog) {
+              (renderer.scene as any)._oldFog = renderer.scene.fog;
+              renderer.scene.fog = null;
+              console.log('Fog: OFF');
+          } else if ((renderer.scene as any)._oldFog) {
+              renderer.scene.fog = (renderer.scene as any)._oldFog;
+              console.log('Fog: ON');
+          }
+      }
   });
   titleScreen?.addEventListener('click', startDrive);
 
@@ -136,27 +162,35 @@ async function init() {
   // 📦 Asset Loading (Failsafe)
   try {
       if (loadingStatus) loadingStatus.innerText = "LOADING METROPOLIS...";
+      console.log('DEBUG: Before Promise.all');
       
       await Promise.all([
-        car.load('/models/car/car.glb').catch(() => {
-            console.error('All model loads failed, using geometric fallback.');
+        car.load('/models/car/car.glb').catch((e) => {
+            console.error('DEBUG: All model loads failed, using geometric fallback.', e);
         })
       ]);
 
+      console.log('DEBUG: After Promise.all');
+
       // Load BGM asynchronously without blocking the start of the game
-      sound.loadBGM('/bgm.webm').catch(() => {
-          console.warn('BGM failed to load.');
+      sound.loadBGM('/bgm.webm').catch((e) => {
+          console.warn('DEBUG: BGM failed to load.', e);
       });
+
+      console.log('DEBUG: Setting up lights');
 
       if (car.model) lighting.setupCarLight(car.model);
 
+      console.log('DEBUG: Setting SYSTEMS ONLINE');
       if (loadingStatus) loadingStatus.innerText = "SYSTEMS ONLINE";
       setTimeout(() => {
+          console.log('DEBUG: Adding ready class');
           if (titleScreen) titleScreen.classList.add('ready');
+          if (loadingStatus) loadingStatus.innerText = "PRESS ENTER TO START";
       }, 1000);
 
   } catch (err) {
-      console.error('Initialization error:', err);
+      console.error('DEBUG: Initialization error:', err);
       if (loadingStatus) loadingStatus.innerText = "ERROR INITIALIZING SYSTEMS";
   }
 
@@ -177,6 +211,7 @@ async function init() {
         sky.update(new THREE.Vector3(0,0,0));
         if (car.model) cameraManager.update(delta, car.model, 0);
         renderer.render(delta, 0);
+        console.log("RENDER:", JSON.stringify(renderer.renderer.info.render));
         return;
     }
 
@@ -235,7 +270,7 @@ async function init() {
     if (rearviewVisible && car.model) renderer.renderMirror(car.model);
 
     stats.update();
-    console.log(renderer.info.render);
+    console.log(JSON.stringify(renderer.renderer.info.render));
 
     // ── Speed HUD ──────────────────────────────────────────────────────
     const speedEl = document.getElementById('speed-val');
