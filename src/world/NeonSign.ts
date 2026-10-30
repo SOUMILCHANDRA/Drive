@@ -1,23 +1,34 @@
 import * as THREE from 'three';
 
+export type NeonState = 'STEADY' | 'FLICKERING' | 'OFF';
+
 /**
- * NeonSign: A living, flickering light source for the Nightcall city.
+ * NeonSign: An atmospheric nocturnal emissive neon sign with a
+ * per-sign flicker state machine (Drive 2011 neon aesthetic).
  */
 export class NeonSign extends THREE.Group {
   private glowMesh: THREE.Mesh;
-  private pointLight: THREE.PointLight;
-  private mat: THREE.MeshStandardMaterial;
-  
-  // Flicker Data
-  private baseIntensity: number = 2.5;
-  private timer: number = Math.random() * 10;
-  private flickerInterval: number = 4 + Math.random() * 8;
-  private broken: boolean = Math.random() < 0.2;
+  private boardMesh: THREE.Mesh;
+  private mat: THREE.MeshBasicMaterial;
   
   public color: THREE.Color;
+  public effectiveIntensity: number = 1.0;
 
-  private static COLORS = [0xff2d78, 0x00ffef, 0xf4b942, 0x39ff14, 0xff6600];
-  private static TEXTS = ['MOTEL', 'OPEN', 'BAR', '24HR', 'GAS', 'PARK', 'EATS'];
+  // Flicker State Machine
+  private state: NeonState = 'STEADY';
+  private stateTimer: number = 0;
+  private nextFlickerTime: number = 3 + Math.random() * 8;
+  private flickerDuration: number = 0;
+  private isDefective: boolean = Math.random() < 0.25;
+
+  private static COLORS = [
+    0xff2d78, // Hot Pink (Drive signature)
+    0x00ffef, // Neon Cyan
+    0xffaa00, // Sodium Amber
+    0x39ff14, // Acid Green
+    0xff3366  // Neon Magenta
+  ];
+  private static TEXTS = ['MOTEL', 'OPEN', 'BAR', '24HR', 'GAS', 'PARK', 'EATS', 'DRIVE', 'HOTEL'];
 
   constructor() {
     super();
@@ -26,58 +37,79 @@ export class NeonSign extends THREE.Group {
     this.color = new THREE.Color(colorVal);
     
     // 1. Backing Board
-    const board = new THREE.Mesh(
-      new THREE.PlaneGeometry(text.length * 0.6 + 0.4, 1.2),
-      new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 1.0 })
-    );
-    this.add(board);
+    const boardGeo = new THREE.PlaneGeometry(text.length * 0.6 + 0.4, 1.2);
+    const boardMat = new THREE.MeshBasicMaterial({ color: 0x05050a });
+    this.boardMesh = new THREE.Mesh(boardGeo, boardMat);
+    this.add(this.boardMesh);
     
-    // 2. Glowing Text Plane
-    this.mat = new THREE.MeshStandardMaterial({
-      color: 0x000000,
-      emissive: this.color,
-      emissiveIntensity: this.baseIntensity,
+    // 2. Glowing Neon Text Plane
+    this.mat = new THREE.MeshBasicMaterial({
+      color: this.color,
       transparent: true,
       opacity: 0.95,
+      toneMapped: false // Glows directly into the bloom pass
     });
     
     this.glowMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(text.length * 0.55, 0.9),
+      new THREE.PlaneGeometry(text.length * 0.55, 0.85),
       this.mat
     );
     this.glowMesh.position.z = 0.02;
     this.add(this.glowMesh);
-    
-    // 3. Point light for sign illumination
-    this.pointLight = new THREE.PointLight(colorVal, 1.8, 18, 2);
-    this.pointLight.position.set(0, 0, 1.5);
-    this.add(this.pointLight);
   }
 
   public update(dt: number): void {
-    this.timer += dt;
-    
-    if (this.timer > this.flickerInterval) {
-      this.timer = 0;
-      // Randomized Flicker Event
-      const isOff = this.broken ? (Math.random() < 0.4) : (Math.random() < 0.05);
-      const targetIntensity = isOff ? 0 : this.baseIntensity;
-      
-      this.mat.emissiveIntensity = targetIntensity;
-      this.pointLight.intensity = isOff ? 0 : 1.8;
-      
-      // Auto-restore after brief flicker
-      if (isOff) {
-          setTimeout(() => {
-              this.mat.emissiveIntensity = this.baseIntensity;
-              this.pointLight.intensity = 1.8;
-          }, 50 + Math.random() * 150);
-      }
+    this.stateTimer += dt;
+
+    switch (this.state) {
+      case 'STEADY':
+        // Subtle 60Hz electrical hum buzz
+        const buzz = Math.sin(Date.now() * 0.06) * 0.05;
+        this.effectiveIntensity = 1.0 + buzz;
+
+        if (this.stateTimer >= this.nextFlickerTime) {
+          this.state = 'FLICKERING';
+          this.stateTimer = 0;
+          this.flickerDuration = this.isDefective ? (0.4 + Math.random() * 0.8) : (0.1 + Math.random() * 0.25);
+        }
+        break;
+
+      case 'FLICKERING':
+        // Rapid chaotic flicker sequence
+        const rand = Math.random();
+        this.effectiveIntensity = rand > 0.4 ? (0.8 + rand * 0.4) : (rand * 0.15);
+
+        if (this.stateTimer >= this.flickerDuration) {
+          if (this.isDefective && Math.random() < 0.3) {
+            this.state = 'OFF';
+            this.stateTimer = 0;
+            this.flickerDuration = 0.5 + Math.random() * 1.5;
+          } else {
+            this.state = 'STEADY';
+            this.stateTimer = 0;
+            this.nextFlickerTime = 4 + Math.random() * 10;
+            this.effectiveIntensity = 1.0;
+          }
+        }
+        break;
+
+      case 'OFF':
+        this.effectiveIntensity = 0.05;
+        if (this.stateTimer >= this.flickerDuration) {
+          this.state = 'STEADY';
+          this.stateTimer = 0;
+          this.nextFlickerTime = 3 + Math.random() * 6;
+          this.effectiveIntensity = 1.0;
+        }
+        break;
     }
-    
-    // Subtle buzz hum (sub-perceptual intensity modulation)
-    if (this.mat.emissiveIntensity > 0) {
-        this.mat.emissiveIntensity = this.baseIntensity + (Math.sin(Date.now() * 0.05) * 0.2);
-    }
+
+    this.mat.opacity = Math.max(0.05, Math.min(1.0, this.effectiveIntensity));
+  }
+
+  public dispose(): void {
+    if (this.glowMesh.geometry) this.glowMesh.geometry.dispose();
+    if (this.boardMesh.geometry) this.boardMesh.geometry.dispose();
+    this.mat.dispose();
   }
 }

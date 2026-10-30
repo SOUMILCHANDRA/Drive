@@ -13,8 +13,10 @@ import { Road } from './world/Road';
 import { Car } from './vehicle/Car';
 import { SoundManager } from './audio/SoundManager';
 import { QualityManager } from './core/QualitySettings';
+import type { QualityTier } from './core/QualitySettings';
+import { DebugGUI } from './core/DebugGUI';
 
-// 🛑 Emergency Global Error Handlers for Headless Debugging
+// Emergency Diagnostic Handlers
 window.onerror = (msg, _url, _line, _col, _error) => {
     console.error('CRASH:', msg, 'at', _line, ':', _col, _error);
     const status = document.getElementById('loading-status');
@@ -28,8 +30,8 @@ window.onunhandledrejection = (event) => {
 
 async function init() {
   // 🚦 WebGL 2 Compatibility Check
-  const canvas = document.createElement('canvas');
-  const gl = canvas.getContext('webgl2');
+  const testCanvas = document.createElement('canvas');
+  const gl = testCanvas.getContext('webgl2');
   if (!gl) {
     const errorOverlay = document.getElementById('webgl-error');
     if (errorOverlay) errorOverlay.style.display = 'flex';
@@ -38,7 +40,7 @@ async function init() {
 
   const qualityManager = new QualityManager();
   
-  // 📱 Mobile Auto-Tiering
+  // Mobile Auto-Tiering
   const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   if (isMobile) {
       qualityManager.setTier('LOW');
@@ -48,7 +50,13 @@ async function init() {
 
   const renderer = new Renderer('app', currentConfig);
   const stats = new Stats();
+  stats.dom.style.position = 'absolute';
+  stats.dom.style.bottom = '10px';
+  stats.dom.style.left = '10px';
+  stats.dom.style.top = 'auto';
+  stats.dom.style.opacity = '0.6';
   document.body.appendChild(stats.dom);
+
   const engine = new Engine();
   const input = new InputManager();
   const cameraManager = new CameraManager(renderer.camera);
@@ -56,11 +64,14 @@ async function init() {
   const lighting = new LightingManager(renderer.scene);
   const sky = new SkyManager(renderer.scene);
   const road = new Road(renderer.scene);
+  road.setRoadEnvMap(renderer.getRoadEnvMap());
   const car = new Car(renderer.scene);
   const rain = new RainSystem(renderer.scene, currentConfig.rainCount);
   const traffic = new TrafficManager(renderer.scene);
   const sound = new SoundManager();
+  const debugGUI = new DebugGUI(renderer, lighting, road, rain);
 
+  // DOM Elements
   const titleScreen = document.getElementById('title-screen');
   const flash = document.getElementById('flash');
   const hud = document.getElementById('hud');
@@ -70,11 +81,34 @@ async function init() {
   const camSelect = document.getElementById('camSelect') as HTMLSelectElement;
   const rearview = document.getElementById('rearview');
   const loadingStatus = document.getElementById('loading-status');
+  const speedEl = document.getElementById('speed-val');
+  const distEl = document.getElementById('dist-val');
+  const fpsEl = document.getElementById('fps-val');
+  const callsEl = document.getElementById('calls-val');
+  const alertBanner = document.getElementById('alert-banner');
+  const masterVol = document.getElementById('masterVol') as HTMLInputElement;
 
   let gameStarted = false;
+  let isReadyToStart = false;
+  let pendingStart = false;
   let idleTime = 0;
   let currentBiome = "DOWNTOWN";
   let rearviewVisible = false;
+  let alertTimeout: any = null;
+  let fpsTimer = 0;
+  let frameCount = 0;
+  let currentFps = 60;
+
+  const showAlert = (text: string, color: string = '#00ffef') => {
+      if (!alertBanner) return;
+      alertBanner.innerText = text;
+      alertBanner.style.color = color;
+      alertBanner.style.display = 'block';
+      clearTimeout(alertTimeout);
+      alertTimeout = setTimeout(() => {
+          alertBanner.style.display = 'none';
+      }, 1200);
+  };
 
   const showBiome = (name: string) => {
       if (!biomeLabel) return;
@@ -84,12 +118,18 @@ async function init() {
   };
 
   const startDrive = () => {
-    if (gameStarted || !titleScreen?.classList.contains('ready')) return;
+    if (gameStarted) return;
+    if (!isReadyToStart) {
+        pendingStart = true;
+        if (loadingStatus) loadingStatus.innerText = "STARTING UPON IGNITION...";
+        return;
+    }
+
     gameStarted = true;
     document.body.classList.add('game-active');
     
     if (flash) {
-        flash.style.opacity = '1';
+        flash.style.opacity = '0.9';
         setTimeout(() => { flash.style.opacity = '0'; }, 300);
     }
     
@@ -101,49 +141,60 @@ async function init() {
     showBiome("DOWNTOWN");
   };
 
-  // 🖱️ Event Orchestration
+  // ⌨️ Controls & Shortcut Bindings
   window.addEventListener('keydown', (e) => { 
-      if (e.key === 'Enter') startDrive(); 
+      if (e.key === 'Enter' || e.code === 'Space') startDrive(); 
       if (e.key === 'Tab') {
           e.preventDefault();
           rearviewVisible = !rearviewVisible;
           if (rearview) rearview.classList.toggle('visible', rearviewVisible);
       }
-      if (e.key === '1') {
+      if (e.key === '1' || e.key.toLowerCase() === 'p') {
           renderer.postProcessingEnabled = !renderer.postProcessingEnabled;
-          console.log('PostProcessing:', renderer.postProcessingEnabled);
+          console.log(`[DEBUG] Post-Processing (Composer): ${renderer.postProcessingEnabled ? 'ENABLED' : 'BYPASSED (Direct WebGL Render)'}`);
+          showAlert(`POST-FX: ${renderer.postProcessingEnabled ? 'ON' : 'BYPASSED'}`);
       }
       if (e.key === '2') {
-          const enabled = renderer.toggleShadows();
-          renderer.scene.traverse((c: any) => {
-              if (c.isMesh) {
-                  if (c._origCast === undefined) c._origCast = c.castShadow;
-                  if (c._origReceive === undefined) c._origReceive = c.receiveShadow;
-                  c.castShadow = enabled ? c._origCast : false;
-                  c.receiveShadow = enabled ? c._origReceive : false;
-              }
-          });
-          console.log('Shadows:', enabled);
+          renderer.toggleShadows();
       }
-      if (e.key === '3') {
-          if (renderer.scene.fog) {
-              (renderer.scene as any)._oldFog = renderer.scene.fog;
-              renderer.scene.fog = null;
-              console.log('Fog: OFF');
-          } else if ((renderer.scene as any)._oldFog) {
-              renderer.scene.fog = (renderer.scene as any)._oldFog;
-              console.log('Fog: ON');
-          }
+      if (e.key.toLowerCase() === 'h') {
+          debugGUI.gui.show(debugGUI.gui._hidden);
       }
   });
-  titleScreen?.addEventListener('click', startDrive);
 
-  // ── Time-of-Day Switcher ──────────────────────────────────────────────
+  titleScreen?.addEventListener('click', startDrive);
+  titleScreen?.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      startDrive();
+  }, { passive: false });
+
+  // ─── Settings Dashboard Wire-Up ──────────────────────────────────────────
+
+  // Master Volume
+  if (masterVol) {
+      masterVol.value = (sound.masterVolume * 100).toString();
+      masterVol.addEventListener('input', () => {
+          const val = parseFloat(masterVol.value) / 100;
+          sound.setVolume(val);
+      });
+  }
+
+  // Rain Intensity Buttons
+  document.querySelectorAll('[data-rain]').forEach(btn => {
+      btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-rain]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const count = parseInt((btn as HTMLElement).dataset.rain || '4000');
+          rain.setCount(count);
+      });
+  });
+
+  // Time-of-Day Switcher
   type ToD = 'midnight' | 'sunset' | 'dawn';
-  const todPresets: Record<ToD, { fogColor: number; ambientColor: number; ambientIntensity: number; bloomStrength: number }> = {
-      midnight: { fogColor: 0x0d0800, ambientColor: 0x3d1f05, ambientIntensity: 1.2, bloomStrength: 0.9 },
-      sunset:   { fogColor: 0x2a1005, ambientColor: 0x6b2a05, ambientIntensity: 2.2, bloomStrength: 1.4 },
-      dawn:     { fogColor: 0x0d0a12, ambientColor: 0x1a0d28, ambientIntensity: 0.8, bloomStrength: 0.7 },
+  const todPresets: Record<ToD, { fogColor: number; bloomStrength: number }> = {
+      midnight: { fogColor: 0x0d0800, bloomStrength: 0.85 },
+      sunset:   { fogColor: 0x2a1005, bloomStrength: 1.2 },
+      dawn:     { fogColor: 0x0d0a12, bloomStrength: 0.7 },
   };
 
   document.querySelectorAll('.tod-btn').forEach(btn => {
@@ -154,44 +205,77 @@ async function init() {
           const preset = todPresets[tod];
           if (preset && renderer.scene.fog instanceof THREE.FogExp2) {
               renderer.scene.fog.color.set(preset.fogColor);
+              renderer.bloomPass.strength = preset.bloomStrength;
           }
-          renderer.bloomPass.strength = preset.bloomStrength;
       });
   });
 
-  // 📦 Asset Loading (Failsafe)
-  try {
-      if (loadingStatus) loadingStatus.innerText = "LOADING METROPOLIS...";
-      console.log('DEBUG: Before Promise.all');
-      
-      await Promise.all([
-        car.load('/models/car/car.glb').catch((e) => {
-            console.error('DEBUG: All model loads failed, using geometric fallback.', e);
-        })
-      ]);
-
-      console.log('DEBUG: After Promise.all');
-
-      // Load BGM asynchronously without blocking the start of the game
-      sound.loadBGM('/bgm.webm').catch((e) => {
-          console.warn('DEBUG: BGM failed to load.', e);
+  // Camera Selection Dropdown
+  if (camSelect) {
+      camSelect.addEventListener('change', () => {
+          cameraManager.setMode(parseInt(camSelect.value));
       });
+  }
 
-      console.log('DEBUG: Setting up lights');
+  // Quality Buttons
+  document.querySelectorAll('.quality-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+          document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const tier = (btn as HTMLElement).dataset.tier as QualityTier;
+          if (tier) {
+              qualityManager.setTier(tier);
+              currentConfig = qualityManager.getConfig();
+              renderer.updateQuality(currentConfig);
+              rain.setCount(currentConfig.rainCount);
+          }
+      });
+  });
+
+  // Post-FX Toggles
+  const grainCheck = document.getElementById('toggleGrain') as HTMLInputElement;
+  if (grainCheck) {
+      grainCheck.addEventListener('change', () => {
+          renderer.setGrainEnabled(grainCheck.checked);
+      });
+  }
+
+  const aberrationCheck = document.getElementById('toggleAberration') as HTMLInputElement;
+  if (aberrationCheck) {
+      aberrationCheck.addEventListener('change', () => {
+          renderer.setAberrationEnabled(aberrationCheck.checked);
+      });
+  }
+
+  // Resume Button
+  document.querySelector('.resume-btn')?.addEventListener('click', () => {
+      input.state.pause = false;
+      if (pauseMenu) pauseMenu.style.display = 'none';
+      if (pauseIcon) pauseIcon.classList.remove('visible');
+  });
+
+  // 📦 Asset Loading (Failsafe & Fast)
+  try {
+      if (loadingStatus) loadingStatus.innerText = "TUNING V8 ENGINE...";
+      
+      await car.load('/models/car/car.glb');
+
+      // Load BGM asynchronously without blocking ignition
+      sound.loadBGM('/bgm.webm').catch(() => {});
 
       if (car.model) lighting.setupCarLight(car.model);
 
-      console.log('DEBUG: Setting SYSTEMS ONLINE');
-      if (loadingStatus) loadingStatus.innerText = "SYSTEMS ONLINE";
-      setTimeout(() => {
-          console.log('DEBUG: Adding ready class');
-          if (titleScreen) titleScreen.classList.add('ready');
-          if (loadingStatus) loadingStatus.innerText = "PRESS ENTER TO START";
-      }, 1000);
+      isReadyToStart = true;
+      if (titleScreen) titleScreen.classList.add('ready');
+      if (loadingStatus) loadingStatus.innerText = "PRESS ENTER OR CLICK TO DRIVE";
 
+      if (pendingStart) {
+          startDrive();
+      }
   } catch (err) {
-      console.error('DEBUG: Initialization error:', err);
-      if (loadingStatus) loadingStatus.innerText = "ERROR INITIALIZING SYSTEMS";
+      console.error('Initialization fallback trigger:', err);
+      isReadyToStart = true;
+      if (titleScreen) titleScreen.classList.add('ready');
   }
 
   let lastCamToggle = false;
@@ -205,13 +289,12 @@ async function init() {
     
     if (!gameStarted) {
         idleTime += delta;
-        if (idleTime > 3) cameraManager.setMode('CINEMATIC');
+        if (idleTime > 2.5) cameraManager.setMode('CINEMATIC');
         road.update(0, new THREE.Vector3(0,0,0), 0, delta, currentConfig);
-        lighting.update(new THREE.Vector3(0,0,0), 0);
+        lighting.update(new THREE.Vector3(0,0,0), 0.8);
         sky.update(new THREE.Vector3(0,0,0));
         if (car.model) cameraManager.update(delta, car.model, 0);
         renderer.render(delta, 0);
-        console.log("RENDER:", JSON.stringify(renderer.renderer.info.render));
         return;
     }
 
@@ -221,13 +304,13 @@ async function init() {
     }
     lastCamToggle = controls.cameraToggle;
 
-    const carZ = car.model ? car.model.position.z : 0;
+    const carZ = car.position.z;
     const roadInfo = road.getRoadPositionAt(carZ);
     const biomeParams = road.biomeManager.getParamsAt(carZ);
     
     const cruiseActive = (document.getElementById('cruiseToggle') as HTMLInputElement)?.checked ?? false;
 
-    // Cruise control: auto-throttle + gentle road-following steer
+    // Controls Handling
     const rawSteer    = controls.pause ? 0 : controls.steer;
     const rawThrottle = controls.pause ? 0 : controls.throttle;
     const rawBrake    = controls.pause ? 0 : controls.brake;
@@ -237,44 +320,87 @@ async function init() {
     let brakeTarget    = rawBrake;
 
     if (cruiseActive && !controls.pause) {
-        throttleTarget = 0.65; // gentle cruise throttle
+        throttleTarget = 0.75;
         brakeTarget    = 0;
-        // Nudge toward road center automatically
-        const lateralErr = (roadInfo.position.x - (car.model?.position.x ?? 0)) * 0.018;
+        // Automatic gentle road center tracking
+        const lateralErr = (roadInfo.position.x - car.position.x) * 0.02;
         steerTarget = THREE.MathUtils.clamp(lateralErr, -0.4, 0.4);
     }
 
-    car.update(delta, { steer: steerTarget, throttle: throttleTarget, brake: brakeTarget }, roadInfo.position.x, road.getRoadMeshes());
+    // Car Kinetics Update
+    car.update(delta, { 
+        steer: steerTarget, 
+        throttle: throttleTarget, 
+        brake: brakeTarget 
+    }, {
+        x: roadInfo.position.x,
+        y: roadInfo.position.y,
+        tangent: roadInfo.tangent
+    });
     
+    // World Systems Update
     road.update(carZ, car.position, car.speed, delta, currentConfig);
-    renderer.updateRoadMirror(car.position);
+    renderer.updateRoadReflection(car.position, road.getRoadMeshes(), delta, car.model);
     lighting.update(car.position, biomeParams.ambientIntensity);
     sky.update(car.position);
     rain.update(delta, car.position, car.speed);
-    
     sound.update(car.speed, delta);
+
+    // Traffic Update & Player Interactions
     traffic.update(delta, carZ, (z) => {
         const pos = road.getRoadPositionAt(z).position;
         return { x: pos.x, y: pos.y };
     });
-    
-    if (car.model) cameraManager.update(delta, car.model, car.speed);
 
-    if (renderer.scene.fog instanceof THREE.FogExp2) {
-        renderer.scene.fog.density = THREE.MathUtils.lerp(renderer.scene.fog.density, biomeParams.fogDensity, 0.05);
-        renderer.scene.fog.color.lerp(new THREE.Color(biomeParams.fogColor), 0.04);
-        renderer.scene.background = renderer.scene.fog.color.clone().multiplyScalar(0.3);
+    const interaction = traffic.checkPlayerInteraction(car.position);
+    if (interaction.collided) {
+        cameraManager.addTrauma(0.65);
+        sound.playCollision();
+        car.speed = Math.max(0, car.speed * 0.45);
+        showAlert("IMPACT!", "#ff3333");
+    } else if (interaction.nearMiss) {
+        cameraManager.addTrauma(0.2);
+        sound.playNearMiss();
+        showAlert("NEAR MISS", "#00ffef");
+    }
+    
+    if (car.model) {
+        cameraManager.update(delta, car.model, car.speed);
     }
 
+    // Dynamic Fog & Sky Adjustment per Biome
+    if (renderer.scene.fog instanceof THREE.FogExp2) {
+        renderer.scene.fog.density = THREE.MathUtils.lerp(renderer.scene.fog.density, biomeParams.fogDensity, 0.04);
+        renderer.scene.fog.color.lerp(new THREE.Color(biomeParams.fogColor), 0.03);
+    }
+
+    // Frame Render
     renderer.render(delta, steerTarget);
-    if (rearviewVisible && car.model) renderer.renderMirror(car.model);
+    if (rearviewVisible && car.model) {
+        renderer.renderMirror(car.model);
+    }
 
     stats.update();
-    console.log(JSON.stringify(renderer.renderer.info.render));
 
-    // ── Speed HUD ──────────────────────────────────────────────────────
-    const speedEl = document.getElementById('speed-val');
-    if (speedEl) speedEl.innerText = Math.floor(car.speed * 6).toString().padStart(3, '0');
+    // ── HUD Readouts ────────────────────────────────────────────────────────
+    if (speedEl) {
+        const kmh = Math.floor(car.speed * 3.6);
+        speedEl.innerText = kmh.toString().padStart(3, '0');
+    }
+    if (distEl) {
+        const distM = Math.floor(car.position.z);
+        distEl.innerText = distM >= 1000 ? (distM / 1000).toFixed(1) + ' KM' : distM + ' M';
+    }
+
+    frameCount++;
+    fpsTimer += delta;
+    if (fpsTimer >= 0.2) {
+        currentFps = Math.round(frameCount / fpsTimer);
+        frameCount = 0;
+        fpsTimer = 0;
+        if (fpsEl) fpsEl.innerText = currentFps.toString();
+        if (callsEl) callsEl.innerText = renderer.renderer.info.render.calls.toString();
+    }
 
     if (biomeParams.name !== currentBiome) {
         currentBiome = biomeParams.name;
@@ -286,6 +412,5 @@ async function init() {
 }
 
 init().catch(err => {
-    console.error('Fatal init error:', err);
-    alert('FATAL ERROR: ' + err.message);
+    console.error('Fatal initialization error:', err);
 });

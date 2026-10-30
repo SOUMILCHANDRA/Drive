@@ -17,53 +17,53 @@ export interface BiomeParams {
 export const Biomes: Record<string, BiomeParams> = {
     DOWNTOWN: {
         name: 'DOWNTOWN',
-        buildingDensity: 0.85,
-        buildingHeight: [25, 70],
-        neonDensity: 0.5,
+        buildingDensity: 0.65,
+        buildingHeight: [25, 65],
+        neonDensity: 0.55,
         streetlightSpacing: 40,
-        fogDensity: 0.0018,
-        fogColor: 0x1a0e04,
-        skyColor: 0x0d0602,
-        ambientIntensity: 0.18,
+        fogDensity: 0.00048,
+        fogColor: 0x0e1432,
+        skyColor: 0x050a1e,
+        ambientIntensity: 1.0,
         rainIntensity: 0.8,
-        hasPalms: false,
+        hasPalms: true,
     },
     CANYON: {
         name: 'CANYON',
         buildingDensity: 0.0,
         buildingHeight: [0, 0],
         neonDensity: 0.0,
-        streetlightSpacing: 140,
-        fogDensity: 0.0006,
-        fogColor: 0x0d0800,
-        skyColor: 0x060300,
-        ambientIntensity: 0.07,
+        streetlightSpacing: 90,
+        fogDensity: 0.00042,
+        fogColor: 0x0c122c,
+        skyColor: 0x04081a,
+        ambientIntensity: 0.95,
         rainIntensity: 0.0,
         hasPalms: true,
     },
     NEON_COAST: {
         name: 'NEON COAST',
-        buildingDensity: 0.28,
-        buildingHeight: [8, 22],
-        neonDensity: 0.65,
-        streetlightSpacing: 55,
-        fogDensity: 0.0011,
-        fogColor: 0x120a02,
-        skyColor: 0x080400,
-        ambientIntensity: 0.14,
+        buildingDensity: 0.25,
+        buildingHeight: [10, 24],
+        neonDensity: 0.70,
+        streetlightSpacing: 50,
+        fogDensity: 0.00045,
+        fogColor: 0x101538,
+        skyColor: 0x060b24,
+        ambientIntensity: 1.0,
         rainIntensity: 0.3,
         hasPalms: true,
     },
     INDUSTRIAL: {
         name: 'INDUSTRIAL',
-        buildingDensity: 0.35,
-        buildingHeight: [8, 18],
-        neonDensity: 0.08,
-        streetlightSpacing: 100,
-        fogDensity: 0.0022,
-        fogColor: 0x150900,
-        skyColor: 0x080400,
-        ambientIntensity: 0.09,
+        buildingDensity: 0.30,
+        buildingHeight: [10, 20],
+        neonDensity: 0.12,
+        streetlightSpacing: 80,
+        fogDensity: 0.00055,
+        fogColor: 0x0e1330,
+        skyColor: 0x05091c,
+        ambientIntensity: 0.9,
         rainIntensity: 1.0,
         hasPalms: false,
     },
@@ -73,10 +73,10 @@ export const Biomes: Record<string, BiomeParams> = {
         buildingHeight: [0, 0],
         neonDensity: 0,
         streetlightSpacing: 25,
-        fogDensity: 0.004,
-        fogColor: 0x0d0800,
-        skyColor: 0x000000,
-        ambientIntensity: 0.22,
+        fogDensity: 0.0015,
+        fogColor: 0x080c20,
+        skyColor: 0x02040c,
+        ambientIntensity: 1.1,
         rainIntensity: 0,
         hasPalms: false,
     },
@@ -92,14 +92,12 @@ export class BiomeManager {
     private sequence: BiomeSection[] = [];
 
     constructor() {
-        // Always start in DOWNTOWN
         this.sequence.push({ type: Biomes.DOWNTOWN, start: 0, length: 2000 });
         this.generateNextSection(2000);
         this.generateNextSection(this.sequence[1].start + this.sequence[1].length);
     }
 
     private generateNextSection(start: number): void {
-        // Weighted pool — more canyon/coast to keep that Drive highway feel
         const pool = [
             Biomes.CANYON, Biomes.CANYON, Biomes.CANYON,
             Biomes.NEON_COAST, Biomes.NEON_COAST,
@@ -109,7 +107,6 @@ export class BiomeManager {
         ];
         let nextType = pool[Math.floor(Math.random() * pool.length)];
 
-        // Avoid same biome twice in a row
         if (this.sequence.length > 0) {
             let attempts = 0;
             while (nextType.name === this.sequence[this.sequence.length - 1].type.name && attempts < 10) {
@@ -123,7 +120,6 @@ export class BiomeManager {
     }
 
     public getParamsAt(z: number): BiomeParams {
-        // Ensure we have lookahead
         if (z > this.sequence[this.sequence.length - 1].start - 2000) {
             const last = this.sequence[this.sequence.length - 1];
             this.generateNextSection(last.start + last.length);
@@ -137,7 +133,6 @@ export class BiomeManager {
 
         if (!next) return current.type;
 
-        // 400-unit transition zone
         const transitionStart = current.start + current.length - 400;
         if (z > transitionStart) {
             const t = (z - transitionStart) / 400;

@@ -1,5 +1,5 @@
 /**
- * QualitySettings: Manages performance tiers and hardware benchmarking.
+ * QualitySettings: Manages performance tiers and hardware scalability.
  */
 
 export type QualityTier = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -24,27 +24,27 @@ export const Tiers: Record<QualityTier, QualityConfig> = {
         postProcessing: false,
         roadReflections: false,
         chunkLimit: 3,
-        fogDensity: 0.003
+        fogDensity: 0.0025
     },
     MEDIUM: {
         tier: 'MEDIUM',
         bloom: true,
-        rainCount: 8000,
+        rainCount: 2000,
         shadowSize: 512,
         postProcessing: true,
         roadReflections: true,
-        chunkLimit: 5,
-        fogDensity: 0.0018
+        chunkLimit: 4,
+        fogDensity: 0.0016
     },
     HIGH: {
         tier: 'HIGH',
         bloom: true,
-        rainCount: 15000,
-        shadowSize: 2048,
+        rainCount: 4000,
+        shadowSize: 1024,
         postProcessing: true,
         roadReflections: true,
-        chunkLimit: 7,
-        fogDensity: 0.0018
+        chunkLimit: 5,
+        fogDensity: 0.0012
     }
 };
 
@@ -61,15 +61,20 @@ export class QualityManager {
     }
 
     private autoDetect(): void {
-        // Simple heuristic: check for mobile or weak GPU
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         this.currentTier = isMobile ? 'LOW' : 'HIGH';
         localStorage.setItem('nightcall_quality', this.currentTier);
     }
 
     public setTier(tier: QualityTier): void {
-        this.currentTier = tier;
-        localStorage.setItem('nightcall_quality', tier);
+        if (Tiers[tier]) {
+            this.currentTier = tier;
+            localStorage.setItem('nightcall_quality', tier);
+        }
+    }
+
+    public getTier(): QualityTier {
+        return this.currentTier;
     }
 
     public getConfig(): QualityConfig {

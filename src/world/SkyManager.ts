@@ -1,149 +1,253 @@
 import * as THREE from 'three';
 
 /**
- * SkyManager: The nocturnal Los Angeles sky.
- * Deep indigo overhead, warm amber sodium glow at the horizon.
- * References the visual palette of Drive (2011).
+ * SkyManager: Majestic nocturnal Los Angeles sky (Drive / Slow Roads aesthetic).
+ * Features:
+ * - Rich midnight navy-to-twilight-indigo sky dome (no mud brown)
+ * - Layered mountain ridgelines along the horizon
+ * - 3D instanced downtown skyscraper skyline with procedural sparkling window facades
+ * - Crisp silver moon and twinkling celestial starfield
  */
 export class SkyManager {
     private scene: THREE.Scene;
     private starField: THREE.Points;
     private moon: THREE.Mesh;
-    private skyline: THREE.Mesh;
     private skyDome: THREE.Mesh;
+    private mountainRing: THREE.Mesh;
+    private instancedSkyline: THREE.InstancedMesh;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
 
-        // 1. Distant Starfield — sparse, slightly warm-tinted
+        // 1. Distant Starfield — realistic brightness variation
         const starGeo = new THREE.BufferGeometry();
-        const starPos = new Float32Array(400 * 3);
-        for (let i = 0; i < 400; i++) {
+        const starCount = 650;
+        const starPos = new Float32Array(starCount * 3);
+        const starSizes = new Float32Array(starCount);
+
+        for (let i = 0; i < starCount; i++) {
             const i3 = i * 3;
             const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(Math.random() * 0.9); // cluster near zenith
-            const r = 4000;
+            const phi = Math.acos(Math.random() * 0.88); // cluster toward zenith
+            const r = 3800;
+
             starPos[i3]     = r * Math.sin(phi) * Math.cos(theta);
             starPos[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
             starPos[i3 + 2] = r * Math.cos(phi);
+            starSizes[i] = 1.0 + Math.random() * 2.0;
         }
+
         starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        starGeo.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+
         const starMat = new THREE.PointsMaterial({
-            color: 0xffd8a0,
+            color: 0xe8f0ff,
             size: 2.2,
             transparent: true,
-            opacity: 0.25,
+            opacity: 0.65,
             sizeAttenuation: false,
+            fog: false,
         });
         this.starField = new THREE.Points(starGeo, starMat);
         this.scene.add(this.starField);
 
-        // 2. Moon — cool silver disc
-        const moonGeo = new THREE.CircleGeometry(36, 32);
+        // 2. Moon — crisp glowing silver orb with atmospheric halo
+        const moonGeo = new THREE.CircleGeometry(42, 32);
         const moonMat = new THREE.MeshBasicMaterial({
-            color: 0xd0dcea,
+            color: 0xebf2ff,
             transparent: true,
-            opacity: 0.55,
+            opacity: 0.85,
+            fog: false,
         });
         this.moon = new THREE.Mesh(moonGeo, moonMat);
-        this.moon.position.set(50, 420, -1000);
+        this.moon.position.set(200, 480, -1200);
         this.scene.add(this.moon);
 
-        // 3. Sky dome — gradient from warm sodium at horizon to deep indigo overhead
+        // 3. Sky dome — deep indigo to luminous twilight horizon (noir synthwave)
         this.skyDome = this.createSkyDome();
         this.scene.add(this.skyDome);
 
-        // 4. Procedural Skyline — LA silhouette with warm lit windows
-        this.skyline = this.createSkyline();
-        this.scene.add(this.skyline);
+        // 4. Distant Mountain Ridge Silhouettes (Slow Roads feel)
+        this.mountainRing = this.createMountainRing();
+        this.scene.add(this.mountainRing);
+
+        // 5. Instanced 3D Skyline Skyscrapers with illuminated windows (~1600m - 2100m radius)
+        this.instancedSkyline = this.createInstancedSkyline();
+        this.scene.add(this.instancedSkyline);
     }
 
     private createSkyDome(): THREE.Mesh {
         const canvas = document.createElement('canvas');
         canvas.width = 1;
-        canvas.height = 256;
+        canvas.height = 512;
         const ctx = canvas.getContext('2d')!;
 
-        // Vertical gradient: indigo (top) → deep amber haze (horizon)
-        const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-        gradient.addColorStop(0.0,  '#04020e'); // deep indigo zenith
-        gradient.addColorStop(0.45, '#0c0608'); // dark mid
-        gradient.addColorStop(0.75, '#1a0c03'); // amber bleed starts
-        gradient.addColorStop(0.90, '#2e1205'); // sodium orange haze
-        gradient.addColorStop(1.0,  '#3d1a08'); // warm horizon glow
+        // Vertical gradient for sphere: 
+        // In Canvas, y=0 maps to top (Zenith, +Y), y=256 is Horizon (Y=0), y=512 is Nadir (-Y)
+        const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+        gradient.addColorStop(0.0,  '#010206'); // pure midnight cosmic navy (Zenith)
+        gradient.addColorStop(0.30, '#030612'); // deep midnight indigo
+        gradient.addColorStop(0.46, '#070c20'); // upper horizon haze
+        gradient.addColorStop(0.50, '#0a1028'); // horizon eye level (matches 0x0a1024 fog)
+        gradient.addColorStop(0.56, '#060a1a'); // lower horizon
+        gradient.addColorStop(1.0,  '#020308'); // nadir (ground void)
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 1, 256);
+        ctx.fillRect(0, 0, 1, 512);
 
         const tex = new THREE.CanvasTexture(canvas);
         tex.wrapS = THREE.RepeatWrapping;
         tex.repeat.set(1, 1);
 
-        const geo = new THREE.SphereGeometry(3500, 16, 16);
+        // Radius 2400 (well within camera far plane of 3000 to eliminate clipping)
+        const geo = new THREE.SphereGeometry(2400, 32, 24);
         const mat = new THREE.MeshBasicMaterial({
             map: tex,
             side: THREE.BackSide,
             depthWrite: false,
+            fog: false,
         });
         return new THREE.Mesh(geo, mat);
     }
 
-    private createSkyline(): THREE.Mesh {
-        const canvas = document.createElement('canvas');
-        canvas.width = 2048;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d')!;
+    /**
+     * Procedural mountain silhouettes forming a majestic natural backdrop on the horizon.
+     */
+    private createMountainRing(): THREE.Mesh {
+        const segs = 96;
+        const radius = 1950;
+        const geo = new THREE.BufferGeometry();
+        const positions: number[] = [];
+        const indices: number[] = [];
 
-        // Dark warm base
-        ctx.fillStyle = '#040200';
-        ctx.fillRect(0, 0, 2048, 512);
+        for (let i = 0; i <= segs; i++) {
+            const angle = (i / segs) * Math.PI * 2;
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
 
-        // LA building silhouettes
-        let x = 0;
-        while (x < 2048) {
-            const w = 35 + Math.random() * 90;
-            const h = 60 + Math.random() * 350;
-            ctx.fillStyle = '#060402';
-            ctx.fillRect(x, 512 - h, w, h);
+            // Multi-frequency rolling California coastal mountain ridgeline
+            const h = 75 + 
+                      Math.sin(angle * 4) * 60 + 
+                      Math.cos(angle * 9) * 35 + 
+                      Math.sin(angle * 19) * 18;
 
-            // Warm sodium windows
-            for (let i = 0; i < h / 22; i++) {
-                for (let j = 0; j < w / 14; j++) {
-                    if (Math.random() < 0.10) {
-                        ctx.fillStyle = Math.random() < 0.7 ? '#ff9020' : '#ffcc55';
-                        ctx.globalAlpha = 0.6 + Math.random() * 0.4;
-                        ctx.fillRect(x + j * 14 + 3, 512 - h + i * 22 + 4, 7, 9);
-                        ctx.globalAlpha = 1.0;
-                    }
-                }
+            // Base vertex (below horizon)
+            positions.push(x, -60, z);
+            // Peak vertex
+            positions.push(x, h, z);
+
+            if (i < segs) {
+                const a = i * 2;
+                const b = a + 1;
+                const c = (i + 1) * 2;
+                const d = c + 1;
+                indices.push(a, b, c, b, d, c);
             }
-            x += w + 4 + Math.random() * 18;
         }
 
-        const skylineTexture = new THREE.CanvasTexture(canvas);
-        skylineTexture.wrapS = THREE.RepeatWrapping;
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setIndex(indices);
+        geo.computeVertexNormals();
 
-        const skylineMat = new THREE.MeshBasicMaterial({
-            map: skylineTexture,
-            transparent: true,
-            side: THREE.BackSide,
+        // Shaded dark indigo silhouette against the starry sky
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x05091a,
+            side: THREE.DoubleSide,
             depthWrite: false,
+            fog: false,
         });
 
-        const skylineGeo = new THREE.CylinderGeometry(2000, 2000, 380, 32, 1, true);
-        const mesh = new THREE.Mesh(skylineGeo, skylineMat);
-        mesh.position.y = 100;
-        return mesh;
+        return new THREE.Mesh(geo, mat);
+    }
+
+    /**
+     * Builds an InstancedMesh of 160 towers at 1600m - 2200m radius with a procedural
+     * illuminated window facade shader that glitters in the night.
+     */
+    private createInstancedSkyline(): THREE.InstancedMesh {
+        const count = 160;
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+
+        const skylineMat = new THREE.ShaderMaterial({
+            vertexShader: `
+                varying vec3 vWorldPos;
+                varying vec3 vNormalVec;
+                void main() {
+                    vNormalVec = normalize(normalMatrix * normal);
+                    vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+                    vWorldPos = wp.xyz;
+                    gl_Position = projectionMatrix * viewMatrix * wp;
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vWorldPos;
+                varying vec3 vNormalVec;
+                void main() {
+                    // Deep indigo skyscraper body
+                    vec3 baseColor = vec3(0.04, 0.06, 0.12);
+
+                    // Windows on vertical facades
+                    if (abs(vNormalVec.y) < 0.6) {
+                        vec2 grid = fract(vWorldPos.xz * 0.04 + vWorldPos.y * 0.032);
+                        float isWin = step(0.32, grid.x) * step(grid.y, 0.68);
+
+                        vec2 cell = floor(vWorldPos.xz * 0.04 + vWorldPos.y * 0.032);
+                        float rand = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+                        float lit = step(0.64, rand); // ~36% lit windows
+
+                        // Varied city lights: sodium amber, warm gold, cool cyan
+                        vec3 winColor;
+                        if (rand > 0.90) {
+                            winColor = vec3(0.4, 0.9, 1.0); // cool cyan office
+                        } else if (rand > 0.78) {
+                            winColor = vec3(1.0, 0.85, 0.5); // warm halogen
+                        } else {
+                            winColor = vec3(1.0, 0.60, 0.18); // sodium amber
+                        }
+
+                        baseColor = mix(baseColor, winColor * 2.2, isWin * lit);
+                    }
+
+                    gl_FragColor = vec4(baseColor, 1.0);
+                }
+            `,
+            depthWrite: false,
+            fog: false,
+        });
+
+        const instancedMesh = new THREE.InstancedMesh(boxGeo, skylineMat, count);
+        const dummy = new THREE.Object3D();
+
+        for (let i = 0; i < count; i++) {
+            const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.04;
+            const dist = 1600 + Math.random() * 500;
+            const w = 40 + Math.random() * 80;
+            const d = 40 + Math.random() * 80;
+            const h = 180 + Math.random() * 380;
+
+            dummy.position.set(
+                Math.cos(angle) * dist,
+                h * 0.5 - 20,
+                Math.sin(angle) * dist
+            );
+            dummy.scale.set(w, h, d);
+            dummy.rotation.y = angle + Math.PI / 2;
+            dummy.updateMatrix();
+
+            instancedMesh.setMatrixAt(i, dummy.matrix);
+        }
+        instancedMesh.instanceMatrix.needsUpdate = true;
+        return instancedMesh;
     }
 
     public update(carPos: THREE.Vector3): void {
         this.starField.position.copy(carPos);
         this.skyDome.position.copy(carPos);
-        this.skyline.position.copy(carPos);
-        this.skyline.position.y = 100;
+        this.mountainRing.position.copy(carPos);
+        this.instancedSkyline.position.copy(carPos);
 
-        this.moon.position.x = carPos.x + 400;
-        this.moon.position.y = 500;
-        this.moon.position.z = carPos.z - 2000;
+        this.moon.position.x = carPos.x + 350;
+        this.moon.position.y = 520;
+        this.moon.position.z = carPos.z - 1800;
         this.moon.lookAt(carPos);
     }
 }

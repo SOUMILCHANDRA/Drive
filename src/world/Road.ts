@@ -1,20 +1,148 @@
 import * as THREE from 'three';
-import { createNoise2D } from 'simplex-noise';
+import { BiomeManager, type BiomeParams } from './BiomeManager';
 import { NeonSign } from './NeonSign';
 import type { QualityConfig } from '../core/QualitySettings';
-import { BiomeManager } from './BiomeManager';
-import type { BiomeParams } from './BiomeManager';
 
-// Fixed-seed noise for deterministic terrain (same every load)
-const noise2D = createNoise2D(() => 0.42);
+// ─── Procedural Fast Simplex Noise ───────────────────────────────────────────
 
-/**
- * RoadChunk: A 500-unit segment of an LA scenic highway.
- * Follows a smooth 3D curve with rolling hills and winding bends.
- */
+const F2 = 0.5 * (Math.sqrt(3.0) - 1.0);
+const G2 = (3.0 - Math.sqrt(3.0)) / 6.0;
+
+function noise2D(xin: number, yin: number): number {
+    let s = (xin + yin) * F2;
+    let i = Math.floor(xin + s);
+    let j = Math.floor(yin + s);
+    let t = (i + j) * G2;
+    let X0 = i - t;
+    let Y0 = j - t;
+    let x0 = xin - X0;
+    let y0 = yin - Y0;
+
+    let i1 = x0 > y0 ? 1 : 0;
+    let j1 = x0 > y0 ? 0 : 1;
+
+    let x1 = x0 - i1 + G2;
+    let y1 = y0 - j1 + G2;
+    let x2 = x0 - 1.0 + 2.0 * G2;
+    let y2 = y0 - 1.0 + 2.0 * G2;
+
+    let n0 = 0, n1 = 0, n2 = 0;
+    let t0 = 0.5 - x0 * x0 - y0 * y0;
+    if (t0 > 0) {
+        t0 *= t0;
+        n0 = t0 * t0 * ((i * 12.9898 + j * 78.233) % 1.0 - 0.5);
+    }
+    let t1 = 0.5 - x1 * x1 - y1 * y1;
+    if (t1 > 0) {
+        t1 *= t1;
+        n1 = t1 * t1 * (((i + i1) * 12.9898 + (j + j1) * 78.233) % 1.0 - 0.5);
+    }
+    let t2 = 0.5 - x2 * x2 - y2 * y2;
+    if (t2 > 0) {
+        t2 *= t2;
+        n2 = t2 * t2 * (((i + 1) * 12.9898 + (j + 1) * 78.233) % 1.0 - 0.5);
+    }
+    return 70.0 * (n0 + n1 + n2);
+}
+
+// ─── Shared Highway Assets & Geometries ───────────────────────────────────────
+
+const MAX_BUILDINGS = 50;
+const MAX_WINDOWS = 520;
+const MAX_STREETLIGHTS = 24;
+const MAX_PALMS = 25;
+const MAX_FRONDS = 150;
+const MAX_GUARDRAILS = 80;
+const MAX_STUDS = 45;
+
+class SharedRoadAssets {
+    // Terrain: Rich nocturnal California landscape (deep indigo/moss tones)
+    public static terrainMaterial = new THREE.MeshStandardMaterial({
+        color: 0x070e1c,
+        roughness: 0.95,
+        metalness: 0.02,
+        flatShading: false,
+    });
+
+    // Streetlights
+    public static poleMaterial = new THREE.MeshStandardMaterial({ color: 0x242838, roughness: 0.7, metalness: 0.5 });
+    public static lampMaterial = new THREE.MeshBasicMaterial({ color: 0xffa525, toneMapped: false });
+    public static streetlightPoleGeo = new THREE.CylinderGeometry(0.09, 0.22, 7.5, 6);
+    public static streetlightArmGeo = new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6);
+    public static streetlightLampGeo = new THREE.SphereGeometry(0.28, 6, 5);
+
+    // Highway Guardrails
+    public static guardrailMat = new THREE.MeshStandardMaterial({ color: 0x484f64, roughness: 0.45, metalness: 0.7 });
+    public static reflectorRedMat = new THREE.MeshBasicMaterial({ color: 0xff2020, toneMapped: false });
+    public static reflectorWhiteMat = new THREE.MeshBasicMaterial({ color: 0xf5f8ff, toneMapped: false });
+    public static guardrailPostGeo = new THREE.BoxGeometry(0.14, 0.95, 0.14);
+    public static guardrailBeamGeo = new THREE.BoxGeometry(0.08, 0.36, 12.6);
+    public static reflectorGeo = new THREE.BoxGeometry(0.06, 0.14, 0.14);
+
+    // Road Studs (Cat's Eyes)
+    public static studMat = new THREE.MeshBasicMaterial({ color: 0xffb830, toneMapped: false });
+    public static studGeo = new THREE.BoxGeometry(0.16, 0.06, 0.24);
+
+    // Palms
+    public static palmTrunkMaterial = new THREE.MeshStandardMaterial({ color: 0x281a10, roughness: 0.95 });
+    public static palmFrondMaterial = new THREE.MeshStandardMaterial({ color: 0x142208, roughness: 0.95, side: THREE.DoubleSide });
+    public static palmTrunkGeo = new THREE.CylinderGeometry(0.14, 0.32, 11.5, 6);
+    public static palmFrondGeo = new THREE.PlaneGeometry(0.55, 4.2);
+
+    // Freeway Overpass & Gantries
+    public static overpassMat = new THREE.MeshStandardMaterial({ color: 0x1e2433, roughness: 0.85, metalness: 0.2 });
+    public static overpassGeo = new THREE.BoxGeometry(18, 1.4, 8);
+    public static gantrySignMat = new THREE.MeshBasicMaterial({ color: 0x006633 });
+    public static gantrySignGeo = new THREE.PlaneGeometry(6.5, 2.2);
+
+    // Buildings & Windows
+    public static buildingBodyMat = new THREE.MeshStandardMaterial({ color: 0x080c16, roughness: 0.88, metalness: 0.12 });
+    public static windowMatAmber = new THREE.MeshBasicMaterial({ color: 0xff9933, toneMapped: false });
+    public static windowMatGold = new THREE.MeshBasicMaterial({ color: 0xffc855, toneMapped: false });
+    public static windowMatCyan = new THREE.MeshBasicMaterial({ color: 0x44ddff, toneMapped: false });
+    public static windowGeo = new THREE.PlaneGeometry(0.65, 0.75);
+
+    // Tunnel Arches
+    public static archGeo = new THREE.TorusGeometry(14, 1.4, 8, 16, Math.PI);
+    public static archMat = new THREE.MeshStandardMaterial({ color: 0x161c28, roughness: 0.85 });
+
+    // Billboards
+    public static billboardPoleGeo = new THREE.CylinderGeometry(0.2, 0.32, 14, 6);
+    public static billboardBoardGeo = new THREE.PlaneGeometry(13, 3.4);
+    private static billboardTextures: THREE.CanvasTexture[] = [];
+
+    public static getBillboardTexture(index: number): THREE.CanvasTexture {
+        if (this.billboardTextures.length === 0) {
+            const signs = ['DRIVE', 'NIGHTCALL', 'HOLLYWOOD', 'PACIFIC COAST', 'CHEVRON', 'BONAVENTURE', 'SUNSET BLVD'];
+            signs.forEach(text => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d')!;
+                ctx.fillStyle = '#0a0d16';
+                ctx.fillRect(0, 0, 512, 128);
+                ctx.fillStyle = '#ff9514';
+                ctx.font = 'bold 52px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, 256, 64);
+                const tex = new THREE.CanvasTexture(canvas);
+                this.billboardTextures.push(tex);
+            });
+        }
+        return this.billboardTextures[index % this.billboardTextures.length];
+    }
+}
+
+// ─── RoadChunk: High Fidelity Highway Section ────────────────────────────────
+
+const SEG_X = 24;
+const SEG_Z = 36;
+
 class RoadChunk {
     public mesh: THREE.Mesh;
-    public lines: THREE.LineSegments;
+    public yellowLines: THREE.LineSegments;
+    public whiteLines: THREE.LineSegments;
     public cityGroup: THREE.Group;
     public neonSigns: NeonSign[] = [];
     public streetlightGlows: THREE.Vector3[] = [];
@@ -22,16 +150,110 @@ class RoadChunk {
     public length: number = 500;
     public curve: THREE.CatmullRomCurve3;
 
-    constructor(material: THREE.Material, lineMaterial: THREE.Material) {
-        // Road surface — segments deformed to follow 3D curve
-        this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(12, 500, 1, 50), material);
-        this.mesh.rotation.x = -Math.PI / 2;
-        this.mesh.receiveShadow = true;
-        this.mesh.castShadow = false;
+    // Terrain
+    private leftTerrainMesh: THREE.Mesh;
+    private rightTerrainMesh: THREE.Mesh;
 
-        this.lines = new THREE.LineSegments(new THREE.BufferGeometry(), lineMaterial);
+    // Instanced highway meshes
+    private buildingMesh: THREE.InstancedMesh;
+    private windowAmberMesh: THREE.InstancedMesh;
+    private windowGoldMesh: THREE.InstancedMesh;
+    private windowCyanMesh: THREE.InstancedMesh;
+    private streetPolesMesh: THREE.InstancedMesh;
+    private streetArmsMesh: THREE.InstancedMesh;
+    private streetLampsMesh: THREE.InstancedMesh;
+    private palmTrunksMesh: THREE.InstancedMesh;
+    private palmFrondsMesh: THREE.InstancedMesh;
+    private tunnelArchesMesh: THREE.InstancedMesh;
+    private guardrailPostsMesh: THREE.InstancedMesh;
+    private guardrailBeamsMesh: THREE.InstancedMesh;
+    private guardrailReflectorsMesh: THREE.InstancedMesh;
+    private roadStudsMesh: THREE.InstancedMesh;
+    private overpassMesh: THREE.InstancedMesh;
+    private billboardsGroup: THREE.Group;
+
+    private dummy = new THREE.Object3D();
+
+    constructor(roadMaterial: THREE.Material, yellowMat: THREE.Material, whiteMat: THREE.Material) {
+        this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(14, 500, 1, 40), roadMaterial);
+        this.mesh.receiveShadow = true;
+
+        this.yellowLines = new THREE.LineSegments(new THREE.BufferGeometry(), yellowMat);
+        this.whiteLines = new THREE.LineSegments(new THREE.BufferGeometry(), whiteMat);
         this.curve = new THREE.CatmullRomCurve3();
         this.cityGroup = new THREE.Group();
+
+        // 1. Terrain Meshes
+        this.leftTerrainMesh = this.initTerrainMesh();
+        this.rightTerrainMesh = this.initTerrainMesh();
+        this.cityGroup.add(this.leftTerrainMesh);
+        this.cityGroup.add(this.rightTerrainMesh);
+
+        // 2. Instanced Highway Meshes
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+        this.buildingMesh = new THREE.InstancedMesh(boxGeo, SharedRoadAssets.buildingBodyMat, MAX_BUILDINGS);
+        this.windowAmberMesh = new THREE.InstancedMesh(SharedRoadAssets.windowGeo, SharedRoadAssets.windowMatAmber, MAX_WINDOWS);
+        this.windowGoldMesh = new THREE.InstancedMesh(SharedRoadAssets.windowGeo, SharedRoadAssets.windowMatGold, MAX_WINDOWS);
+        this.windowCyanMesh = new THREE.InstancedMesh(SharedRoadAssets.windowGeo, SharedRoadAssets.windowMatCyan, MAX_WINDOWS);
+
+        this.streetPolesMesh = new THREE.InstancedMesh(SharedRoadAssets.streetlightPoleGeo, SharedRoadAssets.poleMaterial, MAX_STREETLIGHTS);
+        this.streetArmsMesh = new THREE.InstancedMesh(SharedRoadAssets.streetlightArmGeo, SharedRoadAssets.poleMaterial, MAX_STREETLIGHTS);
+        this.streetLampsMesh = new THREE.InstancedMesh(SharedRoadAssets.streetlightLampGeo, SharedRoadAssets.lampMaterial, MAX_STREETLIGHTS);
+
+        this.palmTrunksMesh = new THREE.InstancedMesh(SharedRoadAssets.palmTrunkGeo, SharedRoadAssets.palmTrunkMaterial, MAX_PALMS);
+        this.palmFrondsMesh = new THREE.InstancedMesh(SharedRoadAssets.palmFrondGeo, SharedRoadAssets.palmFrondMaterial, MAX_FRONDS);
+        this.tunnelArchesMesh = new THREE.InstancedMesh(SharedRoadAssets.archGeo, SharedRoadAssets.archMat, 16);
+
+        this.guardrailPostsMesh = new THREE.InstancedMesh(SharedRoadAssets.guardrailPostGeo, SharedRoadAssets.guardrailMat, MAX_GUARDRAILS);
+        this.guardrailBeamsMesh = new THREE.InstancedMesh(SharedRoadAssets.guardrailBeamGeo, SharedRoadAssets.guardrailMat, MAX_GUARDRAILS);
+        this.guardrailReflectorsMesh = new THREE.InstancedMesh(SharedRoadAssets.reflectorGeo, SharedRoadAssets.reflectorRedMat, MAX_GUARDRAILS);
+        this.roadStudsMesh = new THREE.InstancedMesh(SharedRoadAssets.studGeo, SharedRoadAssets.studMat, MAX_STUDS);
+        this.overpassMesh = new THREE.InstancedMesh(SharedRoadAssets.overpassGeo, SharedRoadAssets.overpassMat, 4);
+
+        this.billboardsGroup = new THREE.Group();
+
+        this.cityGroup.add(
+            this.buildingMesh,
+            this.windowAmberMesh,
+            this.windowGoldMesh,
+            this.windowCyanMesh,
+            this.streetPolesMesh,
+            this.streetArmsMesh,
+            this.streetLampsMesh,
+            this.palmTrunksMesh,
+            this.palmFrondsMesh,
+            this.tunnelArchesMesh,
+            this.guardrailPostsMesh,
+            this.guardrailBeamsMesh,
+            this.guardrailReflectorsMesh,
+            this.roadStudsMesh,
+            this.overpassMesh,
+            this.billboardsGroup
+        );
+    }
+
+    private initTerrainMesh(): THREE.Mesh {
+        const vertexCount = (SEG_X + 1) * (SEG_Z + 1);
+        const positions = new Float32Array(vertexCount * 3);
+        const indices: number[] = [];
+
+        for (let iz = 0; iz < SEG_Z; iz++) {
+            for (let ix = 0; ix < SEG_X; ix++) {
+                const a = iz * (SEG_X + 1) + ix;
+                const b = a + 1;
+                const c = (iz + 1) * (SEG_X + 1) + ix;
+                const d = c + 1;
+                indices.push(a, c, b, b, c, d);
+            }
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setIndex(indices);
+
+        const mesh = new THREE.Mesh(geo, SharedRoadAssets.terrainMaterial);
+        mesh.receiveShadow = true;
+        return mesh;
     }
 
     public activate(startZ: number, points: THREE.Vector3[], scene: THREE.Scene, params: BiomeParams): void {
@@ -41,11 +263,10 @@ class RoadChunk {
         this.generateCity(scene, params);
     }
 
-    /** Deforms the flat road mesh to follow the 3D CatmullRom curve. */
     private updateGeometry(): void {
         const pos = this.mesh.geometry.attributes.position as THREE.BufferAttribute;
-        const segments = 50;
-        const width = 13;
+        const segments = 40;
+        const width = 14;
 
         for (let i = 0; i <= segments; i++) {
             const t = i / segments;
@@ -53,43 +274,178 @@ class RoadChunk {
             const tangent = this.curve.getTangent(t);
             const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-            // Left edge
-            pos.setXYZ(i * 2,     worldPos.x - normal.x * (width / 2), worldPos.y, worldPos.z);
-            // Right edge
-            pos.setXYZ(i * 2 + 1, worldPos.x + normal.x * (width / 2), worldPos.y, worldPos.z);
+            pos.setXYZ(i * 2,     worldPos.x + normal.x * (width / 2), worldPos.y, worldPos.z);
+            pos.setXYZ(i * 2 + 1, worldPos.x - normal.x * (width / 2), worldPos.y, worldPos.z);
         }
         pos.needsUpdate = true;
         this.mesh.geometry.computeVertexNormals();
-        this.updateLines();
+        this.updateMarkings();
     }
 
-    private updateLines(): void {
-        const linePos: number[] = [];
-        const segments = 100;
+    private updateMarkings(): void {
+        const yellowPos: number[] = [];
+        const whitePos: number[] = [];
+        const segments = 90;
+
         for (let i = 0; i < segments; i++) {
-            if (i % 5 === 0) continue; // Dashed centre line
-            const p1 = this.curve.getPoint(i / segments);
-            const p2 = this.curve.getPoint((i + 1) / segments);
-            linePos.push(p1.x, p1.y + 0.05, p1.z, p2.x, p2.y + 0.05, p2.z);
+            const t1 = i / segments;
+            const t2 = (i + 1) / segments;
+            const p1 = this.curve.getPoint(t1);
+            const p2 = this.curve.getPoint(t2);
+            const tan1 = this.curve.getTangent(t1);
+            const norm1 = new THREE.Vector3(-tan1.z, 0, tan1.x).normalize();
+            const tan2 = this.curve.getTangent(t2);
+            const norm2 = new THREE.Vector3(-tan2.z, 0, tan2.x).normalize();
+
+            // 1. Double Solid Yellow Center Divider Lines
+            [-0.18, 0.18].forEach(offset => {
+                yellowPos.push(
+                    p1.x + norm1.x * offset, p1.y + 0.018, p1.z + norm1.z * offset,
+                    p2.x + norm2.x * offset, p2.y + 0.018, p2.z + norm2.z * offset
+                );
+            });
+
+            // 2. Outer Shoulder Fog Lines (Solid White)
+            [-6.4, 6.4].forEach(offset => {
+                whitePos.push(
+                    p1.x + norm1.x * offset, p1.y + 0.018, p1.z + norm1.z * offset,
+                    p2.x + norm2.x * offset, p2.y + 0.018, p2.z + norm2.z * offset
+                );
+            });
+
+            // 3. Dashed White Lane Dividers
+            if (i % 5 < 3) {
+                [-3.2, 3.2].forEach(offset => {
+                    whitePos.push(
+                        p1.x + norm1.x * offset, p1.y + 0.018, p1.z + norm1.z * offset,
+                        p2.x + norm2.x * offset, p2.y + 0.018, p2.z + norm2.z * offset
+                    );
+                });
+            }
         }
-        this.lines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3));
+
+        this.yellowLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(yellowPos, 3));
+        this.whiteLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(whitePos, 3));
     }
 
     private generateCity(scene: THREE.Scene, params: BiomeParams): void {
-        this.cityGroup.clear();
+        while (this.billboardsGroup.children.length > 0) {
+            this.billboardsGroup.remove(this.billboardsGroup.children[0]);
+        }
+        for (let i = 0; i < this.neonSigns.length; i++) {
+            this.cityGroup.remove(this.neonSigns[i]);
+            this.neonSigns[i].dispose();
+        }
         this.neonSigns = [];
         this.streetlightGlows = [];
 
-        // Always generate terrain on both shoulders
-        this.buildTerrainMesh(-1);
-        this.buildTerrainMesh(1);
+        // 1. Update Seamless Continuous Rolling Terrain (460m width each side)
+        this.updateTerrainMesh(this.leftTerrainMesh, -1);
+        this.updateTerrainMesh(this.rightTerrainMesh, 1);
 
-        if (params.name === 'TUNNEL') {
-            this.generateTunnel();
-            scene.add(this.cityGroup);
-            return;
+        let buildingCount = 0;
+        let amberWinCount = 0;
+        let goldWinCount = 0;
+        let cyanWinCount = 0;
+        let streetCount = 0;
+        let palmCount = 0;
+        let frondCount = 0;
+        let guardrailCount = 0;
+        let studCount = 0;
+        let overpassCount = 0;
+
+        // 2. Road Studs along Double Yellow Divider
+        const studSteps = 35;
+        for (let i = 0; i < studSteps; i++) {
+            if (studCount < MAX_STUDS) {
+                const t = (i + 0.5) / studSteps;
+                const pt = this.curve.getPoint(t);
+                const tangent = this.curve.getTangent(t);
+                this.dummy.position.set(pt.x, pt.y + 0.03, pt.z);
+                this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                this.dummy.scale.set(1, 1, 1);
+                this.dummy.updateMatrix();
+                this.roadStudsMesh.setMatrixAt(studCount++, this.dummy.matrix);
+            }
         }
 
+        // 3. Highway Guardrails along Both Edges
+        const railSteps = 38;
+        for (let i = 0; i < railSteps; i++) {
+            const t = i / railSteps;
+            const pt = this.curve.getPoint(t);
+            const tangent = this.curve.getTangent(t);
+            const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+            for (const side of [1, -1]) {
+                if (guardrailCount < MAX_GUARDRAILS) {
+                    const postPos = pt.clone().add(normal.clone().multiplyScalar(side * 6.9));
+                    postPos.y = pt.y + 0.48;
+
+                    // Post
+                    this.dummy.position.copy(postPos);
+                    this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                    this.dummy.scale.set(1, 1, 1);
+                    this.dummy.updateMatrix();
+                    this.guardrailPostsMesh.setMatrixAt(guardrailCount, this.dummy.matrix);
+
+                    // Reflector on post
+                    this.dummy.position.set(postPos.x - side * 0.08, postPos.y + 0.35, postPos.z);
+                    this.dummy.updateMatrix();
+                    this.guardrailReflectorsMesh.setMatrixAt(guardrailCount, this.dummy.matrix);
+
+                    // Horizontal Rail Beam
+                    if (i % 2 === 0) {
+                        this.dummy.position.set(postPos.x, postPos.y + 0.25, postPos.z);
+                        this.dummy.updateMatrix();
+                        this.guardrailBeamsMesh.setMatrixAt(guardrailCount / 2, this.dummy.matrix);
+                    }
+
+                    guardrailCount++;
+                }
+            }
+        }
+
+        // 4. Highway Overpasses
+        if (params.name !== 'TUNNEL' && Math.random() < 0.35 && overpassCount < 2) {
+            const t = 0.5;
+            const pt = this.curve.getPoint(t);
+            const tangent = this.curve.getTangent(t);
+            this.dummy.position.set(pt.x, pt.y + 7.5, pt.z);
+            this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+            this.dummy.rotation.y += Math.PI / 2;
+            this.dummy.scale.set(1, 1, 1);
+            this.dummy.updateMatrix();
+            this.overpassMesh.setMatrixAt(overpassCount++, this.dummy.matrix);
+        }
+
+        // 5. Tunnel Arch Check
+        if (params.name === 'TUNNEL') {
+            const archCount = 14;
+            for (let i = 0; i < archCount; i++) {
+                const t = (i + 0.5) / archCount;
+                const pt = this.curve.getPoint(t);
+                const tangent = this.curve.getTangent(t);
+
+                this.dummy.position.copy(pt);
+                this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                this.dummy.scale.set(1, 1, 1);
+                this.dummy.updateMatrix();
+                this.tunnelArchesMesh.setMatrixAt(i, this.dummy.matrix);
+
+                const lightPos = pt.clone().add(new THREE.Vector3(0, 8.5, 0));
+                this.streetlightGlows.push(lightPos);
+            }
+            this.tunnelArchesMesh.count = archCount;
+            this.tunnelArchesMesh.instanceMatrix.needsUpdate = true;
+            this.applyMeshCounts(buildingCount, amberWinCount, goldWinCount, cyanWinCount, streetCount, palmCount, frondCount, guardrailCount, studCount, overpassCount);
+            scene.add(this.cityGroup);
+            return;
+        } else {
+            this.tunnelArchesMesh.count = 0;
+        }
+
+        // 6. Roadside Architecture & Nature (Set back gracefully from highway)
         const segments = 22;
         for (let i = 0; i < segments; i++) {
             const t = i / segments;
@@ -97,252 +453,262 @@ class RoadChunk {
             const tangent = this.curve.getTangent(t);
             const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-            [1, -1].forEach(side => {
-                // 1. Buildings (downtown / coast only)
-                if (Math.random() < params.buildingDensity) {
+            for (const side of [1, -1]) {
+                // Instanced Buildings (Set back 130m - 240m forming a majestic city skyline)
+                if (Math.random() < params.buildingDensity * 0.7 && buildingCount < MAX_BUILDINGS) {
                     const h = params.buildingHeight[0] + Math.random() * (params.buildingHeight[1] - params.buildingHeight[0]);
-                    const w = 11 + Math.random() * 10;
-                    const d = 14 + Math.random() * 10;
-                    const building = this.createBuilding(w, h, d);
-                    const bpos = worldPos.clone().add(normal.clone().multiplyScalar(side * (20 + Math.random() * 14)));
-                    building.position.copy(bpos);
-                    building.position.y = worldPos.y + h / 2;
-                    building.lookAt(worldPos.clone().setY(building.position.y));
-                    this.cityGroup.add(building);
+                    const w = 24 + Math.random() * 20;
+                    const d = 24 + Math.random() * 20;
+                    const setback = 130 + Math.random() * 110;
+                    const bpos = worldPos.clone().add(normal.clone().multiplyScalar(side * setback));
+                    bpos.y = worldPos.y + h / 2 - 2.0;
 
-                    if (Math.random() < params.neonDensity) {
+                    this.dummy.position.copy(bpos);
+                    this.dummy.scale.set(w, h, d);
+                    this.dummy.lookAt(worldPos.clone().setY(bpos.y));
+                    this.dummy.updateMatrix();
+                    this.buildingMesh.setMatrixAt(buildingCount, this.dummy.matrix);
+
+                    // Dense Illuminated Window Grids across Facade
+                    const bQuat = this.dummy.quaternion.clone();
+                    for (let y = 0; y < 6; y++) {
+                        for (let x = 0; x < 4; x++) {
+                            if (Math.random() > 0.28) {
+                                const localWinPos = new THREE.Vector3(
+                                    -w / 2 + 2.5 + x * (w / 4.2),
+                                    -h / 2 + 3.0 + y * (h / 6.5),
+                                    d / 2 + 0.08
+                                ).applyQuaternion(bQuat).add(bpos);
+
+                                this.dummy.position.copy(localWinPos);
+                                this.dummy.quaternion.copy(bQuat);
+                                this.dummy.scale.set(1.1, 1.1, 1);
+                                this.dummy.updateMatrix();
+
+                                const r = Math.random();
+                                if (r < 0.50 && amberWinCount < MAX_WINDOWS) {
+                                    this.windowAmberMesh.setMatrixAt(amberWinCount++, this.dummy.matrix);
+                                } else if (r < 0.80 && goldWinCount < MAX_WINDOWS) {
+                                    this.windowGoldMesh.setMatrixAt(goldWinCount++, this.dummy.matrix);
+                                } else if (cyanWinCount < MAX_WINDOWS) {
+                                    this.windowCyanMesh.setMatrixAt(cyanWinCount++, this.dummy.matrix);
+                                }
+                            }
+                        }
+                    }
+
+                    // Neon Sign on Rooftop or Upper Facade
+                    if (Math.random() < params.neonDensity && this.neonSigns.length < 5) {
                         const sign = new NeonSign();
-                        sign.position.set(0, Math.random() * h / 3, d / 2 + 0.1);
-                        building.add(sign);
+                        const signOffset = new THREE.Vector3(0, h / 2 - 1.2, d / 2 + 0.25).applyQuaternion(bQuat);
+                        sign.position.copy(bpos).add(signOffset);
+                        sign.quaternion.copy(bQuat);
+                        this.cityGroup.add(sign);
                         this.neonSigns.push(sign);
+                    }
+
+                    buildingCount++;
+                }
+
+                // Roadside California Palms (At highway verge x = 9m - 14m)
+                if (params.hasPalms && i % 2 === 0 && Math.random() < 0.8 && palmCount < MAX_PALMS) {
+                    const ppos = worldPos.clone().add(normal.clone().multiplyScalar(side * (10 + Math.random() * 4)));
+                    ppos.y = worldPos.y - 0.2;
+
+                    this.dummy.position.set(ppos.x, ppos.y + 5.7, ppos.z);
+                    this.dummy.rotation.set(0, 0, (Math.random() - 0.5) * 0.12);
+                    this.dummy.scale.set(1, 1, 1);
+                    this.dummy.updateMatrix();
+                    this.palmTrunksMesh.setMatrixAt(palmCount++, this.dummy.matrix);
+
+                    for (let f = 0; f < 6; f++) {
+                        if (frondCount < MAX_FRONDS) {
+                            const angle = (f / 6) * Math.PI * 2;
+                            this.dummy.position.set(
+                                ppos.x + Math.sin(angle) * 1.3,
+                                ppos.y + 11.2,
+                                ppos.z + Math.cos(angle) * 1.3
+                            );
+                            this.dummy.rotation.set(Math.PI / 3.2, -angle, 0);
+                            this.dummy.scale.set(1, 1, 1);
+                            this.dummy.updateMatrix();
+                            this.palmFrondsMesh.setMatrixAt(frondCount++, this.dummy.matrix);
+                        }
                     }
                 }
 
-                // 2. Palm Trees (canyon / coast)
-                if (params.hasPalms && i % 2 === 0 && Math.random() < 0.85) {
-                    const palm = this.createPalmTree(9 + Math.random() * 6);
-                    const ppos = worldPos.clone().add(normal.clone().multiplyScalar(side * (9 + Math.random() * 7)));
-                    palm.position.copy(ppos);
-                    palm.position.y = worldPos.y;
-                    this.cityGroup.add(palm);
-                }
-
-                // 3. Retro LA Billboards (sparse)
-                if (Math.random() < 0.055 && params.buildingDensity > 0.1) {
+                // Billboards (Set back 28m - 38m)
+                if (Math.random() < 0.06 && params.buildingDensity > 0.1 && this.billboardsGroup.children.length < 2) {
                     const billboard = this.createBillboard();
-                    const blpos = worldPos.clone().add(normal.clone().multiplyScalar(side * (28 + Math.random() * 16)));
+                    const blpos = worldPos.clone().add(normal.clone().multiplyScalar(side * (32 + Math.random() * 10)));
                     billboard.position.copy(blpos);
                     billboard.position.y = worldPos.y;
-                    billboard.lookAt(worldPos.clone().setY(billboard.position.y + 8));
-                    this.cityGroup.add(billboard);
+                    billboard.lookAt(worldPos.clone().setY(billboard.position.y + 7));
+                    this.billboardsGroup.add(billboard);
                 }
 
-                // 4. Sodium Vapor Streetlights (rhythmic)
-                if (i % 3 === 0) {
-                    const streetlight = this.createStreetlight();
-                    const slpos = worldPos.clone().add(normal.clone().multiplyScalar(side * 8));
-                    streetlight.position.copy(slpos);
-                    streetlight.position.y = worldPos.y;
-                    streetlight.lookAt(worldPos.clone().setY(worldPos.y));
-                    this.cityGroup.add(streetlight);
+                // Highway Streetlights
+                if (i % 3 === 0 && streetCount < MAX_STREETLIGHTS) {
+                    const slpos = worldPos.clone().add(normal.clone().multiplyScalar(side * 8.2));
+                    slpos.y = worldPos.y;
 
-                    // Track glow position for PointLight pool
-                    this.streetlightGlows.push(slpos.clone().add(new THREE.Vector3(0, 5.5, 0)));
+                    // Pole
+                    this.dummy.position.set(slpos.x, slpos.y + 3.75, slpos.z);
+                    this.dummy.rotation.set(0, 0, 0);
+                    this.dummy.scale.set(1, 1, 1);
+                    this.dummy.updateMatrix();
+                    this.streetPolesMesh.setMatrixAt(streetCount, this.dummy.matrix);
+
+                    // Overhanging Arm
+                    this.dummy.position.set(slpos.x + side * 1.3, slpos.y + 7.4, slpos.z);
+                    this.dummy.rotation.set(0, 0, side * Math.PI / 2);
+                    this.dummy.updateMatrix();
+                    this.streetArmsMesh.setMatrixAt(streetCount, this.dummy.matrix);
+
+                    // Sodium Luminaire
+                    this.dummy.position.set(slpos.x + side * 2.5, slpos.y + 7.2, slpos.z);
+                    this.dummy.rotation.set(0, 0, 0);
+                    this.dummy.updateMatrix();
+                    this.streetLampsMesh.setMatrixAt(streetCount, this.dummy.matrix);
+
+                    this.streetlightGlows.push(new THREE.Vector3(slpos.x + side * 2.5, slpos.y + 7.2, slpos.z));
+                    streetCount++;
                 }
-            });
+            }
         }
+
+        this.applyMeshCounts(buildingCount, amberWinCount, goldWinCount, cyanWinCount, streetCount, palmCount, frondCount, guardrailCount, studCount, overpassCount);
         scene.add(this.cityGroup);
     }
 
-    /**
-     * Builds a terrain mesh on one shoulder using Simplex noise.
-     * Near the road, height is blended back to the road's elevation.
-     */
-    private buildTerrainMesh(side: number): void {
-        const segZ = 22;
-        const segX = 12;
-        const terrainWidth = 130;
-        const roadHalfWidth = 7;
+    private applyMeshCounts(bCount: number, aWin: number, gWin: number, cWin: number, sCount: number, pCount: number, fCount: number, gRail: number, stud: number, over: number): void {
+        this.buildingMesh.count = bCount;
+        this.buildingMesh.instanceMatrix.needsUpdate = true;
 
-        const positions: number[] = [];
-        const indices: number[] = [];
+        this.windowAmberMesh.count = aWin;
+        this.windowAmberMesh.instanceMatrix.needsUpdate = true;
 
-        for (let iz = 0; iz <= segZ; iz++) {
-            const t = iz / segZ;
+        this.windowGoldMesh.count = gWin;
+        this.windowGoldMesh.instanceMatrix.needsUpdate = true;
+
+        this.windowCyanMesh.count = cWin;
+        this.windowCyanMesh.instanceMatrix.needsUpdate = true;
+
+        this.streetPolesMesh.count = sCount;
+        this.streetPolesMesh.instanceMatrix.needsUpdate = true;
+
+        this.streetArmsMesh.count = sCount;
+        this.streetArmsMesh.instanceMatrix.needsUpdate = true;
+
+        this.streetLampsMesh.count = sCount;
+        this.streetLampsMesh.instanceMatrix.needsUpdate = true;
+
+        this.palmTrunksMesh.count = pCount;
+        this.palmTrunksMesh.instanceMatrix.needsUpdate = true;
+
+        this.palmFrondsMesh.count = fCount;
+        this.palmFrondsMesh.instanceMatrix.needsUpdate = true;
+
+        this.guardrailPostsMesh.count = gRail;
+        this.guardrailPostsMesh.instanceMatrix.needsUpdate = true;
+
+        this.guardrailBeamsMesh.count = Math.floor(gRail / 2);
+        this.guardrailBeamsMesh.instanceMatrix.needsUpdate = true;
+
+        this.guardrailReflectorsMesh.count = gRail;
+        this.guardrailReflectorsMesh.instanceMatrix.needsUpdate = true;
+
+        this.roadStudsMesh.count = stud;
+        this.roadStudsMesh.instanceMatrix.needsUpdate = true;
+
+        this.overpassMesh.count = over;
+        this.overpassMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    private updateTerrainMesh(mesh: THREE.Mesh, side: number): void {
+        const posAttr = mesh.geometry.attributes.position as THREE.BufferAttribute;
+        const positions = posAttr.array as Float32Array;
+        const terrainStart = 7.4;
+        const terrainWidth = 460;
+        let idx = 0;
+
+        for (let iz = 0; iz <= SEG_Z; iz++) {
+            const t = iz / SEG_Z;
             const cp = this.curve.getPoint(t);
             const tangent = this.curve.getTangent(t);
             const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-            for (let ix = 0; ix <= segX; ix++) {
-                const xDist = roadHalfWidth + (ix / segX) * terrainWidth;
-                const basePos = cp.clone().add(normal.clone().multiplyScalar(side * xDist));
+            for (let ix = 0; ix <= SEG_X; ix++) {
+                const u = ix / SEG_X;
+                const xDist = terrainStart + u * terrainWidth;
+                const bx = cp.x + normal.x * (side * xDist);
+                const bz = cp.z + normal.z * (side * xDist);
 
-                // Layered noise for natural hillside feel
-                const noiseH =
-                    noise2D(basePos.x * 0.007,  basePos.z * 0.005)  * 45 +
-                    noise2D(basePos.x * 0.018,  basePos.z * 0.014)  * 12 +
-                    noise2D(basePos.x * 0.045,  basePos.z * 0.038)  * 4;
+                // Multi-octave natural rolling hills (Slow Roads aesthetic)
+                const hillLow = noise2D(bx * 0.0035, bz * 0.0025) * 58;
+                const hillMid = noise2D(bx * 0.012, bz * 0.009) * 16;
+                const hillHigh = noise2D(bx * 0.03, bz * 0.02) * 4.5;
+                const totalHill = hillLow + hillMid + hillHigh;
 
-                // Blend: 0 at road shoulder, 1 at outer edge
-                const blend = Math.min(1.0, Math.pow((xDist - roadHalfWidth) / 38, 1.4));
-                const y = cp.y + noiseH * blend;
+                // Close to road (u < 0.12): gentle ditch/shoulder dropping slightly below road
+                // Medium & far: rolling hillside rising naturally
+                const blend = Math.pow(Math.min(1.0, u / 0.16), 1.5);
+                // At far edge (u > 0.75), softly taper down into horizon fog
+                const taper = Math.cos(Math.max(0.0, (u - 0.75) / 0.25) * (Math.PI / 2));
+                const by = cp.y - 0.32 + (totalHill * blend * taper);
 
-                positions.push(basePos.x, y, basePos.z);
+                positions[idx++] = bx;
+                positions[idx++] = by;
+                positions[idx++] = bz;
             }
         }
 
-        for (let iz = 0; iz < segZ; iz++) {
-            for (let ix = 0; ix < segX; ix++) {
-                const a = iz * (segX + 1) + ix;
-                const b = a + 1;
-                const c = (iz + 1) * (segX + 1) + ix;
-                const d = c + 1;
-                indices.push(a, c, b, b, c, d);
-            }
-        }
-
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        geo.setIndex(indices);
-        geo.computeVertexNormals();
-
-        const mat = new THREE.MeshStandardMaterial({
-            color: 0x0e0b07,
-            roughness: 0.94,
-            metalness: 0.04,
-        });
-
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.receiveShadow = true;
-        this.cityGroup.add(mesh);
-    }
-
-    private generateTunnel(): void {
-        const tunnelGeom = new THREE.CylinderGeometry(25, 25, 500, 16, 1, true, Math.PI, Math.PI);
-        const tunnelMat = new THREE.MeshStandardMaterial({ color: 0x050505, side: THREE.BackSide, roughness: 0.1 });
-        const tunnel = new THREE.Mesh(tunnelGeom, tunnelMat);
-        tunnel.rotation.z = Math.PI / 2;
-        tunnel.position.set(0, 0, this.startZ + 250);
-        this.cityGroup.add(tunnel);
-
-        for (let i = 0; i < 6; i++) {
-            const lightPos = new THREE.Vector3(0, 18, this.startZ + (i * 80) + 50);
-            this.streetlightGlows.push(lightPos);
-        }
+        posAttr.needsUpdate = true;
+        mesh.geometry.computeVertexNormals();
     }
 
     public update(delta: number): void {
-        this.neonSigns.forEach(s => s.update(delta));
-    }
-
-    // ─── Scenery Factories ────────────────────────────────────────────────
-
-    private createBuilding(w: number, h: number, d: number): THREE.Group {
-        const group = new THREE.Group();
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0c0a08, roughness: 0.9, metalness: 0.0 });
-        group.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), bodyMat));
-
-        // Warm sodium-tinted windows
-        for (let y = 0; y < 4; y++) {
-            for (let x = 0; x < 3; x++) {
-                if (Math.random() > 0.42) {
-                    const hue = Math.random() < 0.75 ? 0xff9030 : 0xffbb55; // sodium or halogen
-                    const winMat = new THREE.MeshStandardMaterial({
-                        color: 0x000000,
-                        emissive: hue,
-                        emissiveIntensity: 1.3,
-                    });
-                    const win = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.6), winMat);
-                    win.position.set(-w / 2 + 2 + x * w / 4, -h / 2 + 2 + y * h / 4, d / 2 + 0.1);
-                    group.add(win);
-                }
-            }
+        for (let i = 0; i < this.neonSigns.length; i++) {
+            this.neonSigns[i].update(delta);
         }
-        return group;
     }
 
-    /** Sodium-vapor streetlight — the signature amber-orange of LA nights. */
-    private createStreetlight(): THREE.Group {
-        const group = new THREE.Group();
-        const poleMat = new THREE.MeshStandardMaterial({ color: 0x252018, roughness: 0.85 });
-        const lampMat = new THREE.MeshStandardMaterial({
-            color: 0xff9200,
-            emissive: 0xff9200,
-            emissiveIntensity: 5.0,
-            toneMapped: false,
-        });
-
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.22, 6.5), poleMat);
-        pole.position.y = 3.25;
-
-        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.4), poleMat);
-        arm.rotation.z = Math.PI / 2;
-        arm.position.set(1.2, 6.5, 0);
-
-        const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), lampMat);
-        lamp.position.set(2.4, 6.3, 0);
-
-        group.add(pole, arm, lamp);
-        return group;
-    }
-
-    /** Procedural palm tree — the defining silhouette of LA. */
-    private createPalmTree(height: number): THREE.Group {
-        const group = new THREE.Group();
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1c0e, roughness: 0.95 });
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.32, height, 7), trunkMat);
-        trunk.position.y = height / 2;
-        trunk.rotation.z = (Math.random() - 0.5) * 0.20; // natural lean
-        group.add(trunk);
-
-        const frondMat = new THREE.MeshStandardMaterial({ color: 0x1a2a0a, roughness: 0.95, side: THREE.DoubleSide });
-        for (let i = 0; i < 8; i++) {
-            const frond = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 3.8), frondMat);
-            const angle = (i / 8) * Math.PI * 2;
-            frond.position.set(Math.sin(angle) * 1.3, height - 0.5, Math.cos(angle) * 1.3);
-            frond.rotation.y = -angle;
-            frond.rotation.x = Math.PI / 3.0; // drooping downward
-            group.add(frond);
-        }
-        return group;
-    }
-
-    /** Retro LA billboard with glowing sodium-colored text. */
     private createBillboard(): THREE.Group {
         const group = new THREE.Group();
-        const poleMat = new THREE.MeshStandardMaterial({ color: 0x1a1510, roughness: 0.9 });
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 13, 6), poleMat);
-        pole.position.y = 6.5;
+        const pole = new THREE.Mesh(SharedRoadAssets.billboardPoleGeo, SharedRoadAssets.poleMaterial);
+        pole.position.y = 7.0;
         group.add(pole);
 
-        const signs = ['DRIVE', 'NIGHTCALL', 'LA 1984', 'STANDARD', 'CHEVRON', 'BONAVENTURE', 'SUNSET'];
-        const text = signs[Math.floor(Math.random() * signs.length)];
-
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d')!;
-        ctx.fillStyle = '#0a0806';
-        ctx.fillRect(0, 0, 512, 128);
-        ctx.fillStyle = '#ff9200';
-        ctx.font = 'bold 78px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(text, 256, 68);
-
-        const tex = new THREE.CanvasTexture(canvas);
-        const board = new THREE.Mesh(
-            new THREE.PlaneGeometry(13, 3.2),
-            new THREE.MeshStandardMaterial({
-                map: tex,
-                emissive: 0xff6600,
-                emissiveIntensity: 0.45,
-                emissiveMap: tex,
-            })
-        );
+        const texIndex = Math.floor(Math.random() * 7);
+        const tex = SharedRoadAssets.getBillboardTexture(texIndex);
+        const boardMat = new THREE.MeshBasicMaterial({ map: tex });
+        const board = new THREE.Mesh(SharedRoadAssets.billboardBoardGeo, boardMat);
         board.position.y = 14;
         group.add(board);
         return group;
+    }
+
+    public dispose(): void {
+        this.mesh.geometry.dispose();
+        this.yellowLines.geometry.dispose();
+        this.whiteLines.geometry.dispose();
+        this.leftTerrainMesh.geometry.dispose();
+        this.rightTerrainMesh.geometry.dispose();
+        this.buildingMesh.dispose();
+        this.windowAmberMesh.dispose();
+        this.windowGoldMesh.dispose();
+        this.windowCyanMesh.dispose();
+        this.streetPolesMesh.dispose();
+        this.streetArmsMesh.dispose();
+        this.streetLampsMesh.dispose();
+        this.palmTrunksMesh.dispose();
+        this.palmFrondsMesh.dispose();
+        this.tunnelArchesMesh.dispose();
+        this.guardrailPostsMesh.dispose();
+        this.guardrailBeamsMesh.dispose();
+        this.guardrailReflectorsMesh.dispose();
+        this.roadStudsMesh.dispose();
+        this.overpassMesh.dispose();
     }
 }
 
@@ -354,54 +720,83 @@ export class Road {
     private pool: RoadChunk[] = [];
     private waypoints: THREE.Vector3[] = [];
     private material: THREE.MeshStandardMaterial;
-    private lineMaterial: THREE.Material;
+    private yellowLineMat: THREE.Material;
+    private whiteLineMat: THREE.Material;
     public biomeManager: BiomeManager;
     private streetlights: THREE.PointLight[] = [];
+    private neonLights: THREE.PointLight[] = [];
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
         this.biomeManager = new BiomeManager();
 
-        // Wet dark asphalt — reflects the sodium glow
+        // Sleek wet asphalt highway surface
         this.material = new THREE.MeshStandardMaterial({
-            color: 0x1e1a14,
-            roughness: 0.18,
-            metalness: 0.72,
+            color: 0x181c26,
+            roughness: 0.32,
+            metalness: 0.45,
+            side: THREE.DoubleSide,
             envMapIntensity: 1.8,
         });
 
-        this.lineMaterial = new THREE.LineBasicMaterial({ color: 0xffcc66, transparent: true, opacity: 0.7 });
+        // Double yellow divider lines
+        this.yellowLineMat = new THREE.LineBasicMaterial({
+            color: 0xffaa00,
+            transparent: true,
+            opacity: 0.95,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1.5,
+            polygonOffsetUnits: -1.5,
+        });
 
-        // Sodium-orange PointLight pool for streetlight glow
-        for (let i = 0; i < 10; i++) {
-            const light = new THREE.PointLight(0xff9200, 3.5, 42, 2);
+        // Crisp white fog & dashed lane lines
+        this.whiteLineMat = new THREE.LineBasicMaterial({
+            color: 0xdde4f5,
+            transparent: true,
+            opacity: 0.90,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1.5,
+            polygonOffsetUnits: -1.5,
+        });
+
+        // Streetlights pool
+        for (let i = 0; i < 4; i++) {
+            const light = new THREE.PointLight(0xffa022, 2.8, 38, 2);
+            light.castShadow = false;
             this.streetlights.push(light);
             this.scene.add(light);
         }
 
-        for (let i = 0; i < 22; i++) this.addWaypoint(i * 500);
+        // Shared dynamic neon PointLights
+        for (let i = 0; i < 2; i++) {
+            const light = new THREE.PointLight(0xff2d78, 0, 32, 2);
+            light.castShadow = false;
+            this.neonLights.push(light);
+            this.scene.add(light);
+        }
+
+        for (let i = 0; i < 18; i++) this.addWaypoint(i * 500);
         this.initPool();
         this.spawnInitialChunks();
     }
 
-    /**
-     * Deterministic 3D waypoint using smooth sine/cosine waves.
-     * Creates the gentle winding curves and rolling hills of an LA scenic highway.
-     */
     private addWaypoint(z: number): void {
-        const x = Math.sin(z * 0.00042) * 65 + Math.cos(z * 0.00097) * 28;
-        const y = Math.sin(z * 0.00055) * 22 + Math.cos(z * 0.00023) * 14;
+        // Natural sweeping highway curves with gentle elevation hills starting at origin
+        const x = Math.sin(z * 0.00038) * 75 + (Math.cos(z * 0.00085) - 1.0) * 32;
+        const y = Math.sin(z * 0.00048) * 16 + (Math.cos(z * 0.00022) - 1.0) * 10;
         this.waypoints.push(new THREE.Vector3(x, y, z));
     }
 
     private initPool(): void {
-        for (let i = 0; i < 12; i++) {
-            this.pool.push(new RoadChunk(this.material, this.lineMaterial));
+        for (let i = 0; i < 8; i++) {
+            this.pool.push(new RoadChunk(this.material, this.yellowLineMat, this.whiteLineMat));
         }
     }
 
     private spawnInitialChunks(): void {
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 5; i++) {
             const z = i * 500;
             this.spawnChunk(z, this.biomeManager.getParamsAt(z));
         }
@@ -415,13 +810,12 @@ export class Road {
     }
 
     private spawnChunk(z: number, params: BiomeParams): void {
-        const chunk = this.pool.pop();
-        if (!chunk) return;
+        const chunk = this.pool.pop() || new RoadChunk(this.material, this.yellowLineMat, this.whiteLineMat);
         this.ensureWaypointsFor(z);
         const wpIndex = Math.floor(z / 500);
         const points = this.waypoints.slice(wpIndex, wpIndex + 4);
         chunk.activate(z, points, this.scene, params);
-        this.scene.add(chunk.mesh, chunk.lines);
+        this.scene.add(chunk.mesh, chunk.yellowLines, chunk.whiteLines);
         this.chunks.push(chunk);
     }
 
@@ -437,34 +831,76 @@ export class Road {
     }
 
     public update(carZ: number, carPos: THREE.Vector3, _carSpeed: number, delta: number, config: QualityConfig): void {
-        this.chunks.forEach(c => c.update(delta));
+        for (let i = 0; i < this.chunks.length; i++) {
+            this.chunks[i].update(delta);
+        }
 
-        // Assign nearest streetlight glows to the PointLight pool
-        const allGlows = this.chunks.flatMap(c => c.streetlightGlows);
-        allGlows.sort((a, b) => a.distanceToSquared(carPos) - b.distanceToSquared(carPos));
-
-        this.streetlights.forEach((light, i) => {
-            if (allGlows[i]) {
-                light.position.copy(allGlows[i]);
-                light.intensity = 3.5;
-            } else {
-                light.intensity = 0;
+        // Fast nearest streetlight search
+        let lightIdx = 0;
+        for (let c = 0; c < this.chunks.length && lightIdx < this.streetlights.length; c++) {
+            const chunk = this.chunks[c];
+            if (Math.abs(chunk.startZ + 250 - carZ) < 400) {
+                for (let g = 0; g < chunk.streetlightGlows.length && lightIdx < this.streetlights.length; g++) {
+                    const glowPos = chunk.streetlightGlows[g];
+                    if (glowPos.distanceToSquared(carPos) < 2500) {
+                        this.streetlights[lightIdx].position.copy(glowPos);
+                        this.streetlights[lightIdx].intensity = 2.8;
+                        lightIdx++;
+                    }
+                }
             }
-        });
+        }
+        while (lightIdx < this.streetlights.length) {
+            this.streetlights[lightIdx].intensity = 0;
+            lightIdx++;
+        }
 
-        const lookahead = config.chunkLimit * 500;
-        if (this.chunks.length > 0 && carZ - this.chunks[0].startZ > 800) {
+        // Shared Neon Lights (attached dynamically to closest signs)
+        let neonIdx = 0;
+        const tempSignPos = new THREE.Vector3();
+        for (let c = 0; c < this.chunks.length && neonIdx < this.neonLights.length; c++) {
+            const chunk = this.chunks[c];
+            if (Math.abs(chunk.startZ + 250 - carZ) < 300) {
+                for (let s = 0; s < chunk.neonSigns.length && neonIdx < this.neonLights.length; s++) {
+                    const sign = chunk.neonSigns[s];
+                    sign.getWorldPosition(tempSignPos);
+                    const distSq = tempSignPos.distanceToSquared(carPos);
+                    if (distSq < 2500) {
+                        this.neonLights[neonIdx].position.copy(tempSignPos);
+                        this.neonLights[neonIdx].color.copy(sign.color);
+                        this.neonLights[neonIdx].intensity = sign.effectiveIntensity * 2.2;
+                        neonIdx++;
+                    }
+                }
+            }
+        }
+        while (neonIdx < this.neonLights.length) {
+            this.neonLights[neonIdx].intensity = 0;
+            neonIdx++;
+        }
+
+        // Recycling chunks
+        const lookahead = Math.min(5, config.chunkLimit) * 500;
+        if (this.chunks.length > 0 && carZ - this.chunks[0].startZ > 650) {
             const old = this.chunks.shift();
             if (old) {
-                this.scene.remove(old.mesh, old.lines, old.cityGroup);
+                this.scene.remove(old.mesh, old.yellowLines, old.whiteLines, old.cityGroup);
                 this.pool.push(old);
             }
         }
         const lastChunk = this.chunks[this.chunks.length - 1];
-        if (lastChunk.startZ - carZ < lookahead) {
+        if (lastChunk && lastChunk.startZ - carZ < lookahead) {
             const nextZ = lastChunk.startZ + 500;
             this.spawnChunk(nextZ, this.biomeManager.getParamsAt(nextZ));
         }
+    }
+
+    public setRoadEnvMap(envMap: THREE.Texture): void {
+        this.material.envMap = envMap;
+        this.material.roughness = 0.32;
+        this.material.metalness = 0.45;
+        this.material.envMapIntensity = 1.8;
+        this.material.needsUpdate = true;
     }
 
     public getRoadMeshes(): THREE.Object3D[] {

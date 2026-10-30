@@ -9,10 +9,10 @@ export interface InputState {
 }
 
 /**
- * InputManager: Unified controller for Keyboard, Gamepad, and Analog Smoothing.
+ * InputManager: Unified controller for Keyboard, Gamepad, Touch, and Analog Smoothing.
  */
 export class InputManager {
-    private state: InputState = {
+    public state: InputState = {
         steer: 0,
         throttle: 0,
         brake: 0,
@@ -31,10 +31,14 @@ export class InputManager {
         
         window.addEventListener('keydown', (e) => {
             this.keys[e.key] = true;
+            this.keys[e.code] = true;
             if (e.key === 'Escape') this.state.pause = !this.state.pause;
             if (e.key.toLowerCase() === 'c') this.state.cameraToggle = true;
         });
-        window.addEventListener('keyup', (e) => this.keys[e.key] = false);
+        window.addEventListener('keyup', (e) => {
+            this.keys[e.key] = false;
+            this.keys[e.code] = false;
+        });
 
         if (this.isTouch) {
             this.initTouch();
@@ -45,9 +49,9 @@ export class InputManager {
         const bind = (id: string, key: keyof typeof this.touchStates) => {
             const el = document.getElementById(id);
             if (!el) return;
-            el.addEventListener('touchstart', (e) => { e.preventDefault(); this.touchStates[key] = true; });
-            el.addEventListener('touchend', (e) => { e.preventDefault(); this.touchStates[key] = false; });
-            el.addEventListener('touchcancel', (e) => { e.preventDefault(); this.touchStates[key] = false; });
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); this.touchStates[key] = true; }, { passive: false });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); this.touchStates[key] = false; }, { passive: false });
+            el.addEventListener('touchcancel', (e) => { e.preventDefault(); this.touchStates[key] = false; }, { passive: false });
         };
 
         bind('touch-left', 'left');
@@ -61,21 +65,28 @@ export class InputManager {
         this.updateGamepad();
         this.applyAnalogSmoothing(delta);
         
-        // Reset toggles after one frame
+        // Reset single-frame triggers
         const result = { ...this.state };
         this.state.cameraToggle = false;
         return result;
     }
 
     private updateKeyboard(): void {
-        // Steering Target (Inverted based on user feedback)
+        // Steering Target: -1 for Left, +1 for Right
         this.targetSteer = 0;
-        if (this.keys['a'] || this.keys['ArrowLeft'] || this.touchStates.left) this.targetSteer += 1;
-        if (this.keys['d'] || this.keys['ArrowRight'] || this.touchStates.right) this.targetSteer -= 1;
+        if (this.keys['a'] || this.keys['A'] || this.keys['ArrowLeft'] || this.keys['KeyA'] || this.touchStates.left) {
+            this.targetSteer -= 1;
+        }
+        if (this.keys['d'] || this.keys['D'] || this.keys['ArrowRight'] || this.keys['KeyD'] || this.touchStates.right) {
+            this.targetSteer += 1;
+        }
 
         // Throttle & Brake
-        this.state.throttle = (this.keys['w'] || this.keys['ArrowUp'] || this.touchStates.accel) ? 1 : 0;
-        this.state.brake = (this.keys['s'] || this.keys['ArrowDown'] || this.touchStates.brake) ? 1 : 0;
+        const isUp = this.keys['w'] || this.keys['W'] || this.keys['ArrowUp'] || this.keys['KeyW'] || this.touchStates.accel;
+        const isDown = this.keys['s'] || this.keys['S'] || this.keys['ArrowDown'] || this.keys['KeyS'] || this.touchStates.brake;
+
+        this.state.throttle = isUp ? 1 : 0;
+        this.state.brake = isDown ? 1 : 0;
     }
 
     private updateGamepad(): void {
@@ -85,7 +96,7 @@ export class InputManager {
 
         // Left Stick Steering (with deadzone)
         const stickX = pad.axes[0];
-        if (Math.abs(stickX) > 0.1) {
+        if (Math.abs(stickX) > 0.12) {
             this.targetSteer = stickX;
         }
 
@@ -95,15 +106,15 @@ export class InputManager {
 
         // Buttons
         if (pad.buttons[0]?.pressed) this.state.cameraToggle = true; // A Button
+        if (pad.buttons[9]?.pressed) this.state.pause = !this.state.pause; // Start Button
     }
 
     private applyAnalogSmoothing(delta: number): void {
-        // Steering Lerp
-        const lerpSpeed = 5.0;
-        this.currentSteer = THREE.MathUtils.lerp(this.currentSteer, this.targetSteer, lerpSpeed * delta);
+        const lerpSpeed = 7.0;
+        this.currentSteer = THREE.MathUtils.lerp(this.currentSteer, this.targetSteer, Math.min(1.0, lerpSpeed * delta));
 
-        // Exponential Curve: Gentle near center, sharp at edges
-        const exp = 1.5;
+        // Exponential curve for fine center control and responsive hard steering
+        const exp = 1.3;
         this.state.steer = Math.sign(this.currentSteer) * Math.pow(Math.abs(this.currentSteer), exp);
     }
 }

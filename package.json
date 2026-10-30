@@ -16,6 +16,7 @@
     "@types/howler": "^2.2.12",
     "@types/three": "^0.184.0",
     "howler": "^2.2.4",
+    "lil-gui": "^0.21.0",
     "puppeteer": "^25.0.4",
     "simplex-noise": "^4.0.3",
     "three": "^0.184.0",

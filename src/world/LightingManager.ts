@@ -1,59 +1,66 @@
 import * as THREE from 'three';
 
 /**
- * LightingManager: Warm LA sodium-vapor night atmosphere.
- * References the nocturnal amber glow of Drive (2011).
+ * LightingManager: Balanced cinematic lighting for Nightcall.
+ * Ensures readable world geometry using dark indigo hemisphere sky
+ * and dim moonlight so nothing is pure pitch black.
  */
 export class LightingManager {
-    private scene: THREE.Scene;
-    private ambient: THREE.AmbientLight;
-    private hemisphere: THREE.HemisphereLight;
-    private moon: THREE.DirectionalLight;
-    private carLight?: THREE.PointLight;
+    public scene: THREE.Scene;
+    public ambient: THREE.AmbientLight;
+    public hemisphere: THREE.HemisphereLight;
+    public moon: THREE.DirectionalLight;
+    public carLight?: THREE.PointLight;
+
+    public baseAmbientIntensity: number = 0.22;
+    public baseMoonIntensity: number = 0.35;
+    public baseHemiIntensity: number = 0.25;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
 
-        // 1. Ambient — deep warm amber (sodium-vapor streetlight bleed)
-        this.ambient = new THREE.AmbientLight(0x3d1f05, 1.2);
+        // 1. Ambient — subtle dark indigo fill so shadowed areas aren't crushed to #000
+        this.ambient = new THREE.AmbientLight(0x181832, this.baseAmbientIntensity);
         this.scene.add(this.ambient);
 
-        // 2. Hemisphere — warm amber sky, cool dark ground
-        this.hemisphere = new THREE.HemisphereLight(0x2a1505, 0x050302, 0.9);
+        // 2. Hemisphere — sky: dark indigo #1a1a4e, ground: warm dark #0a0510
+        this.hemisphere = new THREE.HemisphereLight(0x1a1a4e, 0x0a0510, this.baseHemiIntensity);
         this.scene.add(this.hemisphere);
 
-        // 3. Directional "moon" — cool blue-silver, set low for long shadows
-        this.moon = new THREE.DirectionalLight(0xb8c8e0, 2.5);
-        this.moon.position.set(-200, 350, -100);
+        // 3. Directional "moon" — subtle cool indigo moonlight (rim/accent, not a stadium floodlight)
+        this.moon = new THREE.DirectionalLight(0x829ad4, this.baseMoonIntensity);
+        this.moon.position.set(-80, 160, -200);
         this.moon.castShadow = true;
 
-        this.moon.shadow.mapSize.width = 2048;
-        this.moon.shadow.mapSize.height = 2048;
-        this.moon.shadow.camera.near = 0.5;
-        this.moon.shadow.camera.far = 1000;
-        this.moon.shadow.camera.left = -250;
-        this.moon.shadow.camera.right = 250;
-        this.moon.shadow.camera.top = 250;
-        this.moon.shadow.camera.bottom = -250;
+        this.moon.shadow.mapSize.width = 1024;
+        this.moon.shadow.mapSize.height = 1024;
+        this.moon.shadow.camera.near = 10;
+        this.moon.shadow.camera.far = 300;
+        
+        this.moon.shadow.camera.left = -45;
+        this.moon.shadow.camera.right = 45;
+        this.moon.shadow.camera.top = 45;
+        this.moon.shadow.camera.bottom = -45;
+        this.moon.shadow.bias = -0.0005;
 
         this.scene.add(this.moon);
     }
 
-    /** Underseat fill light — warms the car in the sodium glow. */
+    /** Underseat warm cabin fill light - soft interior glow without washing out the ground */
     public setupCarLight(carGroup: THREE.Group): void {
-        this.carLight = new THREE.PointLight(0xff8c20, 1.8, 35);
-        this.carLight.position.set(0, 8, 0);
+        this.carLight = new THREE.PointLight(0xff9530, 0.4, 2.5, 2);
+        this.carLight.position.set(0, 0.8, -0.2);
         carGroup.add(this.carLight);
     }
 
-    public update(carPos: THREE.Vector3, _ambientIntensity: number = 1): void {
-        // Moon follows player for consistent lighting at any distance
-        this.moon.position.x = carPos.x - 200;
-        this.moon.position.z = carPos.z - 100;
+    public update(carPos: THREE.Vector3, ambientMultiplier: number = 1): void {
+        this.moon.position.x = carPos.x - 80;
+        this.moon.position.z = carPos.z - 200;
         this.moon.target.position.copy(carPos);
         this.moon.target.updateMatrixWorld();
 
-        // Dynamic ambient based on biome density
-        this.ambient.intensity = 0.3 * _ambientIntensity;
+        // Keep ambient stable and readable
+        const mult = Math.max(0.6, ambientMultiplier);
+        this.ambient.intensity = this.baseAmbientIntensity * mult;
     }
 }

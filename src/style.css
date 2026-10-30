@@ -58,23 +58,16 @@ body {
   transition: opacity 0.5s ease-out;
 }
 
-/* ─── Film Grain ─────────────────────────────────────── */
+/* ─── Film Grain Overlay ────────────────────────────── */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image: url('https://grainy-gradients.vercel.app/noise.svg');
-  opacity: 0.06;
+  opacity: 0.03;
   z-index: 600;
-  mix-blend-mode: overlay;
-  animation: grain 0.18s infinite steps(4);
-}
-
-@keyframes grain {
-  0%   { transform: translate(0, 0); }
-  50%  { transform: translate(-1%, 1%); }
-  100% { transform: translate(1%, -1%); }
+  background-image: radial-gradient(rgba(255,255,255,0.15) 1px, transparent 0);
+  background-size: 4px 4px;
 }
 
 /* ─── Cinematic Letterbox ────────────────────────────── */
@@ -117,6 +110,62 @@ body::after {
 .speed-display .unit { font-size: 9px; margin-left: 0.2em; opacity: 0.5; }
 
 #speed-val { color: var(--sodium); text-shadow: 0 0 8px var(--sodium); }
+
+.dist-display {
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgba(255, 146, 0, 0.45);
+  letter-spacing: 0.15em;
+}
+
+.perf-display {
+  margin-top: 6px;
+  font-size: 9px;
+  color: rgba(255, 146, 0, 0.6);
+  letter-spacing: 0.12em;
+  font-family: var(--font-mono);
+}
+.perf-display span {
+  font-weight: 600;
+}
+#fps-val {
+  color: #39ff14;
+  text-shadow: 0 0 6px rgba(57, 255, 20, 0.4);
+}
+#calls-val {
+  color: var(--sodium);
+  text-shadow: 0 0 6px var(--sodium-dim);
+}
+.perf-display .divider {
+  margin: 0 0.35rem;
+  opacity: 0.35;
+  color: var(--sodium);
+}
+
+.alert-banner {
+  position: absolute;
+  top: 6vh;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 0.25em;
+  pointer-events: none;
+  display: none;
+  padding: 4px 18px;
+  background: rgba(8, 12, 22, 0.75);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 0 12px currentColor;
+  animation: alertPulse 0.4s ease;
+}
+
+@keyframes alertPulse {
+  0% { transform: translateX(-50%) scale(0.85); opacity: 0; }
+  50% { transform: translateX(-50%) scale(1.1); opacity: 1; }
+  100% { transform: translateX(-50%) scale(1.0); opacity: 1; }
+}
 
 .biome-marker {
   position: absolute;
