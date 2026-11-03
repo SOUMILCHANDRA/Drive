@@ -651,3 +651,37 @@ select option { background: #0e0b08; }
 }
 .pad-btn.brake        { border-color: #ff4444; color: #ff4444; }
 .pad-btn.brake:active { background: #ff4444; color: #fff; }
+
+/* ─── F3 Vehicle Debug Telemetry ────────────────────── */
+.f3-debug {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  background: rgba(6, 10, 20, 0.92);
+  border: 1px solid var(--neon-cyan);
+  box-shadow: 0 0 16px rgba(0, 255, 239, 0.28);
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #c8f6fa;
+  z-index: 99999;
+  pointer-events: none;
+  line-height: 1.55;
+  backdrop-filter: blur(6px);
+}
+.f3-debug .f3-title {
+  color: var(--neon-pink);
+  font-weight: 700;
+  border-bottom: 1px solid rgba(0, 255, 239, 0.35);
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  letter-spacing: 1px;
+}
+.f3-debug .f3-row {
+  margin: 2px 0;
+}
+.f3-debug .f3-row span {
+  font-weight: 700;
+  color: var(--neon-cyan);
+}

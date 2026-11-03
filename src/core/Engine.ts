@@ -16,12 +16,18 @@ export class Engine {
   }
 
   public start(): void {
+    let frame = 0;
     const loop = () => {
       requestAnimationFrame(loop);
-      const delta = this.clock.getDelta();
-      
-      // Execute all system updates
-      this.updateCallbacks.forEach(cb => cb(delta));
+      try {
+        const delta = Math.min(this.clock.getDelta(), 0.1);
+        frame++;
+        (window as any).__ENGINE_FRAME__ = frame;
+        // Execute all system updates
+        this.updateCallbacks.forEach(cb => cb(delta));
+      } catch (err) {
+        console.error('[ENGINE CRITICAL ERROR]', err);
+      }
     };
     loop();
   }

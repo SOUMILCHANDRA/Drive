@@ -810,10 +810,15 @@ export class Road {
     }
 
     private spawnChunk(z: number, params: BiomeParams): void {
-        const chunk = this.pool.pop() || new RoadChunk(this.material, this.yellowLineMat, this.whiteLineMat);
         this.ensureWaypointsFor(z);
-        const wpIndex = Math.floor(z / 500);
-        const points = this.waypoints.slice(wpIndex, wpIndex + 4);
+        const chunk = this.pool.pop() || new RoadChunk(this.material, this.yellowLineMat, this.whiteLineMat);
+        const points: THREE.Vector3[] = [];
+        for (let s = 0; s <= 4; s++) {
+            const pz = z + s * 125;
+            const px = Math.sin(pz * 0.00038) * 75 + (Math.cos(pz * 0.00085) - 1.0) * 32;
+            const py = Math.sin(pz * 0.00048) * 16 + (Math.cos(pz * 0.00022) - 1.0) * 10;
+            points.push(new THREE.Vector3(px, py, pz));
+        }
         chunk.activate(z, points, this.scene, params);
         this.scene.add(chunk.mesh, chunk.yellowLines, chunk.whiteLines);
         this.chunks.push(chunk);
@@ -821,13 +826,14 @@ export class Road {
 
     public getRoadPositionAt(z: number): { position: THREE.Vector3; tangent: THREE.Vector3 } {
         const safeZ = Math.max(0, z);
-        this.ensureWaypointsFor(safeZ);
-        const wpIndex = Math.max(0, Math.floor(safeZ / 500));
-        const t = (safeZ % 500) / 500;
-        const points = this.waypoints.slice(wpIndex, wpIndex + 4);
-        if (points.length < 2) return { position: new THREE.Vector3(0, 0, safeZ), tangent: new THREE.Vector3(0, 0, 1) };
-        const curve = new THREE.CatmullRomCurve3(points);
-        return { position: curve.getPoint(t), tangent: curve.getTangent(t) };
+        const x = Math.sin(safeZ * 0.00038) * 75 + (Math.cos(safeZ * 0.00085) - 1.0) * 32;
+        const y = Math.sin(safeZ * 0.00048) * 16 + (Math.cos(safeZ * 0.00022) - 1.0) * 10;
+        
+        const dx = 75 * 0.00038 * Math.cos(safeZ * 0.00038) - 32 * 0.00085 * Math.sin(safeZ * 0.00085);
+        const dy = 16 * 0.00048 * Math.cos(safeZ * 0.00048) - 10 * 0.00022 * Math.sin(safeZ * 0.00022);
+        const tangent = new THREE.Vector3(dx, dy, 1.0).normalize();
+        
+        return { position: new THREE.Vector3(x, y, safeZ), tangent };
     }
 
     public update(carZ: number, carPos: THREE.Vector3, _carSpeed: number, delta: number, config: QualityConfig): void {

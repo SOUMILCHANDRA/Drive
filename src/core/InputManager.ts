@@ -20,10 +20,10 @@ export class InputManager {
         pause: false
     };
 
-    private keys: Record<string, boolean> = {};
-    private touchStates = { left: false, right: false, accel: false, brake: false };
-    private targetSteer: number = 0;
-    private currentSteer: number = 0;
+    public keys: Record<string, boolean> = {};
+    public touchStates = { left: false, right: false, accel: false, brake: false };
+    public targetSteer: number = 0;
+    public currentSteer: number = 0;
     private isTouch: boolean;
 
     constructor() {
@@ -72,13 +72,13 @@ export class InputManager {
     }
 
     private updateKeyboard(): void {
-        // Steering Target: -1 for Left, +1 for Right
+        // Steering Target: +1 for Left, -1 for Right (Convention: Left = +steer, Right = -steer)
         this.targetSteer = 0;
         if (this.keys['a'] || this.keys['A'] || this.keys['ArrowLeft'] || this.keys['KeyA'] || this.touchStates.left) {
-            this.targetSteer -= 1;
+            this.targetSteer += 1;
         }
         if (this.keys['d'] || this.keys['D'] || this.keys['ArrowRight'] || this.keys['KeyD'] || this.touchStates.right) {
-            this.targetSteer += 1;
+            this.targetSteer -= 1;
         }
 
         // Throttle & Brake
@@ -94,10 +94,10 @@ export class InputManager {
         const pad = gamepads[0];
         if (!pad) return;
 
-        // Left Stick Steering (with deadzone)
+        // Left Stick Steering (with deadzone) - Convention: Left = +steer, Right = -steer
         const stickX = pad.axes[0];
         if (Math.abs(stickX) > 0.12) {
-            this.targetSteer = stickX;
+            this.targetSteer = -stickX;
         }
 
         // Triggers (Analog)

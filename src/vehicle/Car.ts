@@ -1,3 +1,26 @@
+/**
+ * ============================================================================
+ * VEHICLE COORDINATE & STEERING CONVENTION
+ * ============================================================================
+ * - Forward = the direction the car's nose points, in world space (+Z along highway).
+ * - Three.js: positive rotation.y = counter-clockwise from above = turn LEFT.
+ * - Left input = +steer, Right input = -steer, and
+ *   heading += steer * speedFactor * dt.
+ * - Model faces +Z:
+ *     Forward vector = (sin(heading), 0, cos(heading)).
+ *     Velocity uses the SAME vector as the visual orientation:
+ *     velocity.x = sin(heading) * speed;
+ *     velocity.z = cos(heading) * speed;
+ * - GLB Model orientation:
+ *     The raw car.glb model originally faced -Z. It is wrapped inside a parent
+ *     wrapper Group with child.rotation.y = Math.PI so it points along +Z.
+ *     No compensating negative signs are used in the physics engine.
+ * - Chase Camera:
+ *     Sits behind the car along -forward (Z = -7.2) with camera.up = (0, 1, 0).
+ *     Turning left (+steer) swings the car visibly to screen-left.
+ * ============================================================================
+ */
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three-stdlib';
 
@@ -5,11 +28,12 @@ export interface RoadAlignmentData {
     x: number;
     y: number;
     tangent: THREE.Vector3;
+    position?: THREE.Vector3;
 }
 
 /**
  * Car: The player's vehicle with muscle-car kinetics, smooth road alignment,
- * and cinematic halogen & taillight systems.
+ * dedicated road-mesh ground snapping, and cinematic halogen & taillight systems.
  */
 export class Car {
   public model: THREE.Group | null = null;
@@ -20,6 +44,16 @@ export class Car {
   public velocity: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
   public heading: number = 0; 
   public speed: number = 0;
+
+  // Ground Snapping & Lane Telemetry
+  public groundNormal: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
+  public currentLateralOffset: number = 0;
+  public targetLaneOffset: number = 0;
+  public isOnRoad: boolean = true;
+  private raycaster: THREE.Raycaster = new THREE.Raycaster();
+  private downVector: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  private rayOrigin: THREE.Vector3 = new THREE.Vector3();
+  private debugLogTimer: number = 0;
 
   // Cinematic Lighting & Volumetrics
   private headlights: THREE.SpotLight[] = [];
@@ -42,6 +76,42 @@ export class Car {
   }
 
   /**
+   * Spawns the vehicle in an offset lane with initial heading matching road tangent.
+   */
+  public spawn(spawnPos: THREE.Vector3, initialHeading: number, initialLaneOffset: number, roadMeshes?: THREE.Object3D[]): void {
+      this.position.copy(spawnPos);
+      this.heading = initialHeading;
+      this.targetLaneOffset = initialLaneOffset;
+      this.currentLateralOffset = initialLaneOffset;
+      this.speed = 0;
+      this.velocity.set(0, 0, 0);
+
+      // Perform initial ground snap immediately so it doesn't float on frame 0
+      if (roadMeshes && roadMeshes.length > 0) {
+          this.rayOrigin.set(this.position.x, this.position.y + 10.0, this.position.z);
+          this.raycaster.set(this.rayOrigin, this.downVector);
+          this.raycaster.far = 25.0;
+          const hits = this.raycaster.intersectObjects(roadMeshes, false);
+          if (hits.length > 0) {
+              this.position.y = hits[0].point.y;
+              if (hits[0].face) {
+                  this.groundNormal.copy(hits[0].face.normal);
+                  if (hits[0].object) {
+                      this.groundNormal.transformDirection(hits[0].object.matrixWorld);
+                  }
+              }
+          }
+      }
+
+      if (this.model) {
+          this.model.position.copy(this.position);
+          const qSlope = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.groundNormal);
+          const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.heading);
+          this.model.quaternion.copy(qSlope.multiply(qYaw));
+      }
+  }
+
+  /**
    * Loads the vehicle GLB with fallback geometry.
    */
   public async load(url: string): Promise<void> {
@@ -49,9 +119,13 @@ export class Car {
     
     try {
         const gltf = await loader.loadAsync(url);
-        this.model = gltf.scene;
+        this.model = new THREE.Group();
+        const carModel = gltf.scene;
+
+        // BUG 1 (Step 3): Wrap GLB in parent Group and rotate child by Math.PI so it faces +Z
+        carModel.rotation.y = Math.PI;
         
-        this.model.traverse((child) => {
+        carModel.traverse((child) => {
           if (child instanceof THREE.Mesh) {
             const name = child.name.toLowerCase();
             const isInterior = name.includes('cockpit') || 
@@ -96,14 +170,22 @@ export class Car {
           }
         });
 
-        const box = new THREE.Box3().setFromObject(this.model);
+        // BUG 2 (Step 5): Re-center model inside wrapper Group so pivot sits at bottom center between wheels
+        carModel.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(carModel);
         const size = new THREE.Vector3();
         box.getSize(size);
         const scale = 4.5 / (size.z || 1);
-        this.model.scale.setScalar(scale);
-        
-        const center = box.getCenter(new THREE.Vector3()).multiplyScalar(scale);
-        this.model.position.y = -center.y + (size.y * scale) / 2;
+        carModel.scale.setScalar(scale);
+
+        carModel.updateMatrixWorld(true);
+        box.setFromObject(carModel);
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+
+        // Center carModel inside wrapper group so pivot (0, 0, 0) is at bottom center between wheels
+        carModel.position.set(-center.x, -box.min.y, -center.z);
+        this.model.add(carModel);
 
     } catch (error) {
         console.warn('GLB load failed, utilizing high-detail geometric fallback:', error);
@@ -118,6 +200,7 @@ export class Car {
 
   private createFallbackModel(): void {
       this.model = new THREE.Group();
+      const carModel = new THREE.Group();
 
       // Lower body (chassis)
       const bodyGeo = new THREE.BoxGeometry(2.1, 0.8, 4.6);
@@ -128,7 +211,7 @@ export class Car {
       body.position.y = 0.55;
       body.castShadow = true;
       body.receiveShadow = true;
-      this.model.add(body);
+      carModel.add(body);
 
       // Cabin / Roof
       const cabinGeo = new THREE.BoxGeometry(1.7, 0.65, 2.4);
@@ -138,7 +221,7 @@ export class Car {
       const cabin = new THREE.Mesh(cabinGeo, cabinMat);
       cabin.position.set(0, 1.15, -0.2);
       cabin.castShadow = true;
-      this.model.add(cabin);
+      carModel.add(cabin);
 
       // Wheels
       const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.3, 16);
@@ -152,8 +235,10 @@ export class Car {
       ].forEach(([x, y, z]) => {
         const wheel = new THREE.Mesh(wheelGeo, wheelMat);
         wheel.position.set(x, y, z);
-        this.model!.add(wheel);
+        carModel.add(wheel);
       });
+
+      this.model.add(carModel);
   }
 
   private setupLights(): void {
@@ -163,7 +248,7 @@ export class Car {
     const headlightL = new THREE.SpotLight(hlConfig.color, hlConfig.intensity, hlConfig.distance, hlConfig.angle, hlConfig.penumbra, hlConfig.decay);
     headlightL.position.set(-0.7, 0.65, 2.2);
     const targetL = new THREE.Object3D();
-    targetL.position.set(-1.0, -0.4, 30); 
+    targetL.position.set(-0.7, -0.4, 30); 
     this.model!.add(targetL);
     headlightL.target = targetL;
     this.model!.add(headlightL);
@@ -173,7 +258,7 @@ export class Car {
     const headlightR = new THREE.SpotLight(hlConfig.color, hlConfig.intensity, hlConfig.distance, hlConfig.angle, hlConfig.penumbra, hlConfig.decay);
     headlightR.position.set(0.7, 0.65, 2.2);
     const targetR = new THREE.Object3D();
-    targetR.position.set(1.0, -0.4, 30);
+    targetR.position.set(0.7, -0.4, 30);
     this.model!.add(targetR);
     headlightR.target = targetR;
     this.model!.add(headlightR);
@@ -234,6 +319,7 @@ export class Car {
         }
       `,
       fragmentShader: `
+        uniform vec3 uColor;
         varying vec2 vUv;
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
@@ -249,7 +335,7 @@ export class Car {
       depthWrite: false,
     });
     this.groundLightPool = new THREE.Mesh(poolGeo, poolMat);
-    this.groundLightPool.position.set(0, -0.32, 20);
+    this.groundLightPool.position.set(0, 0.02, 20);
     this.model!.add(this.groundLightPool);
 
     // 3. Taillights (subtle rear glow point lights)
@@ -280,7 +366,8 @@ export class Car {
   public update(
     delta: number, 
     input: { steer: number; throttle: number; brake: number }, 
-    roadData: RoadAlignmentData
+    roadData: RoadAlignmentData,
+    roadMeshes?: THREE.Object3D[]
   ): void {
     if (!this.model) return;
 
@@ -291,52 +378,116 @@ export class Car {
     this.speed = Math.max(0, Math.min(this.speed, this.MAX_SPEED));
 
     // 2. Responsive Steering Scale & Interactive Front Wheel Turn
+    const rotYBefore = this.heading;
     const speedRatio = Math.min(1.0, this.speed / 14);
     const turnRate = input.steer * this.MAX_TURN_RATE * speedRatio;
     this.heading += turnRate * delta;
 
+    // Diagnostic logging for BUG 1 Step 1
+    if (Math.abs(input.steer) > 0.05 && (this.debugLogTimer += delta) > 0.5) {
+        this.debugLogTimer = 0;
+        const fwd = new THREE.Vector3(Math.sin(this.heading), 0, Math.cos(this.heading));
+        console.log(`[STEERING CONVENTION] Input: ${input.steer.toFixed(2)}, Heading before: ${rotYBefore.toFixed(3)}, after: ${this.heading.toFixed(3)}, Forward: (${fwd.x.toFixed(3)}, ${fwd.y.toFixed(3)}, ${fwd.z.toFixed(3)}), Model facing: +Z`);
+    }
+
     if (this.wheelLF) this.wheelLF.rotation.y = input.steer * 0.45;
     if (this.wheelRF) this.wheelRF.rotation.y = input.steer * 0.45;
 
-    // Natural road curvature tracking when player is not actively steering
-    const roadAngle = Math.atan2(roadData.tangent.x, roadData.tangent.z);
-    if (Math.abs(input.steer) < 0.05 && this.speed > 3) {
-        let angleDiff = roadAngle - this.heading;
+    // Road tangent & lateral geometry
+    const roadTangent = roadData.tangent.clone().normalize();
+    const roadNormal = new THREE.Vector3(-roadTangent.z, 0, roadTangent.x).normalize();
+    const roadAngle = Math.atan2(roadTangent.x, roadTangent.z);
+
+    // Lateral offset from road centerline (signed distance along road normal)
+    const refZ = roadData.position ? roadData.position.z : this.position.z;
+    const dx = this.position.x - roadData.x;
+    const dz = this.position.z - refZ;
+    this.currentLateralOffset = dx * roadNormal.x + dz * roadNormal.z;
+
+    // Lane Keeping Assist when player is NOT actively steering (Acceptance Test: Hold W only without drifting)
+    if (Math.abs(input.steer) < 0.05 && this.speed > 1.0) {
+        // Positive offset = right lane (+X in road normal, world -X).
+        // If car is too far right (current > target), steer LEFT (+heading).
+        // If car is too far left / near center (current < target), steer RIGHT (-heading).
+        const lateralErr = this.currentLateralOffset - this.targetLaneOffset;
+        const laneCorrectionAngle = THREE.MathUtils.clamp(lateralErr * 0.12, -0.25, 0.25);
+        const targetHeading = roadAngle + laneCorrectionAngle;
+        
+        let angleDiff = targetHeading - this.heading;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        this.heading += angleDiff * Math.min(1.0, 1.8 * delta);
+        this.heading += angleDiff * Math.min(1.0, 4.0 * delta);
+    } else {
+        // Player steered: remember new lane position
+        this.targetLaneOffset = this.currentLateralOffset;
     }
 
     // 3. World Position Translation
-    this.position.x += Math.sin(this.heading) * this.speed * delta;
-    this.position.z += Math.cos(this.heading) * this.speed * delta;
+    // Forward vector = (sin(heading), 0, cos(heading))
+    this.velocity.set(
+        Math.sin(this.heading) * this.speed,
+        0,
+        Math.cos(this.heading) * this.speed
+    );
+    this.position.x += this.velocity.x * delta;
+    this.position.z += this.velocity.z * delta;
 
     // 4. Soft Road Shoulder / Curb Boundary
-    const lateralDist = this.position.x - roadData.x;
     const maxHalfWidth = 6.8;
-    if (Math.abs(lateralDist) > maxHalfWidth) {
-        this.position.x = roadData.x + Math.sign(lateralDist) * maxHalfWidth;
-        this.heading = THREE.MathUtils.lerp(this.heading, 0, 0.12);
+    if (Math.abs(this.currentLateralOffset) > maxHalfWidth) {
+        const clampedOffset = Math.sign(this.currentLateralOffset) * maxHalfWidth;
+        this.position.x = roadData.x + roadNormal.x * clampedOffset;
+        this.heading = THREE.MathUtils.lerp(this.heading, roadAngle, 0.12);
         this.speed *= 0.95; // Curb friction
+        this.targetLaneOffset = clampedOffset;
     }
 
-    // 5. Vertical Smooth Elevation & Pitch Alignment with Suspension Physics
-    this.position.y = roadData.y + 0.38;
+    // 5. Ground Snapping via Raycasting against ROAD MESH ONLY
+    this.rayOrigin.set(this.position.x, this.position.y + 5.0, this.position.z);
+    this.raycaster.set(this.rayOrigin, this.downVector);
+    this.raycaster.far = 15.0;
+
+    let targetGroundY = roadData.y;
+    let hitNormal = new THREE.Vector3(0, 1, 0);
+    let hitRoad = false;
+
+    if (roadMeshes && roadMeshes.length > 0) {
+        const hits = this.raycaster.intersectObjects(roadMeshes, false);
+        if (hits.length > 0) {
+            const hit = hits[0];
+            targetGroundY = hit.point.y;
+            if (hit.face) {
+                hitNormal.copy(hit.face.normal);
+                if (hit.object) {
+                    hitNormal.transformDirection(hit.object.matrixWorld);
+                }
+            }
+            hitRoad = true;
+        }
+    }
+
+    this.isOnRoad = hitRoad || (Math.abs(this.currentLateralOffset) < 7.0);
+
+    // Smooth ground snapping (wheelRadiusOffset = 0 since model pivot is at bottom of wheels)
+    const wheelRadiusOffset = 0.0;
+    this.position.y = THREE.MathUtils.lerp(this.position.y, targetGroundY + wheelRadiusOffset, Math.min(1.0, 18.0 * delta));
     this.model.position.copy(this.position);
 
-    // Heading (Yaw)
-    this.model.rotation.y = this.heading;
+    // 6. Up Vector Alignment to Hit Normal (slerp quaternion) + Steering Yaw Control
+    this.groundNormal.lerp(hitNormal, Math.min(1.0, 12.0 * delta));
+    const qSlope = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.groundNormal);
+    const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.heading);
+    const targetQuat = qSlope.multiply(qYaw);
 
-    // Road Hill Slope (Pitch) + Dynamic Suspension Squat/Dive
-    const tangent = roadData.tangent;
-    const roadPitch = Math.atan2(tangent.y, Math.hypot(tangent.x, tangent.z));
-    const dynamicPitch = -roadPitch - (input.throttle * 0.02) + (input.brake * 0.04);
-    this.model.rotation.x = THREE.MathUtils.lerp(this.model.rotation.x, dynamicPitch, 0.15);
+    // Dynamic pitch (squat/dive) & cornering body roll
+    const dynamicPitch = -(input.throttle * 0.02) + (input.brake * 0.04);
+    const dynamicRoll = -input.steer * 0.07;
+    const qDynamics = new THREE.Quaternion().setFromEuler(new THREE.Euler(dynamicPitch, 0, dynamicRoll, 'YXZ'));
+    targetQuat.multiply(qDynamics);
 
-    // Body Roll (Cornering lean)
-    this.model.rotation.z = THREE.MathUtils.lerp(this.model.rotation.z, -input.steer * 0.08, 0.12);
+    this.model.quaternion.slerp(targetQuat, Math.min(1.0, 16.0 * delta));
 
-    // 6. Taillight Brightness & Flare on Braking
+    // 7. Taillight Brightness & Flare on Braking
     const brakeIntensity = input.brake > 0.1 ? 3.5 : 1.0;
     for (let i = 0; i < this.taillights.length; i++) {
         this.taillights[i].intensity = THREE.MathUtils.lerp(this.taillights[i].intensity, brakeIntensity, 0.25);

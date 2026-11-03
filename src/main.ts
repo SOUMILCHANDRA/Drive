@@ -71,6 +71,26 @@ async function init() {
   const sound = new SoundManager();
   const debugGUI = new DebugGUI(renderer, lighting, road, rain);
 
+  // Expose systems for diagnostics & telemetry
+  (window as any).__NIGHTCALL__ = { car, road, input, renderer, cameraManager };
+
+  // Spawn car in lane aligned with road tangent (BUG 2 Step 2)
+  const spawnInitialCar = () => {
+      const roadStart = road.getRoadPositionAt(0);
+      const tangent = roadStart.tangent.clone().normalize();
+      const roadNormal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+      const laneWidth = 3.5;
+      const initialLaneOffset = laneWidth * 0.5; // +1.75m into the right lane
+      const spawnPos = roadStart.position.clone().add(roadNormal.clone().multiplyScalar(initialLaneOffset));
+      const initialHeading = Math.atan2(tangent.x, tangent.z);
+
+      car.spawn(spawnPos, initialHeading, initialLaneOffset, road.getRoadMeshes());
+
+      console.log(`[VEHICLE SPAWN] World Pos: (${car.position.x.toFixed(2)}, ${car.position.y.toFixed(2)}, ${car.position.z.toFixed(2)}), Road Center: (${roadStart.position.x.toFixed(2)}, ${roadStart.position.y.toFixed(2)}, ${roadStart.position.z.toFixed(2)}), Lateral Offset: ${initialLaneOffset.toFixed(2)}m`);
+  };
+
+  spawnInitialCar();
+
   // DOM Elements
   const titleScreen = document.getElementById('title-screen');
   const flash = document.getElementById('flash');
@@ -87,6 +107,18 @@ async function init() {
   const callsEl = document.getElementById('calls-val');
   const alertBanner = document.getElementById('alert-banner');
   const masterVol = document.getElementById('masterVol') as HTMLInputElement;
+
+  // F3 Debug Overlay Elements (BUG 2 Step 7)
+  const f3Overlay = document.getElementById('f3-debug-overlay');
+  const f3OffsetEl = document.getElementById('f3-offset');
+  const f3LaneOffsetEl = document.getElementById('f3-lane-offset');
+  const f3SpeedEl = document.getElementById('f3-speed');
+  const f3SpeedKmhEl = document.getElementById('f3-speed-kmh');
+  const f3HeadingEl = document.getElementById('f3-heading');
+  const f3HeadingDegEl = document.getElementById('f3-heading-deg');
+  const f3SteerEl = document.getElementById('f3-steer');
+  const f3OnRoadEl = document.getElementById('f3-onroad');
+  let f3OverlayVisible = false;
 
   let gameStarted = false;
   let isReadyToStart = false;
@@ -159,6 +191,11 @@ async function init() {
       }
       if (e.key.toLowerCase() === 'h') {
           debugGUI.gui.show(debugGUI.gui._hidden);
+      }
+      if (e.key === 'F3' || e.code === 'F3') {
+          e.preventDefault();
+          f3OverlayVisible = !f3OverlayVisible;
+          if (f3Overlay) f3Overlay.style.display = f3OverlayVisible ? 'block' : 'none';
       }
   });
 
@@ -259,6 +296,7 @@ async function init() {
       if (loadingStatus) loadingStatus.innerText = "TUNING V8 ENGINE...";
       
       await car.load('/models/car/car.glb');
+      spawnInitialCar();
 
       // Load BGM asynchronously without blocking ignition
       sound.loadBGM('/bgm.webm').catch(() => {});
@@ -274,6 +312,7 @@ async function init() {
       }
   } catch (err) {
       console.error('Initialization fallback trigger:', err);
+      spawnInitialCar();
       isReadyToStart = true;
       if (titleScreen) titleScreen.classList.add('ready');
   }
@@ -290,9 +329,9 @@ async function init() {
     if (!gameStarted) {
         idleTime += delta;
         if (idleTime > 2.5) cameraManager.setMode('CINEMATIC');
-        road.update(0, new THREE.Vector3(0,0,0), 0, delta, currentConfig);
-        lighting.update(new THREE.Vector3(0,0,0), 0.8);
-        sky.update(new THREE.Vector3(0,0,0));
+        road.update(car.position.z, car.position, 0, delta, currentConfig);
+        lighting.update(car.position, 0.8);
+        sky.update(car.position);
         if (car.model) cameraManager.update(delta, car.model, 0);
         renderer.render(delta, 0);
         return;
@@ -322,8 +361,11 @@ async function init() {
     if (cruiseActive && !controls.pause) {
         throttleTarget = 0.75;
         brakeTarget    = 0;
-        // Automatic gentle road center tracking
-        const lateralErr = (roadInfo.position.x - car.position.x) * 0.02;
+        // Automatic gentle road lane tracking
+        const roadTangent = roadInfo.tangent.clone().normalize();
+        const roadNormal = new THREE.Vector3(-roadTangent.z, 0, roadTangent.x).normalize();
+        const targetX = roadInfo.position.x + roadNormal.x * car.targetLaneOffset;
+        const lateralErr = (targetX - car.position.x) * 0.04;
         steerTarget = THREE.MathUtils.clamp(lateralErr, -0.4, 0.4);
     }
 
@@ -335,8 +377,9 @@ async function init() {
     }, {
         x: roadInfo.position.x,
         y: roadInfo.position.y,
-        tangent: roadInfo.tangent
-    });
+        tangent: roadInfo.tangent,
+        position: roadInfo.position
+    }, road.getRoadMeshes());
     
     // World Systems Update
     road.update(carZ, car.position, car.speed, delta, currentConfig);
@@ -390,6 +433,21 @@ async function init() {
     if (distEl) {
         const distM = Math.floor(car.position.z);
         distEl.innerText = distM >= 1000 ? (distM / 1000).toFixed(1) + ' KM' : distM + ' M';
+    }
+
+    // F3 Debug Overlay Telemetry Readouts (BUG 2 Step 7)
+    if (f3OverlayVisible) {
+        if (f3OffsetEl) f3OffsetEl.innerText = car.currentLateralOffset.toFixed(2);
+        if (f3LaneOffsetEl) f3LaneOffsetEl.innerText = (car.currentLateralOffset - car.targetLaneOffset).toFixed(2);
+        if (f3SpeedEl) f3SpeedEl.innerText = car.speed.toFixed(1);
+        if (f3SpeedKmhEl) f3SpeedKmhEl.innerText = Math.round(car.speed * 3.6).toString();
+        if (f3HeadingEl) f3HeadingEl.innerText = car.heading.toFixed(3);
+        if (f3HeadingDegEl) f3HeadingDegEl.innerText = (car.heading * 180 / Math.PI).toFixed(1);
+        if (f3SteerEl) f3SteerEl.innerText = steerTarget.toFixed(2);
+        if (f3OnRoadEl) {
+            f3OnRoadEl.innerText = car.isOnRoad ? 'TRUE' : 'FALSE';
+            f3OnRoadEl.style.color = car.isOnRoad ? '#00ff88' : '#ff3333';
+        }
     }
 
     frameCount++;
