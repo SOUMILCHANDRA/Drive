@@ -171,12 +171,16 @@
     <!-- ═══ F3 Vehicle Debug Telemetry Overlay ═══ -->
     <div id="f3-debug-overlay" class="f3-debug" style="display: none;">
       <div class="f3-title">VEHICLE TELEMETRY [F3]</div>
+      <div class="f3-row">PLAYER LANE: <span id="f3-lane-idx">0</span></div>
       <div class="f3-row">LATERAL OFFSET: <span id="f3-offset">0.00</span> M</div>
       <div class="f3-row">LANE DELTA: <span id="f3-lane-offset">0.00</span> M</div>
       <div class="f3-row">SPEED: <span id="f3-speed">0.0</span> M/S (<span id="f3-speed-kmh">0</span> KM/H)</div>
       <div class="f3-row">HEADING: <span id="f3-heading">0.000</span> RAD (<span id="f3-heading-deg">0.0</span>°)</div>
       <div class="f3-row">STEER INPUT: <span id="f3-steer">0.00</span></div>
       <div class="f3-row">ON-ROAD: <span id="f3-onroad">TRUE</span></div>
+      <div class="f3-row">ONCOMING CARS: <span id="f3-oncoming">0</span></div>
+      <div class="f3-row">SAME-DIR CARS: <span id="f3-samedir">0</span></div>
+      <div class="f3-row">NEAREST CAR: <span id="f3-nearest">--</span> M</div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

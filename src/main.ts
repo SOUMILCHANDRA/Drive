@@ -9,6 +9,7 @@ import { LightingManager } from './world/LightingManager';
 import { SkyManager } from './world/SkyManager';
 import { RainSystem } from './world/RainSystem';
 import { TrafficManager } from './world/TrafficManager';
+import { RoadLanes } from './world/RoadLanes';
 import { Road } from './world/Road';
 import { Car } from './vehicle/Car';
 import { SoundManager } from './audio/SoundManager';
@@ -72,15 +73,14 @@ async function init() {
   const debugGUI = new DebugGUI(renderer, lighting, road, rain);
 
   // Expose systems for diagnostics & telemetry
-  (window as any).__NIGHTCALL__ = { car, road, input, renderer, cameraManager };
+  (window as any).__NIGHTCALL__ = { car, road, input, renderer, cameraManager, traffic, RoadLanes };
 
-  // Spawn car in lane aligned with road tangent (BUG 2 Step 2)
+  // Spawn car in lane aligned with road tangent using single source of truth (RoadLanes)
   const spawnInitialCar = () => {
       const roadStart = road.getRoadPositionAt(0);
       const tangent = roadStart.tangent.clone().normalize();
       const roadNormal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-      const laneWidth = 3.5;
-      const initialLaneOffset = laneWidth * 0.5; // +1.75m into the right lane
+      const initialLaneOffset = RoadLanes.laneCenterLateralOffset(1, 0); // Lane nearest yellow line on the right (+1.75m)
       const spawnPos = roadStart.position.clone().add(roadNormal.clone().multiplyScalar(initialLaneOffset));
       const initialHeading = Math.atan2(tangent.x, tangent.z);
 
@@ -108,7 +108,7 @@ async function init() {
   const alertBanner = document.getElementById('alert-banner');
   const masterVol = document.getElementById('masterVol') as HTMLInputElement;
 
-  // F3 Debug Overlay Elements (BUG 2 Step 7)
+  // F3 Debug Overlay Elements
   const f3Overlay = document.getElementById('f3-debug-overlay');
   const f3OffsetEl = document.getElementById('f3-offset');
   const f3LaneOffsetEl = document.getElementById('f3-lane-offset');
@@ -118,6 +118,10 @@ async function init() {
   const f3HeadingDegEl = document.getElementById('f3-heading-deg');
   const f3SteerEl = document.getElementById('f3-steer');
   const f3OnRoadEl = document.getElementById('f3-onroad');
+  const f3LaneIdxEl = document.getElementById('f3-lane-idx');
+  const f3OncomingEl = document.getElementById('f3-oncoming');
+  const f3SameDirEl = document.getElementById('f3-samedir');
+  const f3NearestEl = document.getElementById('f3-nearest');
   let f3OverlayVisible = false;
 
   let gameStarted = false;
@@ -196,6 +200,7 @@ async function init() {
           e.preventDefault();
           f3OverlayVisible = !f3OverlayVisible;
           if (f3Overlay) f3Overlay.style.display = f3OverlayVisible ? 'block' : 'none';
+          traffic.setDebugVisible(f3OverlayVisible);
       }
   });
 
@@ -390,16 +395,15 @@ async function init() {
     sound.update(car.speed, delta);
 
     // Traffic Update & Player Interactions
-    traffic.update(delta, carZ, (z) => {
-        const pos = road.getRoadPositionAt(z).position;
-        return { x: pos.x, y: pos.y };
+    traffic.update(delta, carZ, car.currentLateralOffset, (z) => {
+        return road.getRoadPositionAt(z);
     });
 
     const interaction = traffic.checkPlayerInteraction(car.position);
     if (interaction.collided) {
         cameraManager.addTrauma(0.65);
         sound.playCollision();
-        car.speed = Math.max(0, car.speed * 0.45);
+        car.speed = Math.max(0, car.speed * 0.55);
         showAlert("IMPACT!", "#ff3333");
     } else if (interaction.nearMiss) {
         cameraManager.addTrauma(0.2);
@@ -435,7 +439,7 @@ async function init() {
         distEl.innerText = distM >= 1000 ? (distM / 1000).toFixed(1) + ' KM' : distM + ' M';
     }
 
-    // F3 Debug Overlay Telemetry Readouts (BUG 2 Step 7)
+    // F3 Debug Overlay Telemetry Readouts
     if (f3OverlayVisible) {
         if (f3OffsetEl) f3OffsetEl.innerText = car.currentLateralOffset.toFixed(2);
         if (f3LaneOffsetEl) f3LaneOffsetEl.innerText = (car.currentLateralOffset - car.targetLaneOffset).toFixed(2);
@@ -448,6 +452,13 @@ async function init() {
             f3OnRoadEl.innerText = car.isOnRoad ? 'TRUE' : 'FALSE';
             f3OnRoadEl.style.color = car.isOnRoad ? '#00ff88' : '#ff3333';
         }
+
+        const playerLaneIdx = RoadLanes.getLaneIndex(1, car.currentLateralOffset);
+        if (f3LaneIdxEl) f3LaneIdxEl.innerText = playerLaneIdx.toString();
+        if (f3OncomingEl) f3OncomingEl.innerText = traffic.getActiveOncomingCount().toString();
+        if (f3SameDirEl) f3SameDirEl.innerText = traffic.getActiveSameDirCount().toString();
+        const nearestDist = traffic.getNearestCarDistance(carZ);
+        if (f3NearestEl) f3NearestEl.innerText = nearestDist !== null ? nearestDist.toFixed(1) : '--';
     }
 
     frameCount++;

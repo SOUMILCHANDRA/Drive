@@ -59,7 +59,6 @@ export class Car {
   private headlights: THREE.SpotLight[] = [];
   private taillights: THREE.PointLight[] = [];
   private volumetricBeams: THREE.Mesh[] = [];
-  private groundLightPool?: THREE.Mesh;
   private taillightFlares: THREE.Mesh[] = [];
   private wheelLF: THREE.Object3D | null = null;
   private wheelRF: THREE.Object3D | null = null;
@@ -242,13 +241,21 @@ export class Car {
   }
 
   private setupLights(): void {
-    const hlConfig = { color: 0xfff6dc, intensity: 5.5, distance: 95, angle: 0.48, penumbra: 0.55, decay: 1.5 };
+    const hlConfig = { 
+      color: 0xfff6dc, 
+      intensity: 5.5, 
+      distance: 85, 
+      angle: 0.5, 
+      penumbra: 0.7, 
+      decay: 1.4 
+    };
     
     // LEFT headlight
     const headlightL = new THREE.SpotLight(hlConfig.color, hlConfig.intensity, hlConfig.distance, hlConfig.angle, hlConfig.penumbra, hlConfig.decay);
+    headlightL.castShadow = false;
     headlightL.position.set(-0.7, 0.65, 2.2);
     const targetL = new THREE.Object3D();
-    targetL.position.set(-0.7, -0.4, 30); 
+    targetL.position.set(-0.7, -0.3, 30); 
     this.model!.add(targetL);
     headlightL.target = targetL;
     this.model!.add(headlightL);
@@ -256,87 +263,40 @@ export class Car {
 
     // RIGHT headlight
     const headlightR = new THREE.SpotLight(hlConfig.color, hlConfig.intensity, hlConfig.distance, hlConfig.angle, hlConfig.penumbra, hlConfig.decay);
+    headlightR.castShadow = false;
     headlightR.position.set(0.7, 0.65, 2.2);
     const targetR = new THREE.Object3D();
-    targetR.position.set(0.7, -0.4, 30);
+    targetR.position.set(0.7, -0.3, 30);
     this.model!.add(targetR);
     headlightR.target = targetR;
     this.model!.add(headlightR);
     this.headlights.push(headlightR);
 
-    // 1. Dual Volumetric Headlight Beams (Cutting through rain & nocturnal mist)
-    const beamGeo = new THREE.CylinderGeometry(0.12, 3.8, 42, 16, 1, true);
-    beamGeo.rotateX(Math.PI / 2);
-    beamGeo.translate(0, 0, 21);
+    // Thin volumetric cone beams: ConeGeometry with 36 radial segments, reaches ~25m forward
+    const coneRadius = 2.6;
+    const coneHeight = 25.0;
+    const beamGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 36, 1, true);
+    // Rotate so apex is at origin and expands forward along +Z
+    beamGeo.rotateX(-Math.PI / 2);
+    beamGeo.translate(0, 0, coneHeight * 0.5);
 
-    const beamMat = new THREE.ShaderMaterial({
-      uniforms: {
-        uColor: { value: new THREE.Color(0xfff5d8) },
-        uIntensity: { value: 0.28 }
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 uColor;
-        uniform float uIntensity;
-        varying vec2 vUv;
-        void main() {
-          float radial = sin(vUv.x * 3.14159265);
-          float longitudinal = pow(1.0 - vUv.y, 1.5);
-          float alpha = radial * longitudinal * uIntensity;
-          gl_FragColor = vec4(uColor, alpha);
-        }
-      `,
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: 0xfff2cc,
       transparent: true,
+      opacity: 0.06,
       blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
       depthWrite: false,
+      side: THREE.BackSide
     });
 
-    [-0.72, 0.72].forEach((x, idx) => {
+    [-0.7, 0.7].forEach((x, idx) => {
       const beam = new THREE.Mesh(beamGeo, beamMat);
       beam.position.set(x, 0.65, 2.2);
-      beam.rotation.x = -0.025;
-      beam.rotation.y = idx === 0 ? -0.015 : 0.015;
+      beam.rotation.x = -0.015;
+      beam.rotation.y = idx === 0 ? -0.01 : 0.01;
       this.model!.add(beam);
       this.volumetricBeams.push(beam);
     });
-
-    // 2. Projected Ground Light Pool on Asphalt Surface
-    const poolGeo = new THREE.PlaneGeometry(10.5, 36);
-    poolGeo.rotateX(-Math.PI / 2);
-    const poolMat = new THREE.ShaderMaterial({
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 uColor;
-        varying vec2 vUv;
-        void main() {
-          vec2 p = vUv * 2.0 - 1.0;
-          float r = length(vec2(p.x * 1.5, p.y));
-          float spot = smoothstep(1.0, 0.15, r);
-          float fade = smoothstep(0.0, 0.25, vUv.y) * smoothstep(1.0, 0.7, vUv.y);
-          float alpha = spot * fade * 0.45;
-          gl_FragColor = vec4(1.0, 0.95, 0.82, alpha);
-        }
-      `,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    this.groundLightPool = new THREE.Mesh(poolGeo, poolMat);
-    this.groundLightPool.position.set(0, 0.02, 20);
-    this.model!.add(this.groundLightPool);
 
     // 3. Taillights (subtle rear glow point lights)
     [0.75, -0.75].forEach(x => {
