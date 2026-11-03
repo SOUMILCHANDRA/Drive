@@ -69,8 +69,12 @@ async function init() {
   const car = new Car(renderer.scene);
   const rain = new RainSystem(renderer.scene, currentConfig.rainCount);
   const traffic = new TrafficManager(renderer.scene);
+  traffic.setEnvMap(renderer.getRoadEnvMap());
   const sound = new SoundManager();
   const debugGUI = new DebugGUI(renderer, lighting, road, rain);
+  (window as any).__scene = renderer.scene;
+  (window as any).__road = road;
+  (window as any).__renderer = renderer;
 
   // Expose systems for diagnostics & telemetry
   (window as any).__NIGHTCALL__ = { car, road, input, renderer, cameraManager, traffic, RoadLanes };
@@ -332,6 +336,7 @@ async function init() {
     if (pauseIcon) pauseIcon.classList.toggle('visible', controls.pause);
     
     if (!gameStarted) {
+        renderer.beginFrame();
         idleTime += delta;
         if (idleTime > 2.5) cameraManager.setMode('CINEMATIC');
         road.update(car.position.z, car.position, 0, delta, currentConfig);
@@ -339,6 +344,16 @@ async function init() {
         sky.update(car.position);
         if (car.model) cameraManager.update(delta, car.model, 0);
         renderer.render(delta, 0);
+
+        frameCount++;
+        fpsTimer += delta;
+        if (fpsTimer >= 0.2) {
+            currentFps = Math.round(frameCount / fpsTimer);
+            frameCount = 0;
+            fpsTimer = 0;
+            if (fpsEl) fpsEl.innerText = currentFps.toString();
+            if (callsEl) callsEl.innerText = renderer.renderer.info.render.calls.toString();
+        }
         return;
     }
 
@@ -387,6 +402,7 @@ async function init() {
     }, road.getRoadMeshes());
     
     // World Systems Update
+    renderer.beginFrame();
     road.update(carZ, car.position, car.speed, delta, currentConfig);
     renderer.updateRoadReflection(car.position, road.getRoadMeshes(), delta, car.model);
     lighting.update(car.position, biomeParams.ambientIntensity);

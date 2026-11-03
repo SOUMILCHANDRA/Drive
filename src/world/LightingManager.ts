@@ -10,11 +10,13 @@ export class LightingManager {
     public ambient: THREE.AmbientLight;
     public hemisphere: THREE.HemisphereLight;
     public moon: THREE.DirectionalLight;
+    public rimLight: THREE.DirectionalLight;
     public carLight?: THREE.PointLight;
 
     public baseAmbientIntensity: number = 0.22;
-    public baseMoonIntensity: number = 0.35;
-    public baseHemiIntensity: number = 0.25;
+    public baseMoonIntensity: number = 0.70;
+    public baseHemiIntensity: number = 0.60;
+    public baseRimIntensity: number = 0.40;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
@@ -23,13 +25,13 @@ export class LightingManager {
         this.ambient = new THREE.AmbientLight(0x181832, this.baseAmbientIntensity);
         this.scene.add(this.ambient);
 
-        // 2. Hemisphere — sky: dark indigo #1a1a4e, ground: warm dark #0a0510
-        this.hemisphere = new THREE.HemisphereLight(0x1a1a4e, 0x0a0510, this.baseHemiIntensity);
+        // 2. Hemisphere (Bug 3b) — sky #2a3a7a / ground #120a1a, intensity 0.6
+        this.hemisphere = new THREE.HemisphereLight(0x2a3a7a, 0x120a1a, this.baseHemiIntensity);
         this.scene.add(this.hemisphere);
 
-        // 3. Directional "moon" — subtle cool indigo moonlight (rim/accent, not a stadium floodlight)
-        this.moon = new THREE.DirectionalLight(0x829ad4, this.baseMoonIntensity);
-        this.moon.position.set(-80, 160, -200);
+        // 3. Moon DirectionalLight (Bug 3b) — #6f86ff, intensity 0.7, casting shadows from above/side
+        this.moon = new THREE.DirectionalLight(0x6f86ff, this.baseMoonIntensity);
+        this.moon.position.set(-60, 140, -120);
         this.moon.castShadow = true;
 
         this.moon.shadow.mapSize.width = 1024;
@@ -44,6 +46,12 @@ export class LightingManager {
         this.moon.shadow.bias = -0.0005;
 
         this.scene.add(this.moon);
+
+        // 4. Subtle rim light behind camera (Bug 3b) — DirectionalLight #ff3a9a, intensity 0.4
+        this.rimLight = new THREE.DirectionalLight(0xff3a9a, this.baseRimIntensity);
+        this.rimLight.position.set(0, 18, -45);
+        this.rimLight.castShadow = false;
+        this.scene.add(this.rimLight);
     }
 
     /** Underseat warm cabin fill light - soft interior glow without washing out the ground */
@@ -54,10 +62,16 @@ export class LightingManager {
     }
 
     public update(carPos: THREE.Vector3, ambientMultiplier: number = 1): void {
-        this.moon.position.x = carPos.x - 80;
-        this.moon.position.z = carPos.z - 200;
+        // Moon tracks overhead with side angle
+        this.moon.position.x = carPos.x - 60;
+        this.moon.position.z = carPos.z - 120;
         this.moon.target.position.copy(carPos);
         this.moon.target.updateMatrixWorld();
+
+        // Rim light stays behind chase camera aiming forward along highway
+        this.rimLight.position.set(carPos.x, carPos.y + 18, carPos.z - 45);
+        this.rimLight.target.position.set(carPos.x, carPos.y + 2, carPos.z + 50);
+        this.rimLight.target.updateMatrixWorld();
 
         // Keep ambient stable and readable
         const mult = Math.max(0.6, ambientMultiplier);

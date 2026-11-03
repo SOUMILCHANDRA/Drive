@@ -65,6 +65,7 @@ export class SkyManager {
 
         // 3. Sky dome — deep indigo to luminous twilight horizon (noir synthwave)
         this.skyDome = this.createSkyDome();
+        this.skyDome.layers.enable(1); // Enable reflection in wet road CubeCamera
         this.scene.add(this.skyDome);
 
         // 4. Distant Mountain Ridge Silhouettes (Slow Roads feel)
@@ -77,35 +78,57 @@ export class SkyManager {
     }
 
     private createSkyDome(): THREE.Mesh {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d')!;
+        // Vertical gradient with triangle-noise dithering (Bug 3c fix for color banding)
+        const vertexShader = `
+            varying vec3 vWorldPosition;
+            void main() {
+                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                vWorldPosition = worldPosition.xyz - cameraPosition;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
 
-        // Vertical gradient for sphere: 
-        // In Canvas, y=0 maps to top (Zenith, +Y), y=256 is Horizon (Y=0), y=512 is Nadir (-Y)
-        const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-        gradient.addColorStop(0.0,  '#010206'); // pure midnight cosmic navy (Zenith)
-        gradient.addColorStop(0.30, '#030612'); // deep midnight indigo
-        gradient.addColorStop(0.46, '#070c20'); // upper horizon haze
-        gradient.addColorStop(0.50, '#0a1028'); // horizon eye level (matches 0x0a1024 fog)
-        gradient.addColorStop(0.56, '#060a1a'); // lower horizon
-        gradient.addColorStop(1.0,  '#020308'); // nadir (ground void)
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 1, 512);
+        const fragmentShader = `
+            varying vec3 vWorldPosition;
+            void main() {
+                vec3 dir = normalize(vWorldPosition);
+                float h = clamp(dir.y, 0.0, 1.0);
 
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.wrapS = THREE.RepeatWrapping;
-        tex.repeat.set(1, 1);
+                // Vertical gradient: zenith #05060f -> mid #0d0b2a -> horizon #3a1840 with thin warm #7a2e4a band
+                vec3 zenith   = vec3(0.0196, 0.0235, 0.0588); // #05060f
+                vec3 mid      = vec3(0.0510, 0.0431, 0.1647); // #0d0b2a
+                vec3 horizon  = vec3(0.2275, 0.0941, 0.2510); // #3a1840
+                vec3 warmBand = vec3(0.4784, 0.1804, 0.2902); // #7a2e4a
 
-        // Radius 2400 (well within camera far plane of 3000 to eliminate clipping)
+                vec3 color = mix(mid, zenith, smoothstep(0.15, 0.85, h));
+                color = mix(horizon, color, smoothstep(0.02, 0.28, h));
+
+                // Subtle warm sunset horizon line
+                float warmFactor = exp(-pow((h - 0.025) / 0.025, 2.0));
+                color += warmBand * warmFactor * 0.40;
+
+                // Ground nadir fade (below horizon)
+                if (dir.y < 0.0) {
+                    color = mix(horizon, vec3(0.01, 0.015, 0.03), clamp(-dir.y * 4.0, 0.0, 1.0));
+                }
+
+                // Triangle-noise dithering to eliminate 8-bit sky banding (Bug 3c)
+                float dither = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
+                color += dither;
+
+                gl_FragColor = vec4(color, 1.0);
+            }
+        `;
+
         const geo = new THREE.SphereGeometry(2400, 32, 24);
-        const mat = new THREE.MeshBasicMaterial({
-            map: tex,
+        const mat = new THREE.ShaderMaterial({
+            vertexShader,
+            fragmentShader,
             side: THREE.BackSide,
             depthWrite: false,
             fog: false,
         });
+
         return new THREE.Mesh(geo, mat);
     }
 
@@ -166,6 +189,7 @@ export class SkyManager {
     private createInstancedSkyline(): THREE.InstancedMesh {
         const count = 160;
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+        boxGeo.clearGroups();
 
         const skylineMat = new THREE.ShaderMaterial({
             vertexShader: `

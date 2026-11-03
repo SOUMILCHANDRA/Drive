@@ -28,6 +28,45 @@ export const Biomes: Record<string, BiomeParams> = {
         rainIntensity: 0.8,
         hasPalms: true,
     },
+    BRIDGE: {
+        name: 'THE BRIDGE',
+        buildingDensity: 0.0,
+        buildingHeight: [0, 0],
+        neonDensity: 0.0,
+        streetlightSpacing: 45,
+        fogDensity: 0.00055,
+        fogColor: 0x091228,
+        skyColor: 0x04081c,
+        ambientIntensity: 0.90,
+        rainIntensity: 0.4,
+        hasPalms: false,
+    },
+    TUNNEL: {
+        name: 'THE TUNNEL',
+        buildingDensity: 0,
+        buildingHeight: [0, 0],
+        neonDensity: 0,
+        streetlightSpacing: 25,
+        fogDensity: 0.0016,
+        fogColor: 0x090a1a,
+        skyColor: 0x02030a,
+        ambientIntensity: 1.15,
+        rainIntensity: 0,
+        hasPalms: false,
+    },
+    GAS_STATION: {
+        name: 'GAS STATION OASIS',
+        buildingDensity: 0.18,
+        buildingHeight: [10, 20],
+        neonDensity: 0.85,
+        streetlightSpacing: 45,
+        fogDensity: 0.00045,
+        fogColor: 0x121434,
+        skyColor: 0x060922,
+        ambientIntensity: 1.05,
+        rainIntensity: 0.2,
+        hasPalms: true,
+    },
     CANYON: {
         name: 'CANYON',
         buildingDensity: 0.0,
@@ -67,19 +106,6 @@ export const Biomes: Record<string, BiomeParams> = {
         rainIntensity: 1.0,
         hasPalms: false,
     },
-    TUNNEL: {
-        name: 'TUNNEL',
-        buildingDensity: 0,
-        buildingHeight: [0, 0],
-        neonDensity: 0,
-        streetlightSpacing: 25,
-        fogDensity: 0.0015,
-        fogColor: 0x080c20,
-        skyColor: 0x02040c,
-        ambientIntensity: 1.1,
-        rainIntensity: 0,
-        hasPalms: false,
-    },
 };
 
 interface BiomeSection {
@@ -90,32 +116,23 @@ interface BiomeSection {
 
 export class BiomeManager {
     private sequence: BiomeSection[] = [];
+    private landmarkOrder = [
+        Biomes.DOWNTOWN,
+        Biomes.BRIDGE,
+        Biomes.TUNNEL,
+        Biomes.GAS_STATION,
+    ];
 
     constructor() {
-        this.sequence.push({ type: Biomes.DOWNTOWN, start: 0, length: 2000 });
-        this.generateNextSection(2000);
-        this.generateNextSection(this.sequence[1].start + this.sequence[1].length);
+        this.sequence.push({ type: Biomes.DOWNTOWN, start: 0, length: 1500 });
+        this.generateNextSection(1500);
+        this.generateNextSection(3000);
     }
 
     private generateNextSection(start: number): void {
-        const pool = [
-            Biomes.CANYON, Biomes.CANYON, Biomes.CANYON,
-            Biomes.NEON_COAST, Biomes.NEON_COAST,
-            Biomes.DOWNTOWN,
-            Biomes.INDUSTRIAL,
-            Biomes.TUNNEL,
-        ];
-        let nextType = pool[Math.floor(Math.random() * pool.length)];
-
-        if (this.sequence.length > 0) {
-            let attempts = 0;
-            while (nextType.name === this.sequence[this.sequence.length - 1].type.name && attempts < 10) {
-                nextType = pool[Math.floor(Math.random() * pool.length)];
-                attempts++;
-            }
-        }
-
-        const length = 1800 + Math.random() * 2500;
+        const step = Math.floor(start / 1500);
+        const nextType = this.landmarkOrder[step % this.landmarkOrder.length];
+        const length = 1500;
         this.sequence.push({ type: nextType, start, length });
     }
 
@@ -133,9 +150,9 @@ export class BiomeManager {
 
         if (!next) return current.type;
 
-        const transitionStart = current.start + current.length - 400;
+        const transitionStart = current.start + current.length - 250;
         if (z > transitionStart) {
-            const t = (z - transitionStart) / 400;
+            const t = (z - transitionStart) / 250;
             return this.lerpBiomes(current.type, next.type, t);
         }
 

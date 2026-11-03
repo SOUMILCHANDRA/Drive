@@ -76,10 +76,10 @@ export class Renderer {
     window.addEventListener('resize', () => this.onWindowResize());
   }
 
-  // Low-resolution 15Hz CubeCamera for dynamic wet road puddle reflections
+  // Low-resolution time-sliced CubeCamera for dynamic wet road puddle reflections (~10Hz full cubemap cycle)
   private cubeRenderTarget!: THREE.WebGLCubeRenderTarget;
   private cubeCamera!: THREE.CubeCamera;
-  private cubeTimer: number = 0;
+  private cubeFaceIndex: number = 0;
 
   private setupRoadReflectionCamera(): void {
     this.cubeRenderTarget = new THREE.WebGLCubeRenderTarget(64, {
@@ -88,6 +88,11 @@ export class Renderer {
       magFilter: THREE.LinearFilter
     });
     this.cubeCamera = new THREE.CubeCamera(0.5, 250, this.cubeRenderTarget);
+    // Layer 1 isolates reflection objects (sky, skyline, neon) to achieve 60+ FPS and < 150 draw calls
+    this.cubeCamera.layers.set(1);
+    for (const child of this.cubeCamera.children) {
+      child.layers.set(1);
+    }
     this.scene.add(this.cubeCamera);
   }
 
@@ -95,19 +100,37 @@ export class Renderer {
     return this.cubeRenderTarget.texture;
   }
 
-  public updateRoadReflection(carPos: THREE.Vector3, roadMeshes: THREE.Object3D[], delta: number, carModel?: THREE.Object3D | null): void {
-    this.cubeTimer += delta;
-    // 15Hz update rate (~0.0667s)
-    if (this.cubeTimer >= 1.0 / 15.0) {
-      this.cubeTimer = 0;
-      this.cubeCamera.position.set(carPos.x, carPos.y + 0.6, carPos.z + 8.0);
+  public updateRoadReflection(carPos: THREE.Vector3, roadMeshes: THREE.Object3D[], _delta: number, carModel?: THREE.Object3D | null): void {
+    this.cubeCamera.position.set(carPos.x, carPos.y + 0.6, carPos.z + 8.0);
+    if (this.cubeCamera.parent === null) this.cubeCamera.updateMatrixWorld();
 
-      // Temporarily hide the road surface and car so it doesn't self-reflect
-      for (let i = 0; i < roadMeshes.length; i++) roadMeshes[i].visible = false;
-      if (carModel) carModel.visible = false;
-      this.cubeCamera.update(this.renderer, this.scene);
-      for (let i = 0; i < roadMeshes.length; i++) roadMeshes[i].visible = true;
-      if (carModel) carModel.visible = true;
+    const cameras = this.cubeCamera.children as THREE.PerspectiveCamera[];
+    if (!cameras || cameras.length < 6) return;
+
+    const face = this.cubeFaceIndex;
+    this.cubeFaceIndex = (this.cubeFaceIndex + 1) % 6;
+
+    // Temporarily hide the road surface and car so it doesn't self-reflect
+    for (let i = 0; i < roadMeshes.length; i++) roadMeshes[i].visible = false;
+    if (carModel) carModel.visible = false;
+
+    const currentRenderTarget = this.renderer.getRenderTarget();
+    const currentActiveCubeFace = this.renderer.getActiveCubeFace();
+    const currentActiveMipmapLevel = this.renderer.getActiveMipmapLevel();
+    const prevShadow = this.renderer.shadowMap.enabled;
+
+    this.renderer.shadowMap.enabled = false;
+    this.renderer.setRenderTarget(this.cubeRenderTarget, face, 0);
+    this.renderer.render(this.scene, cameras[face]);
+    this.renderer.shadowMap.enabled = prevShadow;
+
+    this.renderer.setRenderTarget(currentRenderTarget, currentActiveCubeFace, currentActiveMipmapLevel);
+
+    for (let i = 0; i < roadMeshes.length; i++) roadMeshes[i].visible = true;
+    if (carModel) carModel.visible = true;
+
+    if (face === 5) {
+      this.cubeRenderTarget.texture.needsPMREMUpdate = true;
     }
   }
 
@@ -177,8 +200,11 @@ export class Renderer {
     this.bloomPass.setSize(window.innerWidth, window.innerHeight);
   }
 
-  public render(delta: number, steer: number = 0): void {
+  public beginFrame(): void {
     this.renderer.info.reset();
+  }
+
+  public render(delta: number, steer: number = 0): void {
     this.renderer.clear();
     
     if (this.compositePass) {

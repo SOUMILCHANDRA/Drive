@@ -28,18 +28,19 @@ export class NeonSign extends THREE.Group {
     0x39ff14, // Acid Green
     0xff3366  // Neon Magenta
   ];
-  private static TEXTS = ['MOTEL', 'OPEN', 'BAR', '24HR', 'GAS', 'PARK', 'EATS', 'DRIVE', 'HOTEL'];
+
+  private static sharedBoardGeo = new THREE.PlaneGeometry(3.6, 1.2);
+  private static sharedBoardMat = new THREE.MeshBasicMaterial({ color: 0x05050a });
+  private static sharedGlowGeo = new THREE.PlaneGeometry(3.2, 0.85);
 
   constructor() {
     super();
     const colorVal = NeonSign.COLORS[Math.floor(Math.random() * NeonSign.COLORS.length)];
-    const text = NeonSign.TEXTS[Math.floor(Math.random() * NeonSign.TEXTS.length)];
     this.color = new THREE.Color(colorVal);
     
-    // 1. Backing Board
-    const boardGeo = new THREE.PlaneGeometry(text.length * 0.6 + 0.4, 1.2);
-    const boardMat = new THREE.MeshBasicMaterial({ color: 0x05050a });
-    this.boardMesh = new THREE.Mesh(boardGeo, boardMat);
+    // 1. Backing Board (shared geometry & material)
+    this.boardMesh = new THREE.Mesh(NeonSign.sharedBoardGeo, NeonSign.sharedBoardMat);
+    this.boardMesh.layers.enable(1); // Dynamic road reflection
     this.add(this.boardMesh);
     
     // 2. Glowing Neon Text Plane
@@ -50,11 +51,9 @@ export class NeonSign extends THREE.Group {
       toneMapped: false // Glows directly into the bloom pass
     });
     
-    this.glowMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(text.length * 0.55, 0.85),
-      this.mat
-    );
+    this.glowMesh = new THREE.Mesh(NeonSign.sharedGlowGeo, this.mat);
     this.glowMesh.position.z = 0.02;
+    this.glowMesh.layers.enable(1); // Dynamic road reflection
     this.add(this.glowMesh);
   }
 

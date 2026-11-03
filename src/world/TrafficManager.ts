@@ -158,6 +158,9 @@ export class TrafficManager {
     private taillightsInstanced: THREE.InstancedMesh;
     private beamsInstanced: THREE.InstancedMesh;
 
+    // Pooled SpotLights for the nearest 2 oncoming cars
+    private oncomingSpotlights: { light: THREE.SpotLight; target: THREE.Object3D }[] = [];
+
     // Matrix helpers
     private tempMatrix = new THREE.Matrix4();
     private zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -165,55 +168,98 @@ export class TrafficManager {
     private tempScale = new THREE.Vector3(1, 1, 1);
     private yAxis = new THREE.Vector3(0, 1, 0);
 
-    // Debug Lane Lines (Green = Player direction, Red = Oncoming)
+    // Debug Visualization (F3): Lane Lines + Wireframe Car Boxes
     private debugLinesGreen: THREE.LineSegments;
     private debugLinesRed: THREE.LineSegments;
+    private debugBoxes: THREE.LineSegments;
     private debugVisible: boolean = false;
+    private diagLogTimer: number = 0;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
 
         // 1. Build Merged Shared Geometries
         const body = new THREE.BoxGeometry(1.9, 0.72, 4.3);
+        body.clearGroups();
         body.translate(0, 0.5, 0);
         const cabin = new THREE.BoxGeometry(1.5, 0.52, 2.3);
+        cabin.clearGroups();
         cabin.translate(0, 0.95, -0.2);
         const chassisGeo = BufferGeometryUtils.mergeGeometries([body, cabin]);
 
-        const hl1 = new THREE.PlaneGeometry(0.36, 0.18);
-        hl1.translate(-0.65, 0.55, 2.16);
-        const hl2 = new THREE.PlaneGeometry(0.36, 0.18);
-        hl2.translate(0.65, 0.55, 2.16);
+        // Two bright headlight emissive quads (0.42m x 0.22m)
+        const hl1 = new THREE.PlaneGeometry(0.42, 0.22);
+        hl1.clearGroups();
+        hl1.translate(-0.65, 0.58, 2.18);
+        const hl2 = new THREE.PlaneGeometry(0.42, 0.22);
+        hl2.clearGroups();
+        hl2.translate(0.65, 0.58, 2.18);
         const headlightsGeo = BufferGeometryUtils.mergeGeometries([hl1, hl2]);
 
-        const tl1 = new THREE.PlaneGeometry(0.36, 0.18);
+        // Two bright taillight emissive quads (0.42m x 0.22m)
+        const tl1 = new THREE.PlaneGeometry(0.42, 0.22);
+        tl1.clearGroups();
         tl1.rotateY(Math.PI);
-        tl1.translate(-0.65, 0.55, -2.16);
-        const tl2 = new THREE.PlaneGeometry(0.36, 0.18);
+        tl1.translate(-0.65, 0.58, -2.18);
+        const tl2 = new THREE.PlaneGeometry(0.42, 0.22);
+        tl2.clearGroups();
         tl2.rotateY(Math.PI);
-        tl2.translate(0.65, 0.55, -2.16);
+        tl2.translate(0.65, 0.58, -2.18);
         const taillightsGeo = BufferGeometryUtils.mergeGeometries([tl1, tl2]);
 
-        const b1 = new THREE.ConeGeometry(1.8, 18, 24, 1, true);
+        // Volumetric headlight cones
+        const b1 = new THREE.ConeGeometry(2.0, 22, 28, 1, true);
         b1.rotateX(-Math.PI / 2);
-        b1.translate(-0.65, 0.55, 11.16);
-        const b2 = new THREE.ConeGeometry(1.8, 18, 24, 1, true);
+        b1.translate(-0.65, 0.58, 13.18);
+        const b2 = new THREE.ConeGeometry(2.0, 22, 28, 1, true);
         b2.rotateX(-Math.PI / 2);
-        b2.translate(0.65, 0.55, 11.16);
+        b2.translate(0.65, 0.58, 13.18);
         const beamsGeo = BufferGeometryUtils.mergeGeometries([b1, b2]);
 
-        // 2. Materials
+        // 2. Materials (Bug 2: readable at night with base #2a2a3a, envMap, and Fresnel #4466ff rim)
         const chassisMat = new THREE.MeshStandardMaterial({
-            color: 0x141822,
-            roughness: 0.7,
-            metalness: 0.3
+            color: 0x2a2a3a,
+            roughness: 0.4,
+            metalness: 0.5,
+            envMapIntensity: 1.5
         });
-        const headlightMat = new THREE.MeshBasicMaterial({ color: 0xffeed0, toneMapped: false });
-        const taillightMat = new THREE.MeshBasicMaterial({ color: 0xff1616, toneMapped: false });
-        const beamMat = new THREE.MeshBasicMaterial({
-            color: 0xfff0d0,
+
+        // Inject faint cool Fresnel rim light (#4466ff) into chassis shader
+        chassisMat.onBeforeCompile = (shader) => {
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <opaque_fragment>',
+                `
+                // Faint cool rim light (Fresnel, color #4466ff)
+                float rimDot = 1.0 - saturate(dot(geometryNormal, geometryViewDir));
+                float rimFactor = pow(rimDot, 3.0);
+                outgoingLight += vec3(0.267, 0.4, 1.0) * rimFactor * 0.45;
+                #include <opaque_fragment>
+                `
+            );
+        };
+
+        const headlightMat = new THREE.MeshBasicMaterial({
+            color: 0xfff4d6,
             transparent: true,
-            opacity: 0.05,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+
+        const taillightMat = new THREE.MeshBasicMaterial({
+            color: 0xff1e1e,
+            transparent: true,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+
+        const beamMat = new THREE.MeshBasicMaterial({
+            color: 0xfff4d6,
+            transparent: true,
+            opacity: 0.07,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             side: THREE.BackSide
@@ -224,6 +270,12 @@ export class TrafficManager {
         this.headlightsInstanced = new THREE.InstancedMesh(headlightsGeo, headlightMat, this.maxPool);
         this.taillightsInstanced = new THREE.InstancedMesh(taillightsGeo, taillightMat, this.maxPool);
         this.beamsInstanced = new THREE.InstancedMesh(beamsGeo, beamMat, this.maxPool);
+
+        // BUG 2 FIX: Disable frustum culling on InstancedMeshes so Three.js doesn't cull entire highway traffic
+        this.chassisInstanced.frustumCulled = false;
+        this.headlightsInstanced.frustumCulled = false;
+        this.taillightsInstanced.frustumCulled = false;
+        this.beamsInstanced.frustumCulled = false;
 
         this.chassisInstanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         this.headlightsInstanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -245,7 +297,18 @@ export class TrafficManager {
             this.beamsInstanced
         );
 
-        // 4. Colored Debug Lane Lines
+        // 4. Pooled SpotLights for the nearest 2 oncoming cars
+        for (let s = 0; s < 2; s++) {
+            const spot = new THREE.SpotLight(0xfff4d6, 0, 75, 0.48, 0.7, 1.4);
+            spot.castShadow = false;
+            const target = new THREE.Object3D();
+            this.scene.add(spot);
+            this.scene.add(target);
+            spot.target = target;
+            this.oncomingSpotlights.push({ light: spot, target });
+        }
+
+        // 5. Colored Debug Lane Lines & 3D Car Wireframe Boxes (F3)
         this.debugLinesGreen = new THREE.LineSegments(
             new THREE.BufferGeometry(),
             new THREE.LineBasicMaterial({ color: 0x00ff66, transparent: true, opacity: 0.9 })
@@ -254,15 +317,29 @@ export class TrafficManager {
             new THREE.BufferGeometry(),
             new THREE.LineBasicMaterial({ color: 0xff2244, transparent: true, opacity: 0.9 })
         );
+        this.debugBoxes = new THREE.LineSegments(
+            new THREE.BufferGeometry(),
+            new THREE.LineBasicMaterial({ color: 0xffff33, transparent: true, opacity: 0.95 })
+        );
         this.debugLinesGreen.visible = false;
         this.debugLinesRed.visible = false;
-        this.scene.add(this.debugLinesGreen, this.debugLinesRed);
+        this.debugBoxes.visible = false;
+        this.scene.add(this.debugLinesGreen, this.debugLinesRed, this.debugBoxes);
+    }
+
+    public setEnvMap(envMap: THREE.Texture | THREE.RenderTarget | null): void {
+        if (this.chassisInstanced && this.chassisInstanced.material) {
+            const mat = this.chassisInstanced.material as THREE.MeshStandardMaterial;
+            mat.envMap = (envMap as any)?.texture || (envMap as THREE.Texture) || null;
+            mat.needsUpdate = true;
+        }
     }
 
     public setDebugVisible(visible: boolean): void {
         this.debugVisible = visible;
         this.debugLinesGreen.visible = visible;
         this.debugLinesRed.visible = visible;
+        this.debugBoxes.visible = visible;
     }
 
     public getActiveOncomingCount(): number {
@@ -347,9 +424,20 @@ export class TrafficManager {
         this.taillightsInstanced.instanceMatrix.needsUpdate = true;
         this.beamsInstanced.instanceMatrix.needsUpdate = true;
 
-        // 4. Update Debug Lane Lines if visible
+        // 4. Update pooled oncoming headlights for nearest 2 oncoming cars
+        this.updateOncomingSpotlights(playerZ);
+
+        // 5. Update Debug Lane Lines and 3D Bounding Boxes (F3) if visible
         if (this.debugVisible) {
             this.updateDebugLines(playerZ, getRoadPos);
+            this.updateDebugBoxes();
+        }
+
+        // 6. Periodic Diagnostic Logging (Bug 2: log per traffic car properties)
+        this.diagLogTimer += delta;
+        if (this.diagLogTimer >= 3.0) {
+            this.diagLogTimer = 0;
+            this.logTrafficDiagnostics(playerZ);
         }
     }
 
@@ -564,5 +652,95 @@ export class TrafficManager {
             'position',
             new THREE.Float32BufferAttribute(redPositions, 3)
         );
+    }
+
+    /**
+     * Updates pooled SpotLights for the nearest 2 oncoming cars facing the player.
+     */
+    private updateOncomingSpotlights(playerZ: number): void {
+        const oncomingCars = this.activeCars
+            .filter(c => c.direction === TrafficDirection.ONCOMING && c.currentZ > playerZ - 20)
+            .sort((a, b) => (a.currentZ - playerZ) - (b.currentZ - playerZ));
+
+        for (let i = 0; i < this.oncomingSpotlights.length; i++) {
+            const spot = this.oncomingSpotlights[i];
+            if (i < oncomingCars.length) {
+                const car = oncomingCars[i];
+                spot.light.position.set(car.worldPosition.x, car.worldPosition.y + 0.65, car.worldPosition.z);
+                // Aim headlight forward in vehicle travel direction (-Z) toward player
+                spot.target.position.set(car.worldPosition.x, car.worldPosition.y - 0.2, car.worldPosition.z - 35);
+                spot.light.intensity = 4.8;
+            } else {
+                spot.light.intensity = 0;
+            }
+        }
+    }
+
+    /**
+     * Draws a wireframe 3D bounding box (F3) around each active traffic car.
+     */
+    private updateDebugBoxes(): void {
+        const boxPositions: number[] = [];
+
+        // Box half-extents (2.0m width, 1.3m height, 4.4m length)
+        const hw = 1.0;
+        const hh = 1.25;
+        const hl = 2.2;
+
+        const cornersLocal = [
+            new THREE.Vector3(-hw, 0.05, -hl),
+            new THREE.Vector3(hw, 0.05, -hl),
+            new THREE.Vector3(hw, 0.05, hl),
+            new THREE.Vector3(-hw, 0.05, hl),
+            new THREE.Vector3(-hw, hh, -hl),
+            new THREE.Vector3(hw, hh, -hl),
+            new THREE.Vector3(hw, hh, hl),
+            new THREE.Vector3(-hw, hh, hl)
+        ];
+
+        const edgeIndices = [
+            0, 1, 1, 2, 2, 3, 3, 0, // bottom loop
+            4, 5, 5, 6, 6, 7, 7, 4, // top loop
+            0, 4, 1, 5, 2, 6, 3, 7  // vertical pillars
+        ];
+
+        for (let i = 0; i < this.activeCars.length; i++) {
+            const car = this.activeCars[i];
+            if (!car.active) continue;
+
+            const carMatrix = new THREE.Matrix4().compose(
+                car.worldPosition,
+                new THREE.Quaternion().setFromAxisAngle(this.yAxis, car.worldRotationY),
+                this.tempScale
+            );
+
+            const cornersWorld = cornersLocal.map(c => c.clone().applyMatrix4(carMatrix));
+
+            for (let e = 0; e < edgeIndices.length; e += 2) {
+                const c1 = cornersWorld[edgeIndices[e]];
+                const c2 = cornersWorld[edgeIndices[e + 1]];
+                boxPositions.push(c1.x, c1.y, c1.z, c2.x, c2.y, c2.z);
+            }
+        }
+
+        this.debugBoxes.geometry.setAttribute(
+            'position',
+            new THREE.Float32BufferAttribute(boxPositions, 3)
+        );
+    }
+
+    /**
+     * Logs per-car diagnostic telemetry to verify visibility, bounds, transforms, and culling state.
+     */
+    public logTrafficDiagnostics(playerZ: number): void {
+        if (this.activeCars.length === 0) return;
+        console.log(`[TRAFFIC DIAGNOSTICS] Active Cars: ${this.activeCars.length}, Player Z: ${playerZ.toFixed(1)}m`);
+        console.log(`[TRAFFIC MESH] InstancedMesh - frustumCulled: ${this.chassisInstanced.frustumCulled}, visible: ${this.chassisInstanced.visible}, parent: ${this.chassisInstanced.parent?.type}`);
+        for (let i = 0; i < this.activeCars.length; i++) {
+            const car = this.activeCars[i];
+            const dir = car.direction === TrafficDirection.ONCOMING ? 'ONCOMING' : 'SAME_DIR';
+            const dist = (car.currentZ - playerZ).toFixed(1);
+            console.log(`  Car #${car.index} (${dir}) - Pos: (${car.worldPosition.x.toFixed(2)}, ${car.worldPosition.y.toFixed(2)}, ${car.worldPosition.z.toFixed(2)}), Dist: ${dist}m, Scale: (1,1,1), frustumCulled: false, Side: Front/Double, Bounds: [x: ±1.0, y: [0, 1.25], z: ±2.2]`);
+        }
     }
 }

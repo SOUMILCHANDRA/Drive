@@ -23,7 +23,7 @@ export const Tiers: Record<QualityTier, QualityConfig> = {
         shadowSize: 0,
         postProcessing: false,
         roadReflections: false,
-        chunkLimit: 3,
+        chunkLimit: 2,
         fogDensity: 0.0025
     },
     MEDIUM: {
@@ -33,8 +33,8 @@ export const Tiers: Record<QualityTier, QualityConfig> = {
         shadowSize: 512,
         postProcessing: true,
         roadReflections: true,
-        chunkLimit: 4,
-        fogDensity: 0.0016
+        chunkLimit: 3,
+        fogDensity: 0.0018
     },
     HIGH: {
         tier: 'HIGH',
@@ -43,8 +43,8 @@ export const Tiers: Record<QualityTier, QualityConfig> = {
         shadowSize: 1024,
         postProcessing: true,
         roadReflections: true,
-        chunkLimit: 5,
-        fogDensity: 0.0012
+        chunkLimit: 3,
+        fogDensity: 0.0018
     }
 };
 

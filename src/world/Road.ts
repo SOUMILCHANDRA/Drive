@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BiomeManager, type BiomeParams } from './BiomeManager';
 import { NeonSign } from './NeonSign';
 import type { QualityConfig } from '../core/QualitySettings';
@@ -58,45 +59,316 @@ const MAX_STUDS = 45;
 class SharedRoadAssets {
     // Terrain: Rich nocturnal California landscape (deep indigo/moss tones)
     public static terrainMaterial = new THREE.MeshStandardMaterial({
-        color: 0x070e1c,
+        color: 0x0c0c18,
         roughness: 0.95,
-        metalness: 0.02,
+        metalness: 0.05,
         flatShading: false,
     });
 
     // Streetlights
     public static poleMaterial = new THREE.MeshStandardMaterial({ color: 0x242838, roughness: 0.7, metalness: 0.5 });
-    public static lampMaterial = new THREE.MeshBasicMaterial({ color: 0xffa525, toneMapped: false });
-    public static streetlightPoleGeo = new THREE.CylinderGeometry(0.09, 0.22, 7.5, 6);
-    public static streetlightArmGeo = new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6);
+    public static lampMaterial = new THREE.MeshBasicMaterial({ color: 0xffb35a, toneMapped: false });
+    public static streetlightPoleGeo = (() => { const g = new THREE.CylinderGeometry(0.09, 0.22, 7.5, 6); g.clearGroups(); return g; })();
+    public static streetlightArmGeo = (() => { const g = new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6); g.clearGroups(); return g; })();
     public static streetlightLampGeo = new THREE.SphereGeometry(0.28, 6, 5);
+
+    // Lamp Bulb Volumetric Glow Sprite (Bug 3a: crossed billboard, additive)
+    private static lampGlowTex: THREE.CanvasTexture | null = null;
+    public static getLampGlowTexture(): THREE.CanvasTexture {
+        if (!this.lampGlowTex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d')!;
+            const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            grad.addColorStop(0.0, 'rgba(255, 235, 190, 1.0)');
+            grad.addColorStop(0.25, 'rgba(255, 179, 90, 0.7)');
+            grad.addColorStop(0.65, 'rgba(255, 140, 50, 0.18)');
+            grad.addColorStop(1.0, 'rgba(255, 140, 50, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 64, 64);
+            this.lampGlowTex = new THREE.CanvasTexture(canvas);
+        }
+        return this.lampGlowTex;
+    }
+
+    public static lampGlowGeo = (() => {
+        const geo = new THREE.BufferGeometry();
+        const s = 1.35;
+        const positions = new Float32Array([
+            // Quad 1: XY plane
+            -s, -s, 0,   s, -s, 0,   s,  s, 0,
+            -s, -s, 0,   s,  s, 0,  -s,  s, 0,
+            // Quad 2: YZ plane
+            0, -s, -s,   0, -s,  s,   0,  s,  s,
+            0, -s, -s,   0,  s,  s,   0,  s, -s,
+        ]);
+        const uvs = new Float32Array([
+            0, 0,  1, 0,  1, 1,
+            0, 0,  1, 1,  0, 1,
+            0, 0,  1, 0,  1, 1,
+            0, 0,  1, 1,  0, 1,
+        ]);
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        return geo;
+    })();
+
+    public static lampGlowMat = new THREE.MeshBasicMaterial({
+        map: SharedRoadAssets.getLampGlowTexture(),
+        color: 0xffb35a,
+        transparent: true,
+        opacity: 0.7,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+    });
+
+    // Road Light-Pool Decal (Bug 3a: radial-gradient quad on road under each lamp)
+    private static lightPoolTex: THREE.CanvasTexture | null = null;
+    public static getLightPoolTexture(): THREE.CanvasTexture {
+        if (!this.lightPoolTex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d')!;
+            const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+            grad.addColorStop(0.0, 'rgba(255, 179, 90, 1.0)');
+            grad.addColorStop(0.3, 'rgba(255, 179, 90, 0.65)');
+            grad.addColorStop(0.7, 'rgba(255, 179, 90, 0.2)');
+            grad.addColorStop(1.0, 'rgba(255, 179, 90, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 128, 128);
+            this.lightPoolTex = new THREE.CanvasTexture(canvas);
+        }
+        return this.lightPoolTex;
+    }
+
+    public static lightPoolGeo = (() => {
+        const geo = new THREE.PlaneGeometry(12.0, 12.0);
+        geo.rotateX(-Math.PI / 2);
+        return geo;
+    })();
+
+    public static lightPoolMat = new THREE.MeshBasicMaterial({
+        map: SharedRoadAssets.getLightPoolTexture(),
+        color: 0xffb35a,
+        transparent: true,
+        opacity: 0.35,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2
+    });
 
     // Highway Guardrails
     public static guardrailMat = new THREE.MeshStandardMaterial({ color: 0x484f64, roughness: 0.45, metalness: 0.7 });
     public static reflectorRedMat = new THREE.MeshBasicMaterial({ color: 0xff2020, toneMapped: false });
     public static reflectorWhiteMat = new THREE.MeshBasicMaterial({ color: 0xf5f8ff, toneMapped: false });
-    public static guardrailPostGeo = new THREE.BoxGeometry(0.14, 0.95, 0.14);
-    public static guardrailBeamGeo = new THREE.BoxGeometry(0.08, 0.36, 12.6);
-    public static reflectorGeo = new THREE.BoxGeometry(0.06, 0.14, 0.14);
+    public static guardrailPostGeo = (() => { const g = new THREE.BoxGeometry(0.14, 0.95, 0.14); g.clearGroups(); return g; })();
+    public static guardrailBeamGeo = (() => { const g = new THREE.BoxGeometry(0.08, 0.36, 12.6); g.clearGroups(); return g; })();
+    public static reflectorGeo = (() => { const g = new THREE.BoxGeometry(0.06, 0.14, 0.14); g.clearGroups(); return g; })();
 
     // Road Studs (Cat's Eyes)
     public static studMat = new THREE.MeshBasicMaterial({ color: 0xffb830, toneMapped: false });
-    public static studGeo = new THREE.BoxGeometry(0.16, 0.06, 0.24);
+    public static studGeo = (() => { const g = new THREE.BoxGeometry(0.16, 0.06, 0.24); g.clearGroups(); return g; })();
 
     // Palms
     public static palmTrunkMaterial = new THREE.MeshStandardMaterial({ color: 0x281a10, roughness: 0.95 });
     public static palmFrondMaterial = new THREE.MeshStandardMaterial({ color: 0x142208, roughness: 0.95, side: THREE.DoubleSide });
-    public static palmTrunkGeo = new THREE.CylinderGeometry(0.14, 0.32, 11.5, 6);
+    public static palmTrunkGeo = (() => { const g = new THREE.CylinderGeometry(0.14, 0.32, 11.5, 6); g.clearGroups(); return g; })();
     public static palmFrondGeo = new THREE.PlaneGeometry(0.55, 4.2);
 
-    // Freeway Overpass & Gantries
+    // Freeway Overpass with side pillars
     public static overpassMat = new THREE.MeshStandardMaterial({ color: 0x1e2433, roughness: 0.85, metalness: 0.2 });
-    public static overpassGeo = new THREE.BoxGeometry(18, 1.4, 8);
-    public static gantrySignMat = new THREE.MeshBasicMaterial({ color: 0x006633 });
-    public static gantrySignGeo = new THREE.PlaneGeometry(6.5, 2.2);
+    public static overpassGeo = (() => {
+        const deck = new THREE.BoxGeometry(26, 1.4, 6.5);
+        deck.clearGroups();
+        const pillarL = new THREE.CylinderGeometry(0.65, 0.65, 8.0, 8);
+        pillarL.clearGroups();
+        pillarL.translate(-9.2, -3.8, 0);
+        const pillarR = new THREE.CylinderGeometry(0.65, 0.65, 8.0, 8);
+        pillarR.clearGroups();
+        pillarR.translate(9.2, -3.8, 0);
+        const merged = BufferGeometryUtils.mergeGeometries([deck, pillarL, pillarR]);
+        merged.clearGroups();
+        return merged;
+    })();
+    public static gantrySignMat = new THREE.MeshBasicMaterial({ color: 0x00552b });
+    public static gantrySignGeo = (() => { const g = new THREE.PlaneGeometry(6.5, 2.2); g.clearGroups(); return g; })();
 
-    // Buildings & Windows
-    public static buildingBodyMat = new THREE.MeshStandardMaterial({ color: 0x080c16, roughness: 0.88, metalness: 0.12 });
+    // Bridge: 42m tall suspension pylons & red warning beacons
+    public static bridgePylonGeo = (() => {
+        const tL = new THREE.BoxGeometry(1.6, 42, 1.8);
+        tL.clearGroups();
+        tL.translate(-8.6, 21, 0);
+        const tR = new THREE.BoxGeometry(1.6, 42, 1.8);
+        tR.clearGroups();
+        tR.translate(8.6, 21, 0);
+        const beam = new THREE.BoxGeometry(18.8, 1.5, 1.6);
+        beam.clearGroups();
+        beam.translate(0, 36, 0);
+        const merged = BufferGeometryUtils.mergeGeometries([tL, tR, beam]);
+        merged.clearGroups();
+        return merged;
+    })();
+    public static bridgePylonMat = new THREE.MeshStandardMaterial({
+        color: 0x222a3a,
+        roughness: 0.6,
+        metalness: 0.4
+    });
+    public static beaconGeo = new THREE.SphereGeometry(0.45, 8, 6);
+    public static beaconRedMat = new THREE.MeshBasicMaterial({ color: 0xff1818, toneMapped: false });
+
+    // Gas Station Oasis: Illuminated canopy, fuel dispensers, forecourt light, and neon totem
+    public static gasCanopyGeo = (() => {
+        const roof = new THREE.BoxGeometry(20, 0.8, 12);
+        roof.clearGroups();
+        roof.translate(0, 5.2, 0);
+        const p1 = new THREE.CylinderGeometry(0.24, 0.24, 5.2, 8);
+        p1.clearGroups();
+        p1.translate(-6, 2.6, -3.5);
+        const p2 = new THREE.CylinderGeometry(0.24, 0.24, 5.2, 8);
+        p2.clearGroups();
+        p2.translate(6, 2.6, -3.5);
+        const p3 = new THREE.CylinderGeometry(0.24, 0.24, 5.2, 8);
+        p3.clearGroups();
+        p3.translate(-6, 2.6, 3.5);
+        const p4 = new THREE.CylinderGeometry(0.24, 0.24, 5.2, 8);
+        p4.clearGroups();
+        p4.translate(6, 2.6, 3.5);
+        const island1 = new THREE.BoxGeometry(1.2, 1.4, 2.8);
+        island1.clearGroups();
+        island1.translate(-3.5, 0.7, 0);
+        const island2 = new THREE.BoxGeometry(1.2, 1.4, 2.8);
+        island2.clearGroups();
+        island2.translate(3.5, 0.7, 0);
+        const merged = BufferGeometryUtils.mergeGeometries([roof, p1, p2, p3, p4, island1, island2]);
+        merged.clearGroups();
+        return merged;
+    })();
+    public static gasCanopyMat = new THREE.MeshStandardMaterial({
+        color: 0x242a3a,
+        roughness: 0.5,
+        metalness: 0.3
+    });
+    public static gasForecourtGeo = (() => {
+        const pad = new THREE.PlaneGeometry(22, 14);
+        pad.clearGroups();
+        pad.rotateX(-Math.PI / 2);
+        return pad;
+    })();
+    public static gasForecourtMat = new THREE.MeshBasicMaterial({
+        color: 0xffe8b0,
+        transparent: true,
+        opacity: 0.28,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1.5,
+        polygonOffsetUnits: -1.5
+    });
+    public static gasTotemGeo = (() => {
+        const pole = new THREE.BoxGeometry(0.6, 11, 0.6);
+        pole.clearGroups();
+        pole.translate(0, 5.5, 0);
+        const board = new THREE.BoxGeometry(4.2, 3.2, 0.8);
+        board.clearGroups();
+        board.translate(0, 9.5, 0);
+        const merged = BufferGeometryUtils.mergeGeometries([pole, board]);
+        merged.clearGroups();
+        return merged;
+    })();
+    public static gasTotemMat = new THREE.MeshStandardMaterial({
+        color: 0x161a26,
+        roughness: 0.6,
+        metalness: 0.4
+    });
+    public static gasSignFaceGeo = (() => { const g = new THREE.PlaneGeometry(3.8, 2.8); g.clearGroups(); return g; })();
+    public static gasSignFaceMat = new THREE.MeshBasicMaterial({
+        color: 0xff2a85, // hot pink neon glow
+        toneMapped: false
+    });
+
+    // Side Exit: 4.2m wide x 90m long off-ramp branching right
+    public static exitRampGeo = (() => {
+        const geo = new THREE.PlaneGeometry(4.2, 90, 1, 8);
+        geo.clearGroups();
+        geo.rotateX(-Math.PI / 2);
+        return geo;
+    })();
+
+    // Lit Intersection on Non-Player Side (x < 0)
+    public static crossStreetGeo = (() => {
+        const plane = new THREE.PlaneGeometry(24, 8);
+        plane.clearGroups();
+        plane.rotateX(-Math.PI / 2);
+        plane.translate(-19, 0.02, 0);
+        return plane;
+    })();
+    public static trafficSignalGeo = (() => {
+        const pole = new THREE.CylinderGeometry(0.12, 0.16, 7.5, 8);
+        pole.clearGroups();
+        pole.translate(-7.5, 3.75, 0);
+        const arm = new THREE.CylinderGeometry(0.08, 0.08, 8.0, 6);
+        arm.clearGroups();
+        arm.rotateZ(Math.PI / 2);
+        arm.translate(-11.5, 7.0, 0);
+        const box = new THREE.BoxGeometry(0.35, 0.95, 0.35);
+        box.clearGroups();
+        box.translate(-12.5, 6.3, 0);
+        const merged = BufferGeometryUtils.mergeGeometries([pole, arm, box]);
+        merged.clearGroups();
+        return merged;
+    })();
+    public static trafficSignalMat = new THREE.MeshStandardMaterial({
+        color: 0x222630,
+        roughness: 0.6,
+        metalness: 0.5
+    });
+    public static signalLensGeo = new THREE.SphereGeometry(0.14, 6, 4);
+    public static signalGreenMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff88,
+        toneMapped: false
+    });
+
+    // Buildings & Procedural Windows (Bug 3d: crisp window grid, ~20% warm yellow/cool cyan lit)
+    public static buildingBodyMat = new THREE.MeshStandardMaterial({
+        color: 0x14142a,
+        roughness: 0.8,
+        metalness: 0.1
+    });
+
+    // Helper: evaluate continuous terrain elevation at any (x, z)
+    public static computeTerrainElevation(bx: number, bz: number, roadY: number, sideDistance: number): number {
+        const terrainStart = 7.4;
+        const terrainWidth = 460;
+        const u = Math.max(0.0, Math.min(1.0, (sideDistance - terrainStart) / terrainWidth));
+        if (u <= 0.001) return roadY;
+
+        const hillLow = noise2D(bx * 0.0035, bz * 0.0025) * 58;
+        const hillMid = noise2D(bx * 0.012, bz * 0.009) * 16;
+        const hillHigh = noise2D(bx * 0.03, bz * 0.02) * 4.5;
+        const totalHill = hillLow + hillMid + hillHigh;
+
+        const blend = Math.pow(Math.min(1.0, u / 0.16), 1.5);
+        const taper = Math.cos(Math.max(0.0, (u - 0.75) / 0.25) * (Math.PI / 2));
+        let elevation = roadY - 0.32 + (totalHill * blend * taper);
+
+        // Bridge section (every 6000m at offset 1500-3000m): drop terrain into a coastal bay
+        const cycleZ = ((bz % 6000) + 6000) % 6000;
+        if (cycleZ >= 1400 && cycleZ <= 3100) {
+            const bridgeCenter = 2250;
+            const bDist = Math.abs(cycleZ - bridgeCenter);
+            const dropFactor = Math.max(0.0, 1.0 - bDist / 850);
+            const drop = dropFactor * dropFactor * 24.0;
+            elevation = Math.min(roadY - 1.2, elevation - drop);
+        }
+
+        return elevation;
+    }
+
     public static windowMatAmber = new THREE.MeshBasicMaterial({ color: 0xff9933, toneMapped: false });
     public static windowMatGold = new THREE.MeshBasicMaterial({ color: 0xffc855, toneMapped: false });
     public static windowMatCyan = new THREE.MeshBasicMaterial({ color: 0x44ddff, toneMapped: false });
@@ -107,9 +379,10 @@ class SharedRoadAssets {
     public static archMat = new THREE.MeshStandardMaterial({ color: 0x161c28, roughness: 0.85 });
 
     // Billboards
-    public static billboardPoleGeo = new THREE.CylinderGeometry(0.2, 0.32, 14, 6);
-    public static billboardBoardGeo = new THREE.PlaneGeometry(13, 3.4);
+    public static billboardPoleGeo = (() => { const g = new THREE.CylinderGeometry(0.2, 0.32, 14, 6); g.clearGroups(); return g; })();
+    public static billboardBoardGeo = (() => { const g = new THREE.PlaneGeometry(13, 3.4); g.clearGroups(); return g; })();
     private static billboardTextures: THREE.CanvasTexture[] = [];
+    private static billboardMaterials: THREE.MeshBasicMaterial[] = [];
 
     public static getBillboardTexture(index: number): THREE.CanvasTexture {
         if (this.billboardTextures.length === 0) {
@@ -132,7 +405,70 @@ class SharedRoadAssets {
         }
         return this.billboardTextures[index % this.billboardTextures.length];
     }
+
+    public static getBillboardMaterial(index: number): THREE.MeshBasicMaterial {
+        const i = index % 7;
+        if (!this.billboardMaterials[i]) {
+            this.billboardMaterials[i] = new THREE.MeshBasicMaterial({
+                map: this.getBillboardTexture(i)
+            });
+        }
+        return this.billboardMaterials[i];
+    }
 }
+
+// Inject procedural window shader into buildingBodyMat (Bug 3d)
+SharedRoadAssets.buildingBodyMat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `#include <common>
+        varying vec3 vWorldPos;
+        varying vec3 vNormalVec;`
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+        vNormalVec = normalize((modelMatrix * vec4(normal, 0.0)).xyz);`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <common>',
+        `#include <common>
+        varying vec3 vWorldPos;
+        varying vec3 vNormalVec;`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <opaque_fragment>',
+        `
+        // Procedural crisp rectangular window grid on building facades (Bug 3d)
+        if (abs(vNormalVec.y) < 0.3) {
+            float horiz = abs(vNormalVec.x) > abs(vNormalVec.z) ? vWorldPos.z : vWorldPos.x;
+            float vert = vWorldPos.y;
+
+            float densityX = 0.35; // window every ~2.8m
+            float densityY = 0.30; // window floor every ~3.3m
+
+            vec2 cell = vec2(horiz * densityX, vert * densityY);
+            vec2 g = fract(cell);
+            vec2 cellId = floor(cell);
+
+            // Crisp window rectangle: width 0.58 of cell, height 0.64 of cell
+            vec2 wBox = step(vec2(0.21, 0.18), g) * (1.0 - step(vec2(0.79, 0.82), g));
+            float isWin = wBox.x * wBox.y;
+
+            if (isWin > 0.5) {
+                float rnd = fract(sin(dot(cellId, vec2(12.9898, 78.233))) * 43758.5453);
+                // ~20% of windows lit with warm yellow / cool cyan emissive
+                if (rnd < 0.22) {
+                    vec3 winColor = rnd < 0.15 ? vec3(1.0, 0.76, 0.32) : vec3(0.25, 0.85, 1.0);
+                    outgoingLight += winColor * 1.6;
+                }
+            }
+        }
+        #include <opaque_fragment>
+        `
+    );
+};
 
 // ─── RoadChunk: High Fidelity Highway Section ────────────────────────────────
 
@@ -162,6 +498,8 @@ class RoadChunk {
     private streetPolesMesh: THREE.InstancedMesh;
     private streetArmsMesh: THREE.InstancedMesh;
     private streetLampsMesh: THREE.InstancedMesh;
+    private streetLampGlowsMesh: THREE.InstancedMesh;
+    private streetLightPoolsMesh: THREE.InstancedMesh;
     private palmTrunksMesh: THREE.InstancedMesh;
     private palmFrondsMesh: THREE.InstancedMesh;
     private tunnelArchesMesh: THREE.InstancedMesh;
@@ -171,6 +509,19 @@ class RoadChunk {
     private roadStudsMesh: THREE.InstancedMesh;
     private overpassMesh: THREE.InstancedMesh;
     private billboardsGroup: THREE.Group;
+
+    // Landmark & Layout Instanced Meshes (Bug 4)
+    private bridgePylonsMesh: THREE.InstancedMesh;
+    private bridgeBeaconsMesh: THREE.InstancedMesh;
+    private gasCanopyMesh: THREE.InstancedMesh;
+    private gasForecourtMesh: THREE.InstancedMesh;
+    private gasTotemMesh: THREE.InstancedMesh;
+    private gasSignFaceMesh: THREE.InstancedMesh;
+    private exitRampsMesh: THREE.InstancedMesh;
+    private exitSignsMesh: THREE.InstancedMesh;
+    private crossStreetsMesh: THREE.InstancedMesh;
+    private trafficSignalsMesh: THREE.InstancedMesh;
+    private signalLensesMesh: THREE.InstancedMesh;
 
     private dummy = new THREE.Object3D();
 
@@ -191,6 +542,7 @@ class RoadChunk {
 
         // 2. Instanced Highway Meshes
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+        boxGeo.clearGroups();
         this.buildingMesh = new THREE.InstancedMesh(boxGeo, SharedRoadAssets.buildingBodyMat, MAX_BUILDINGS);
         this.windowAmberMesh = new THREE.InstancedMesh(SharedRoadAssets.windowGeo, SharedRoadAssets.windowMatAmber, MAX_WINDOWS);
         this.windowGoldMesh = new THREE.InstancedMesh(SharedRoadAssets.windowGeo, SharedRoadAssets.windowMatGold, MAX_WINDOWS);
@@ -199,6 +551,8 @@ class RoadChunk {
         this.streetPolesMesh = new THREE.InstancedMesh(SharedRoadAssets.streetlightPoleGeo, SharedRoadAssets.poleMaterial, MAX_STREETLIGHTS);
         this.streetArmsMesh = new THREE.InstancedMesh(SharedRoadAssets.streetlightArmGeo, SharedRoadAssets.poleMaterial, MAX_STREETLIGHTS);
         this.streetLampsMesh = new THREE.InstancedMesh(SharedRoadAssets.streetlightLampGeo, SharedRoadAssets.lampMaterial, MAX_STREETLIGHTS);
+        this.streetLampGlowsMesh = new THREE.InstancedMesh(SharedRoadAssets.lampGlowGeo, SharedRoadAssets.lampGlowMat, MAX_STREETLIGHTS);
+        this.streetLightPoolsMesh = new THREE.InstancedMesh(SharedRoadAssets.lightPoolGeo, SharedRoadAssets.lightPoolMat, MAX_STREETLIGHTS);
 
         this.palmTrunksMesh = new THREE.InstancedMesh(SharedRoadAssets.palmTrunkGeo, SharedRoadAssets.palmTrunkMaterial, MAX_PALMS);
         this.palmFrondsMesh = new THREE.InstancedMesh(SharedRoadAssets.palmFrondGeo, SharedRoadAssets.palmFrondMaterial, MAX_FRONDS);
@@ -210,7 +564,69 @@ class RoadChunk {
         this.roadStudsMesh = new THREE.InstancedMesh(SharedRoadAssets.studGeo, SharedRoadAssets.studMat, MAX_STUDS);
         this.overpassMesh = new THREE.InstancedMesh(SharedRoadAssets.overpassGeo, SharedRoadAssets.overpassMat, 4);
 
+        // Landmark & Highway Layout Instanced Meshes (Bug 4)
+        this.bridgePylonsMesh = new THREE.InstancedMesh(SharedRoadAssets.bridgePylonGeo, SharedRoadAssets.bridgePylonMat, 2);
+        this.bridgeBeaconsMesh = new THREE.InstancedMesh(SharedRoadAssets.beaconGeo, SharedRoadAssets.beaconRedMat, 4);
+
+        this.gasCanopyMesh = new THREE.InstancedMesh(SharedRoadAssets.gasCanopyGeo, SharedRoadAssets.gasCanopyMat, 2);
+        this.gasForecourtMesh = new THREE.InstancedMesh(SharedRoadAssets.gasForecourtGeo, SharedRoadAssets.gasForecourtMat, 2);
+        this.gasTotemMesh = new THREE.InstancedMesh(SharedRoadAssets.gasTotemGeo, SharedRoadAssets.gasTotemMat, 2);
+        this.gasSignFaceMesh = new THREE.InstancedMesh(SharedRoadAssets.gasSignFaceGeo, SharedRoadAssets.gasSignFaceMat, 2);
+
+        this.exitRampsMesh = new THREE.InstancedMesh(SharedRoadAssets.exitRampGeo, roadMaterial, 2);
+        this.exitSignsMesh = new THREE.InstancedMesh(SharedRoadAssets.gantrySignGeo, SharedRoadAssets.gantrySignMat, 2);
+
+        this.crossStreetsMesh = new THREE.InstancedMesh(SharedRoadAssets.crossStreetGeo, roadMaterial, 2);
+        this.trafficSignalsMesh = new THREE.InstancedMesh(SharedRoadAssets.trafficSignalGeo, SharedRoadAssets.trafficSignalMat, 2);
+        this.signalLensesMesh = new THREE.InstancedMesh(SharedRoadAssets.signalLensGeo, SharedRoadAssets.signalGreenMat, 2);
+
         this.billboardsGroup = new THREE.Group();
+
+        const allInstanced = [
+            this.buildingMesh,
+            this.windowAmberMesh,
+            this.windowGoldMesh,
+            this.windowCyanMesh,
+            this.streetPolesMesh,
+            this.streetArmsMesh,
+            this.streetLampsMesh,
+            this.streetLampGlowsMesh,
+            this.streetLightPoolsMesh,
+            this.palmTrunksMesh,
+            this.palmFrondsMesh,
+            this.tunnelArchesMesh,
+            this.guardrailPostsMesh,
+            this.guardrailBeamsMesh,
+            this.guardrailReflectorsMesh,
+            this.roadStudsMesh,
+            this.overpassMesh,
+            this.bridgePylonsMesh,
+            this.bridgeBeaconsMesh,
+            this.gasCanopyMesh,
+            this.gasForecourtMesh,
+            this.gasTotemMesh,
+            this.gasSignFaceMesh,
+            this.exitRampsMesh,
+            this.exitSignsMesh,
+            this.crossStreetsMesh,
+            this.trafficSignalsMesh,
+            this.signalLensesMesh
+        ];
+        for (const m of allInstanced) {
+            m.visible = false;
+            m.count = 0;
+            m.castShadow = false;
+            m.receiveShadow = false;
+        }
+        this.buildingMesh.castShadow = true;
+        this.buildingMesh.receiveShadow = true;
+        this.buildingMesh.layers.enable(1); // Road dynamic reflection
+        this.overpassMesh.castShadow = true;
+        this.bridgePylonsMesh.castShadow = true;
+        this.bridgePylonsMesh.layers.enable(1);
+        this.tunnelArchesMesh.castShadow = true;
+        this.gasCanopyMesh.castShadow = true;
+        this.gasCanopyMesh.layers.enable(1);
 
         this.cityGroup.add(
             this.buildingMesh,
@@ -220,6 +636,8 @@ class RoadChunk {
             this.streetPolesMesh,
             this.streetArmsMesh,
             this.streetLampsMesh,
+            this.streetLampGlowsMesh,
+            this.streetLightPoolsMesh,
             this.palmTrunksMesh,
             this.palmFrondsMesh,
             this.tunnelArchesMesh,
@@ -228,6 +646,17 @@ class RoadChunk {
             this.guardrailReflectorsMesh,
             this.roadStudsMesh,
             this.overpassMesh,
+            this.bridgePylonsMesh,
+            this.bridgeBeaconsMesh,
+            this.gasCanopyMesh,
+            this.gasForecourtMesh,
+            this.gasTotemMesh,
+            this.gasSignFaceMesh,
+            this.exitRampsMesh,
+            this.exitSignsMesh,
+            this.crossStreetsMesh,
+            this.trafficSignalsMesh,
+            this.signalLensesMesh,
             this.billboardsGroup
         );
     }
@@ -353,6 +782,17 @@ class RoadChunk {
         let guardrailCount = 0;
         let studCount = 0;
         let overpassCount = 0;
+        let bridgePylonCount = 0;
+        let bridgeBeaconCount = 0;
+        let gasCanopyCount = 0;
+        let gasForecourtCount = 0;
+        let gasTotemCount = 0;
+        let gasSignFaceCount = 0;
+        let exitRampCount = 0;
+        let exitSignCount = 0;
+        let crossStreetCount = 0;
+        let trafficSignalCount = 0;
+        let signalLensCount = 0;
 
         // 2. Road Studs along Double Yellow Divider
         const studSteps = 35;
@@ -406,21 +846,23 @@ class RoadChunk {
             }
         }
 
-        // 4. Highway Overpasses
-        if (params.name !== 'TUNNEL' && Math.random() < 0.35 && overpassCount < 2) {
-            const t = 0.5;
-            const pt = this.curve.getPoint(t);
-            const tangent = this.curve.getTangent(t);
-            this.dummy.position.set(pt.x, pt.y + 7.5, pt.z);
-            this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
-            this.dummy.rotation.y += Math.PI / 2;
-            this.dummy.scale.set(1, 1, 1);
-            this.dummy.updateMatrix();
-            this.overpassMesh.setMatrixAt(overpassCount++, this.dummy.matrix);
+        // 4. Occasional Highway Overpasses (Bug 4)
+        if (params.name !== 'THE TUNNEL' && params.name !== 'TUNNEL' && params.name !== 'THE BRIDGE') {
+            if ((this.startZ % 1500) === 0 && this.startZ > 0) {
+                const t = 0.5;
+                const pt = this.curve.getPoint(t);
+                const tangent = this.curve.getTangent(t);
+                this.dummy.position.set(pt.x, pt.y + 7.5, pt.z);
+                this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                this.dummy.rotation.y += Math.PI / 2;
+                this.dummy.scale.set(1, 1, 1);
+                this.dummy.updateMatrix();
+                this.overpassMesh.setMatrixAt(overpassCount++, this.dummy.matrix);
+            }
         }
 
-        // 5. Tunnel Arch Check
-        if (params.name === 'TUNNEL') {
+        // 5. Tunnel Arch Check (Bug 4 landmark)
+        if (params.name === 'THE TUNNEL' || params.name === 'TUNNEL') {
             const archCount = 14;
             for (let i = 0; i < archCount; i++) {
                 const t = (i + 0.5) / archCount;
@@ -436,16 +878,139 @@ class RoadChunk {
                 const lightPos = pt.clone().add(new THREE.Vector3(0, 8.5, 0));
                 this.streetlightGlows.push(lightPos);
             }
+            this.tunnelArchesMesh.visible = archCount > 0;
             this.tunnelArchesMesh.count = archCount;
-            this.tunnelArchesMesh.instanceMatrix.needsUpdate = true;
-            this.applyMeshCounts(buildingCount, amberWinCount, goldWinCount, cyanWinCount, streetCount, palmCount, frondCount, guardrailCount, studCount, overpassCount);
+            this.tunnelArchesMesh.instanceMatrix.needsUpdate = archCount > 0;
+            this.applyMeshCounts(
+                buildingCount, amberWinCount, goldWinCount, cyanWinCount, streetCount,
+                palmCount, frondCount, guardrailCount, studCount, overpassCount,
+                bridgePylonCount, bridgeBeaconCount, gasCanopyCount, gasForecourtCount,
+                gasTotemCount, gasSignFaceCount, exitRampCount, exitSignCount,
+                crossStreetCount, trafficSignalCount, signalLensCount
+            );
             scene.add(this.cityGroup);
             return;
         } else {
+            this.tunnelArchesMesh.visible = false;
             this.tunnelArchesMesh.count = 0;
         }
 
-        // 6. Roadside Architecture & Nature (Set back gracefully from highway)
+        // 6. The Bridge Landmark Check (Bug 4: 42m suspension towers with red beacons)
+        if (params.name === 'THE BRIDGE') {
+            if (this.startZ % 1500 === 500) {
+                const t = 0.5;
+                const pt = this.curve.getPoint(t);
+                const tangent = this.curve.getTangent(t);
+                const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+                this.dummy.position.copy(pt);
+                this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                this.dummy.scale.set(1, 1, 1);
+                this.dummy.updateMatrix();
+                this.bridgePylonsMesh.setMatrixAt(bridgePylonCount++, this.dummy.matrix);
+
+                // Red aviation warning beacons atop towers (y + 42m)
+                [-8.6, 8.6].forEach(offset => {
+                    const bpos = pt.clone().add(normal.clone().multiplyScalar(offset)).add(new THREE.Vector3(0, 42.2, 0));
+                    this.dummy.position.copy(bpos);
+                    this.dummy.updateMatrix();
+                    this.bridgeBeaconsMesh.setMatrixAt(bridgeBeaconCount++, this.dummy.matrix);
+                });
+            }
+        }
+
+        // 7. Gas Station Oasis Landmark Check (Bug 4: canopy, forecourt, and pink/cyan neon totem)
+        if (params.name === 'GAS STATION OASIS') {
+            if (this.startZ % 1500 === 500) {
+                const t = 0.5;
+                const pt = this.curve.getPoint(t);
+                const tangent = this.curve.getTangent(t);
+                const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+                const gasPos = pt.clone().add(normal.clone().multiplyScalar(22.0));
+                gasPos.y = pt.y;
+
+                // Canopy
+                this.dummy.position.copy(gasPos);
+                this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                this.dummy.scale.set(1, 1, 1);
+                this.dummy.updateMatrix();
+                this.gasCanopyMesh.setMatrixAt(gasCanopyCount++, this.dummy.matrix);
+
+                // Forecourt illumination decal
+                const padPos = gasPos.clone();
+                padPos.y = pt.y + 0.03;
+                this.dummy.position.copy(padPos);
+                this.dummy.updateMatrix();
+                this.gasForecourtMesh.setMatrixAt(gasForecourtCount++, this.dummy.matrix);
+
+                // Totem pylon sign
+                const totemPos = pt.clone().add(normal.clone().multiplyScalar(15.0)).add(tangent.clone().multiplyScalar(-24.0));
+                totemPos.y = pt.y;
+                this.dummy.position.copy(totemPos);
+                this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                this.dummy.updateMatrix();
+                this.gasTotemMesh.setMatrixAt(gasTotemCount++, this.dummy.matrix);
+
+                // Neon sign face on totem
+                const facePos = totemPos.clone().add(new THREE.Vector3(0, 9.5, 0)).add(tangent.clone().multiplyScalar(0.42));
+                this.dummy.position.copy(facePos);
+                this.dummy.updateMatrix();
+                this.gasSignFaceMesh.setMatrixAt(gasSignFaceCount++, this.dummy.matrix);
+
+                this.streetlightGlows.push(gasPos.clone().add(new THREE.Vector3(0, 5.0, 0)));
+            }
+        }
+
+        // 8. Side Exits (Bug 4: off-ramp branching right with green gantry sign)
+        if (params.name !== 'THE TUNNEL' && params.name !== 'TUNNEL' && params.name !== 'THE BRIDGE') {
+            if ((this.startZ % 1500) === 1000) {
+                const t = 0.35;
+                const pt = this.curve.getPoint(t);
+                const tangent = this.curve.getTangent(t);
+                const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+                const rampPos = pt.clone().add(normal.clone().multiplyScalar(11.5)).add(tangent.clone().multiplyScalar(25.0));
+                rampPos.y = pt.y + 0.02;
+                this.dummy.position.copy(rampPos);
+                this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                this.dummy.rotation.y -= 0.16;
+                this.dummy.scale.set(1, 1, 1);
+                this.dummy.updateMatrix();
+                this.exitRampsMesh.setMatrixAt(exitRampCount++, this.dummy.matrix);
+
+                const signPos = pt.clone().add(normal.clone().multiplyScalar(5.5));
+                signPos.y = pt.y + 6.8;
+                this.dummy.position.copy(signPos);
+                this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                this.dummy.updateMatrix();
+                this.exitSignsMesh.setMatrixAt(exitSignCount++, this.dummy.matrix);
+            }
+        }
+
+        // 9. Lit Intersections on Non-Player Side (Bug 4: cross street left with traffic signal)
+        if (params.name !== 'THE TUNNEL' && params.name !== 'TUNNEL' && params.name !== 'THE BRIDGE') {
+            if ((this.startZ % 1500) === 500 && params.name !== 'GAS STATION OASIS') {
+                const t = 0.65;
+                const pt = this.curve.getPoint(t);
+                const tangent = this.curve.getTangent(t);
+
+                this.dummy.position.copy(pt);
+                this.dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+                this.dummy.scale.set(1, 1, 1);
+                this.dummy.updateMatrix();
+                this.crossStreetsMesh.setMatrixAt(crossStreetCount++, this.dummy.matrix);
+
+                this.trafficSignalsMesh.setMatrixAt(trafficSignalCount++, this.dummy.matrix);
+
+                const lensPos = pt.clone().add(new THREE.Vector3(-12.5, 6.3, 0).applyQuaternion(this.dummy.quaternion));
+                this.dummy.position.copy(lensPos);
+                this.dummy.updateMatrix();
+                this.signalLensesMesh.setMatrixAt(signalLensCount++, this.dummy.matrix);
+            }
+        }
+
+        // 6. Roadside Architecture & Nature (Bug 3d & 3e: grounded on terrain elevation)
         const segments = 22;
         for (let i = 0; i < segments; i++) {
             const t = i / segments;
@@ -454,14 +1019,15 @@ class RoadChunk {
             const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
             for (const side of [1, -1]) {
-                // Instanced Buildings (Set back 130m - 240m forming a majestic city skyline)
+                // Instanced Buildings (Grounded on terrain elevation; procedural window shader handles windows)
                 if (Math.random() < params.buildingDensity * 0.7 && buildingCount < MAX_BUILDINGS) {
                     const h = params.buildingHeight[0] + Math.random() * (params.buildingHeight[1] - params.buildingHeight[0]);
                     const w = 24 + Math.random() * 20;
                     const d = 24 + Math.random() * 20;
                     const setback = 130 + Math.random() * 110;
                     const bpos = worldPos.clone().add(normal.clone().multiplyScalar(side * setback));
-                    bpos.y = worldPos.y + h / 2 - 2.0;
+                    const terrainY = SharedRoadAssets.computeTerrainElevation(bpos.x, bpos.z, worldPos.y, setback);
+                    bpos.y = terrainY + h / 2 - 2.0;
 
                     this.dummy.position.copy(bpos);
                     this.dummy.scale.set(w, h, d);
@@ -469,36 +1035,10 @@ class RoadChunk {
                     this.dummy.updateMatrix();
                     this.buildingMesh.setMatrixAt(buildingCount, this.dummy.matrix);
 
-                    // Dense Illuminated Window Grids across Facade
                     const bQuat = this.dummy.quaternion.clone();
-                    for (let y = 0; y < 6; y++) {
-                        for (let x = 0; x < 4; x++) {
-                            if (Math.random() > 0.28) {
-                                const localWinPos = new THREE.Vector3(
-                                    -w / 2 + 2.5 + x * (w / 4.2),
-                                    -h / 2 + 3.0 + y * (h / 6.5),
-                                    d / 2 + 0.08
-                                ).applyQuaternion(bQuat).add(bpos);
-
-                                this.dummy.position.copy(localWinPos);
-                                this.dummy.quaternion.copy(bQuat);
-                                this.dummy.scale.set(1.1, 1.1, 1);
-                                this.dummy.updateMatrix();
-
-                                const r = Math.random();
-                                if (r < 0.50 && amberWinCount < MAX_WINDOWS) {
-                                    this.windowAmberMesh.setMatrixAt(amberWinCount++, this.dummy.matrix);
-                                } else if (r < 0.80 && goldWinCount < MAX_WINDOWS) {
-                                    this.windowGoldMesh.setMatrixAt(goldWinCount++, this.dummy.matrix);
-                                } else if (cyanWinCount < MAX_WINDOWS) {
-                                    this.windowCyanMesh.setMatrixAt(cyanWinCount++, this.dummy.matrix);
-                                }
-                            }
-                        }
-                    }
 
                     // Neon Sign on Rooftop or Upper Facade
-                    if (Math.random() < params.neonDensity && this.neonSigns.length < 5) {
+                    if (Math.random() < params.neonDensity && this.neonSigns.length < 2) {
                         const sign = new NeonSign();
                         const signOffset = new THREE.Vector3(0, h / 2 - 1.2, d / 2 + 0.25).applyQuaternion(bQuat);
                         sign.position.copy(bpos).add(signOffset);
@@ -510,10 +1050,11 @@ class RoadChunk {
                     buildingCount++;
                 }
 
-                // Roadside California Palms (At highway verge x = 9m - 14m)
+                // Roadside California Palms (Bug 3e: grounded at terrain elevation)
                 if (params.hasPalms && i % 2 === 0 && Math.random() < 0.8 && palmCount < MAX_PALMS) {
-                    const ppos = worldPos.clone().add(normal.clone().multiplyScalar(side * (10 + Math.random() * 4)));
-                    ppos.y = worldPos.y - 0.2;
+                    const palmDist = 10 + Math.random() * 4;
+                    const ppos = worldPos.clone().add(normal.clone().multiplyScalar(side * palmDist));
+                    ppos.y = SharedRoadAssets.computeTerrainElevation(ppos.x, ppos.z, worldPos.y, palmDist);
 
                     this.dummy.position.set(ppos.x, ppos.y + 5.7, ppos.z);
                     this.dummy.rotation.set(0, 0, (Math.random() - 0.5) * 0.12);
@@ -537,92 +1078,188 @@ class RoadChunk {
                     }
                 }
 
-                // Billboards (Set back 28m - 38m)
-                if (Math.random() < 0.06 && params.buildingDensity > 0.1 && this.billboardsGroup.children.length < 2) {
+                // Billboards (Bug 3e: grounded at terrain elevation)
+                if (Math.random() < 0.06 && params.buildingDensity > 0.1 && this.billboardsGroup.children.length < 1) {
                     const billboard = this.createBillboard();
-                    const blpos = worldPos.clone().add(normal.clone().multiplyScalar(side * (32 + Math.random() * 10)));
+                    const bbDist = 32 + Math.random() * 10;
+                    const blpos = worldPos.clone().add(normal.clone().multiplyScalar(side * bbDist));
+                    blpos.y = SharedRoadAssets.computeTerrainElevation(blpos.x, blpos.z, worldPos.y, bbDist);
                     billboard.position.copy(blpos);
-                    billboard.position.y = worldPos.y;
-                    billboard.lookAt(worldPos.clone().setY(billboard.position.y + 7));
+                    billboard.lookAt(worldPos.clone().setY(blpos.y + 7));
                     this.billboardsGroup.add(billboard);
                 }
 
-                // Highway Streetlights
+                // Highway Streetlights (Bug 3a: pole, arm, luminaire bulb, volumetric glow sprite, and road light pool decal)
                 if (i % 3 === 0 && streetCount < MAX_STREETLIGHTS) {
-                    const slpos = worldPos.clone().add(normal.clone().multiplyScalar(side * 8.2));
+                    const slpos = worldPos.clone().add(normal.clone().multiplyScalar(side * 7.5));
                     slpos.y = worldPos.y;
 
-                    // Pole
+                    // Pole (7.5m high)
                     this.dummy.position.set(slpos.x, slpos.y + 3.75, slpos.z);
                     this.dummy.rotation.set(0, 0, 0);
                     this.dummy.scale.set(1, 1, 1);
                     this.dummy.updateMatrix();
                     this.streetPolesMesh.setMatrixAt(streetCount, this.dummy.matrix);
 
-                    // Overhanging Arm
-                    this.dummy.position.set(slpos.x + side * 1.3, slpos.y + 7.4, slpos.z);
-                    this.dummy.rotation.set(0, 0, side * Math.PI / 2);
+                    // Overhanging Arm extending towards the highway
+                    const armPos = slpos.clone().add(normal.clone().multiplyScalar(-side * 1.3));
+                    this.dummy.position.set(armPos.x, slpos.y + 7.4, armPos.z);
+                    this.dummy.rotation.set(0, 0, -side * Math.PI / 2);
+                    this.dummy.scale.set(1, 1, 1);
                     this.dummy.updateMatrix();
                     this.streetArmsMesh.setMatrixAt(streetCount, this.dummy.matrix);
 
-                    // Sodium Luminaire
-                    this.dummy.position.set(slpos.x + side * 2.5, slpos.y + 7.2, slpos.z);
+                    // Sodium Luminaire Bulb
+                    const bulbPos = slpos.clone().add(normal.clone().multiplyScalar(-side * 2.5));
+                    bulbPos.y = slpos.y + 7.2;
+                    this.dummy.position.copy(bulbPos);
                     this.dummy.rotation.set(0, 0, 0);
+                    this.dummy.scale.set(1, 1, 1);
                     this.dummy.updateMatrix();
                     this.streetLampsMesh.setMatrixAt(streetCount, this.dummy.matrix);
 
-                    this.streetlightGlows.push(new THREE.Vector3(slpos.x + side * 2.5, slpos.y + 7.2, slpos.z));
+                    // Volumetric Glow Sprite (crossed billboard, additive)
+                    this.streetLampGlowsMesh.setMatrixAt(streetCount, this.dummy.matrix);
+
+                    // Road Light-Pool Decal directly under the luminaire
+                    const decalPos = bulbPos.clone();
+                    decalPos.y = worldPos.y + 0.04;
+                    this.dummy.position.copy(decalPos);
+                    this.dummy.rotation.set(0, 0, 0);
+                    this.dummy.scale.set(1, 1, 1);
+                    this.dummy.updateMatrix();
+                    this.streetLightPoolsMesh.setMatrixAt(streetCount, this.dummy.matrix);
+
+                    this.streetlightGlows.push(bulbPos);
                     streetCount++;
                 }
             }
         }
 
-        this.applyMeshCounts(buildingCount, amberWinCount, goldWinCount, cyanWinCount, streetCount, palmCount, frondCount, guardrailCount, studCount, overpassCount);
+        this.applyMeshCounts(
+            buildingCount, amberWinCount, goldWinCount, cyanWinCount, streetCount,
+            palmCount, frondCount, guardrailCount, studCount, overpassCount,
+            bridgePylonCount, bridgeBeaconCount, gasCanopyCount, gasForecourtCount,
+            gasTotemCount, gasSignFaceCount, exitRampCount, exitSignCount,
+            crossStreetCount, trafficSignalCount, signalLensCount
+        );
         scene.add(this.cityGroup);
     }
 
-    private applyMeshCounts(bCount: number, aWin: number, gWin: number, cWin: number, sCount: number, pCount: number, fCount: number, gRail: number, stud: number, over: number): void {
+    private applyMeshCounts(
+        bCount: number, _aWin: number, _gWin: number, _cWin: number, sCount: number,
+        pCount: number, fCount: number, gRail: number, stud: number, over: number,
+        bPylon: number, bBeacon: number, gCanopy: number, gForecourt: number,
+        gTotem: number, gSignFace: number, eRamp: number, eSign: number,
+        cStreet: number, tSignal: number, sLens: number
+    ): void {
+        this.buildingMesh.visible = bCount > 0;
         this.buildingMesh.count = bCount;
-        this.buildingMesh.instanceMatrix.needsUpdate = true;
+        this.buildingMesh.instanceMatrix.needsUpdate = bCount > 0;
 
-        this.windowAmberMesh.count = aWin;
-        this.windowAmberMesh.instanceMatrix.needsUpdate = true;
+        // Procedural window shader on buildingBodyMat handles windows (Bug 3d)
+        this.windowAmberMesh.visible = false;
+        this.windowAmberMesh.count = 0;
+        this.windowGoldMesh.visible = false;
+        this.windowGoldMesh.count = 0;
+        this.windowCyanMesh.visible = false;
+        this.windowCyanMesh.count = 0;
 
-        this.windowGoldMesh.count = gWin;
-        this.windowGoldMesh.instanceMatrix.needsUpdate = true;
-
-        this.windowCyanMesh.count = cWin;
-        this.windowCyanMesh.instanceMatrix.needsUpdate = true;
-
+        this.streetPolesMesh.visible = sCount > 0;
         this.streetPolesMesh.count = sCount;
-        this.streetPolesMesh.instanceMatrix.needsUpdate = true;
+        this.streetPolesMesh.instanceMatrix.needsUpdate = sCount > 0;
 
+        this.streetArmsMesh.visible = sCount > 0;
         this.streetArmsMesh.count = sCount;
-        this.streetArmsMesh.instanceMatrix.needsUpdate = true;
+        this.streetArmsMesh.instanceMatrix.needsUpdate = sCount > 0;
 
+        this.streetLampsMesh.visible = sCount > 0;
         this.streetLampsMesh.count = sCount;
-        this.streetLampsMesh.instanceMatrix.needsUpdate = true;
+        this.streetLampsMesh.instanceMatrix.needsUpdate = sCount > 0;
 
+        this.streetLampGlowsMesh.visible = sCount > 0;
+        this.streetLampGlowsMesh.count = sCount;
+        this.streetLampGlowsMesh.instanceMatrix.needsUpdate = sCount > 0;
+
+        this.streetLightPoolsMesh.visible = sCount > 0;
+        this.streetLightPoolsMesh.count = sCount;
+        this.streetLightPoolsMesh.instanceMatrix.needsUpdate = sCount > 0;
+
+        this.palmTrunksMesh.visible = pCount > 0;
         this.palmTrunksMesh.count = pCount;
-        this.palmTrunksMesh.instanceMatrix.needsUpdate = true;
+        this.palmTrunksMesh.instanceMatrix.needsUpdate = pCount > 0;
 
+        this.palmFrondsMesh.visible = fCount > 0;
         this.palmFrondsMesh.count = fCount;
-        this.palmFrondsMesh.instanceMatrix.needsUpdate = true;
+        this.palmFrondsMesh.instanceMatrix.needsUpdate = fCount > 0;
 
+        this.tunnelArchesMesh.visible = false;
+        this.tunnelArchesMesh.count = 0;
+
+        this.guardrailPostsMesh.visible = gRail > 0;
         this.guardrailPostsMesh.count = gRail;
-        this.guardrailPostsMesh.instanceMatrix.needsUpdate = true;
+        this.guardrailPostsMesh.instanceMatrix.needsUpdate = gRail > 0;
 
-        this.guardrailBeamsMesh.count = Math.floor(gRail / 2);
-        this.guardrailBeamsMesh.instanceMatrix.needsUpdate = true;
+        const gBeam = Math.floor(gRail / 2);
+        this.guardrailBeamsMesh.visible = gBeam > 0;
+        this.guardrailBeamsMesh.count = gBeam;
+        this.guardrailBeamsMesh.instanceMatrix.needsUpdate = gBeam > 0;
 
+        this.guardrailReflectorsMesh.visible = gRail > 0;
         this.guardrailReflectorsMesh.count = gRail;
-        this.guardrailReflectorsMesh.instanceMatrix.needsUpdate = true;
+        this.guardrailReflectorsMesh.instanceMatrix.needsUpdate = gRail > 0;
 
+        this.roadStudsMesh.visible = stud > 0;
         this.roadStudsMesh.count = stud;
-        this.roadStudsMesh.instanceMatrix.needsUpdate = true;
+        this.roadStudsMesh.instanceMatrix.needsUpdate = stud > 0;
 
+        this.overpassMesh.visible = over > 0;
         this.overpassMesh.count = over;
-        this.overpassMesh.instanceMatrix.needsUpdate = true;
+        this.overpassMesh.instanceMatrix.needsUpdate = over > 0;
+
+        this.bridgePylonsMesh.visible = bPylon > 0;
+        this.bridgePylonsMesh.count = bPylon;
+        this.bridgePylonsMesh.instanceMatrix.needsUpdate = bPylon > 0;
+
+        this.bridgeBeaconsMesh.visible = bBeacon > 0;
+        this.bridgeBeaconsMesh.count = bBeacon;
+        this.bridgeBeaconsMesh.instanceMatrix.needsUpdate = bBeacon > 0;
+
+        this.gasCanopyMesh.visible = gCanopy > 0;
+        this.gasCanopyMesh.count = gCanopy;
+        this.gasCanopyMesh.instanceMatrix.needsUpdate = gCanopy > 0;
+
+        this.gasForecourtMesh.visible = gForecourt > 0;
+        this.gasForecourtMesh.count = gForecourt;
+        this.gasForecourtMesh.instanceMatrix.needsUpdate = gForecourt > 0;
+
+        this.gasTotemMesh.visible = gTotem > 0;
+        this.gasTotemMesh.count = gTotem;
+        this.gasTotemMesh.instanceMatrix.needsUpdate = gTotem > 0;
+
+        this.gasSignFaceMesh.visible = gSignFace > 0;
+        this.gasSignFaceMesh.count = gSignFace;
+        this.gasSignFaceMesh.instanceMatrix.needsUpdate = gSignFace > 0;
+
+        this.exitRampsMesh.visible = eRamp > 0;
+        this.exitRampsMesh.count = eRamp;
+        this.exitRampsMesh.instanceMatrix.needsUpdate = eRamp > 0;
+
+        this.exitSignsMesh.visible = eSign > 0;
+        this.exitSignsMesh.count = eSign;
+        this.exitSignsMesh.instanceMatrix.needsUpdate = eSign > 0;
+
+        this.crossStreetsMesh.visible = cStreet > 0;
+        this.crossStreetsMesh.count = cStreet;
+        this.crossStreetsMesh.instanceMatrix.needsUpdate = cStreet > 0;
+
+        this.trafficSignalsMesh.visible = tSignal > 0;
+        this.trafficSignalsMesh.count = tSignal;
+        this.trafficSignalsMesh.instanceMatrix.needsUpdate = tSignal > 0;
+
+        this.signalLensesMesh.visible = sLens > 0;
+        this.signalLensesMesh.count = sLens;
+        this.signalLensesMesh.instanceMatrix.needsUpdate = sLens > 0;
     }
 
     private updateTerrainMesh(mesh: THREE.Mesh, side: number): void {
@@ -634,9 +1271,11 @@ class RoadChunk {
 
         for (let iz = 0; iz <= SEG_Z; iz++) {
             const t = iz / SEG_Z;
-            const cp = this.curve.getPoint(t);
-            const tangent = this.curve.getTangent(t);
-            const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+            // Bug 3f: Sample continuous analytical road position so adjacent chunk vertices match perfectly
+            const globalZ = this.startZ + t * 500;
+            const roadInfo = Road.evaluateRoadPosition(globalZ);
+            const cp = roadInfo.position;
+            const normal = roadInfo.normal;
 
             for (let ix = 0; ix <= SEG_X; ix++) {
                 const u = ix / SEG_X;
@@ -644,18 +1283,8 @@ class RoadChunk {
                 const bx = cp.x + normal.x * (side * xDist);
                 const bz = cp.z + normal.z * (side * xDist);
 
-                // Multi-octave natural rolling hills (Slow Roads aesthetic)
-                const hillLow = noise2D(bx * 0.0035, bz * 0.0025) * 58;
-                const hillMid = noise2D(bx * 0.012, bz * 0.009) * 16;
-                const hillHigh = noise2D(bx * 0.03, bz * 0.02) * 4.5;
-                const totalHill = hillLow + hillMid + hillHigh;
-
-                // Close to road (u < 0.12): gentle ditch/shoulder dropping slightly below road
-                // Medium & far: rolling hillside rising naturally
-                const blend = Math.pow(Math.min(1.0, u / 0.16), 1.5);
-                // At far edge (u > 0.75), softly taper down into horizon fog
-                const taper = Math.cos(Math.max(0.0, (u - 0.75) / 0.25) * (Math.PI / 2));
-                const by = cp.y - 0.32 + (totalHill * blend * taper);
+                // Multi-octave continuous elevation function shared across chunks & objects (Bug 3e & 3f)
+                const by = SharedRoadAssets.computeTerrainElevation(bx, bz, cp.y, xDist);
 
                 positions[idx++] = bx;
                 positions[idx++] = by;
@@ -680,9 +1309,7 @@ class RoadChunk {
         group.add(pole);
 
         const texIndex = Math.floor(Math.random() * 7);
-        const tex = SharedRoadAssets.getBillboardTexture(texIndex);
-        const boardMat = new THREE.MeshBasicMaterial({ map: tex });
-        const board = new THREE.Mesh(SharedRoadAssets.billboardBoardGeo, boardMat);
+        const board = new THREE.Mesh(SharedRoadAssets.billboardBoardGeo, SharedRoadAssets.getBillboardMaterial(texIndex));
         board.position.y = 14;
         group.add(board);
         return group;
@@ -701,6 +1328,8 @@ class RoadChunk {
         this.streetPolesMesh.dispose();
         this.streetArmsMesh.dispose();
         this.streetLampsMesh.dispose();
+        this.streetLampGlowsMesh.dispose();
+        this.streetLightPoolsMesh.dispose();
         this.palmTrunksMesh.dispose();
         this.palmFrondsMesh.dispose();
         this.tunnelArchesMesh.dispose();
@@ -709,6 +1338,17 @@ class RoadChunk {
         this.guardrailReflectorsMesh.dispose();
         this.roadStudsMesh.dispose();
         this.overpassMesh.dispose();
+        this.bridgePylonsMesh.dispose();
+        this.bridgeBeaconsMesh.dispose();
+        this.gasCanopyMesh.dispose();
+        this.gasForecourtMesh.dispose();
+        this.gasTotemMesh.dispose();
+        this.gasSignFaceMesh.dispose();
+        this.exitRampsMesh.dispose();
+        this.exitSignsMesh.dispose();
+        this.crossStreetsMesh.dispose();
+        this.trafficSignalsMesh.dispose();
+        this.signalLensesMesh.dispose();
     }
 }
 
@@ -761,9 +1401,9 @@ export class Road {
             polygonOffsetUnits: -1.5,
         });
 
-        // Streetlights pool
-        for (let i = 0; i < 4; i++) {
-            const light = new THREE.PointLight(0xffa022, 2.8, 38, 2);
+        // Streetlights pool (Bug 3a: 6 PointLights #ffb35a, intensity ~25, distance 30, decay 2)
+        for (let i = 0; i < 6; i++) {
+            const light = new THREE.PointLight(0xffb35a, 25, 30, 2);
             light.castShadow = false;
             this.streetlights.push(light);
             this.scene.add(light);
@@ -783,10 +1423,7 @@ export class Road {
     }
 
     private addWaypoint(z: number): void {
-        // Natural sweeping highway curves with gentle elevation hills starting at origin
-        const x = Math.sin(z * 0.00038) * 75 + (Math.cos(z * 0.00085) - 1.0) * 32;
-        const y = Math.sin(z * 0.00048) * 16 + (Math.cos(z * 0.00022) - 1.0) * 10;
-        this.waypoints.push(new THREE.Vector3(x, y, z));
+        this.waypoints.push(Road.evaluateRoadPosition(z).position);
     }
 
     private initPool(): void {
@@ -796,7 +1433,7 @@ export class Road {
     }
 
     private spawnInitialChunks(): void {
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 3; i++) {
             const z = i * 500;
             this.spawnChunk(z, this.biomeManager.getParamsAt(z));
         }
@@ -815,25 +1452,49 @@ export class Road {
         const points: THREE.Vector3[] = [];
         for (let s = 0; s <= 4; s++) {
             const pz = z + s * 125;
-            const px = Math.sin(pz * 0.00038) * 75 + (Math.cos(pz * 0.00085) - 1.0) * 32;
-            const py = Math.sin(pz * 0.00048) * 16 + (Math.cos(pz * 0.00022) - 1.0) * 10;
-            points.push(new THREE.Vector3(px, py, pz));
+            points.push(Road.evaluateRoadPosition(pz).position);
         }
         chunk.activate(z, points, this.scene, params);
         this.scene.add(chunk.mesh, chunk.yellowLines, chunk.whiteLines);
         this.chunks.push(chunk);
     }
 
-    public getRoadPositionAt(z: number): { position: THREE.Vector3; tangent: THREE.Vector3 } {
-        const safeZ = Math.max(0, z);
-        const x = Math.sin(safeZ * 0.00038) * 75 + (Math.cos(safeZ * 0.00085) - 1.0) * 32;
-        const y = Math.sin(safeZ * 0.00048) * 16 + (Math.cos(safeZ * 0.00022) - 1.0) * 10;
-        
-        const dx = 75 * 0.00038 * Math.cos(safeZ * 0.00038) - 32 * 0.00085 * Math.sin(safeZ * 0.00085);
-        const dy = 16 * 0.00048 * Math.cos(safeZ * 0.00048) - 10 * 0.00022 * Math.sin(safeZ * 0.00022);
+    public static evaluateRoadPosition(globalZ: number): { position: THREE.Vector3; tangent: THREE.Vector3; normal: THREE.Vector3 } {
+        const safeZ = Math.max(0, globalZ);
+
+        // Gentle sweeping highway curves (curvature strictly < 1/400m, min R > 1000m)
+        // Starts straight at origin (x(0)=0, dx/dz(0)=0) and smoothly sweeps into curves
+        const w1 = 0.0020;
+        const w2 = 0.0010;
+        const w3 = 0.0007;
+        const A1 = 120.0;
+        const A2 = 72.0;
+
+        const u1 = 1.0 - Math.cos(safeZ * w1);
+        const s1 = Math.sin(safeZ * w2);
+        const u2 = 1.0 - Math.cos(safeZ * w3);
+
+        const x = u1 * A1 * s1 + u2 * A2;
+        const dx = (w1 * Math.sin(safeZ * w1) * s1 + u1 * w2 * Math.cos(safeZ * w2)) * A1 + (w3 * Math.sin(safeZ * w3)) * A2;
+
+        // Rising and falling highway grade (smooth undulations, max 3.8% slope)
+        const wy1 = 0.0014;
+        const wy2 = 0.0007;
+        const uy1 = 1.0 - Math.cos(safeZ * wy1);
+        const sy1 = Math.sin(safeZ * wy2);
+
+        const y = uy1 * 24.0 * sy1;
+        const dy = (wy1 * Math.sin(safeZ * wy1) * sy1 + uy1 * wy2 * Math.cos(safeZ * wy2)) * 24.0;
+
         const tangent = new THREE.Vector3(dx, dy, 1.0).normalize();
-        
-        return { position: new THREE.Vector3(x, y, safeZ), tangent };
+        const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+        return { position: new THREE.Vector3(x, y, safeZ), tangent, normal };
+    }
+
+    public getRoadPositionAt(z: number): { position: THREE.Vector3; tangent: THREE.Vector3 } {
+        const info = Road.evaluateRoadPosition(z);
+        return { position: info.position, tangent: info.tangent };
     }
 
     public update(carZ: number, carPos: THREE.Vector3, _carSpeed: number, delta: number, config: QualityConfig): void {
@@ -841,24 +1502,29 @@ export class Road {
             this.chunks[i].update(delta);
         }
 
-        // Fast nearest streetlight search
-        let lightIdx = 0;
-        for (let c = 0; c < this.chunks.length && lightIdx < this.streetlights.length; c++) {
+        // Re-assign the 6 PointLights to the 6 nearest lamps ahead of the player (Bug 3a)
+        const candidates: { pos: THREE.Vector3; distSq: number }[] = [];
+        for (let c = 0; c < this.chunks.length; c++) {
             const chunk = this.chunks[c];
-            if (Math.abs(chunk.startZ + 250 - carZ) < 400) {
-                for (let g = 0; g < chunk.streetlightGlows.length && lightIdx < this.streetlights.length; g++) {
+            if (chunk.startZ + 500 >= carZ - 20 && chunk.startZ <= carZ + 350) {
+                for (let g = 0; g < chunk.streetlightGlows.length; g++) {
                     const glowPos = chunk.streetlightGlows[g];
-                    if (glowPos.distanceToSquared(carPos) < 2500) {
-                        this.streetlights[lightIdx].position.copy(glowPos);
-                        this.streetlights[lightIdx].intensity = 2.8;
-                        lightIdx++;
+                    if (glowPos.z >= carZ - 10 && glowPos.z <= carZ + 250) {
+                        const distSq = glowPos.distanceToSquared(carPos);
+                        candidates.push({ pos: glowPos, distSq });
                     }
                 }
             }
         }
-        while (lightIdx < this.streetlights.length) {
-            this.streetlights[lightIdx].intensity = 0;
-            lightIdx++;
+        candidates.sort((a, b) => a.distSq - b.distSq);
+
+        for (let i = 0; i < this.streetlights.length; i++) {
+            if (i < candidates.length) {
+                this.streetlights[i].position.copy(candidates[i].pos);
+                this.streetlights[i].intensity = 25;
+            } else {
+                this.streetlights[i].intensity = 0;
+            }
         }
 
         // Shared Neon Lights (attached dynamically to closest signs)
@@ -885,9 +1551,9 @@ export class Road {
             neonIdx++;
         }
 
-        // Recycling chunks
-        const lookahead = Math.min(5, config.chunkLimit) * 500;
-        if (this.chunks.length > 0 && carZ - this.chunks[0].startZ > 650) {
+        // Recycling chunks (keep 3 active chunks: 1500m ahead, despawn behind at >450m)
+        const lookahead = Math.min(3, config.chunkLimit) * 500;
+        if (this.chunks.length > 0 && carZ - this.chunks[0].startZ > 450) {
             const old = this.chunks.shift();
             if (old) {
                 this.scene.remove(old.mesh, old.yellowLines, old.whiteLines, old.cityGroup);

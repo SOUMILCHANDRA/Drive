@@ -23,12 +23,23 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three-stdlib';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export interface RoadAlignmentData {
     x: number;
     y: number;
     tangent: THREE.Vector3;
     position?: THREE.Vector3;
+}
+
+export interface WheelAssembly {
+    name: string;
+    isFront: boolean;
+    radius: number;
+    wheelAnchor: THREE.Object3D;
+    steerPivot: THREE.Object3D;
+    spinPivot: THREE.Object3D;
+    wheelMesh: THREE.Mesh;
 }
 
 /**
@@ -57,11 +68,13 @@ export class Car {
 
   // Cinematic Lighting & Volumetrics
   private headlights: THREE.SpotLight[] = [];
-  private taillights: THREE.PointLight[] = [];
   private volumetricBeams: THREE.Mesh[] = [];
   private taillightFlares: THREE.Mesh[] = [];
-  private wheelLF: THREE.Object3D | null = null;
-  private wheelRF: THREE.Object3D | null = null;
+  private headlightFlares: THREE.Mesh[] = [];
+
+  // Wheel Hierarchy Assembly (Bug 1 Fix: 4-tier anchor -> steer -> spin -> mesh)
+  private wheels: WheelAssembly[] = [];
+  private steerAngle: number = 0;
 
   // Tuning Constants (Calibrated 1973 Malibu Muscle Car)
   private readonly ACCEL = 18;
@@ -121,9 +134,12 @@ export class Car {
         this.model = new THREE.Group();
         const carModel = gltf.scene;
 
-        // BUG 1 (Step 3): Wrap GLB in parent Group and rotate child by Math.PI so it faces +Z
+        // Wrap GLB in parent Group and rotate child by Math.PI so it faces +Z
         carModel.rotation.y = Math.PI;
         
+        const wheelMeshes: THREE.Mesh[] = [];
+
+        const toRemove: THREE.Object3D[] = [];
         carModel.traverse((child) => {
           if (child instanceof THREE.Mesh) {
             const name = child.name.toLowerCase();
@@ -135,41 +151,64 @@ export class Car {
                                name.includes('speed_') ||
                                name.includes('seat') ||
                                name.includes('cloth');
-            if (isInterior) {
+            const isOldWheelMesh = name.includes('lod0_wheel') || name.includes('lod0che_chevelle_70_lod0_wheel');
+            const isUnseenDetail = name.includes('undercarriage') ||
+                                   name.includes('under_') ||
+                                   name.includes('rubber') ||
+                                   name.includes('weatherstrip') ||
+                                   name.includes('plastic') ||
+                                   name.includes('matte_colors') ||
+                                   name.includes('emblem') ||
+                                   name.includes('frame') ||
+                                   name.includes('exhaust') ||
+                                   name.includes('int_glass');
+
+            if (isInterior || isOldWheelMesh || isUnseenDetail) {
               child.visible = false;
+              toRemove.push(child);
               return;
             }
+
+            if (name.includes('wheel5a')) {
+              wheelMeshes.push(child);
+              return;
+            }
+
             const isMainBody = name.includes('body_body') || 
                                name.includes('trunk_body') || 
-                               name.includes('bumper') ||
-                               name.includes('wheel_rim');
+                               name.includes('bumper');
             child.castShadow = isMainBody;
             child.receiveShadow = true;
-
-            if (name.includes('wheelf_l') || name.includes('wheel5a_lf') || name.includes('wheellf')) {
-              this.wheelLF = child;
-            }
-            if (name.includes('wheelf_r') || name.includes('wheel5a_rf') || name.includes('wheelrf')) {
-              this.wheelRF = child;
-            }
+            if (child.geometry) child.geometry.clearGroups();
             
             if (child.material) {
-              const mat = child.material as THREE.MeshStandardMaterial;
-              if (mat.color) {
-                  const r = mat.color.r;
-                  const g = mat.color.g;
-                  const b = mat.color.b;
-                  mat.color.setRGB(Math.max(0.15, r), Math.max(0.15, g), Math.max(0.15, b));
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              for (const mat of mats) {
+                const anyMat = mat as any;
+                if (anyMat.transmission !== undefined) anyMat.transmission = 0;
+                if (anyMat.side === THREE.DoubleSide) anyMat.side = THREE.FrontSide;
+                anyMat.forceSinglePass = true;
+                if (anyMat.color) {
+                    const r = anyMat.color.r;
+                    const g = anyMat.color.g;
+                    const b = anyMat.color.b;
+                    anyMat.color.setRGB(Math.max(0.15, r), Math.max(0.15, g), Math.max(0.15, b));
+                }
+                anyMat.roughness = Math.min(anyMat.roughness ?? 0.4, 0.7);
+                anyMat.metalness = Math.max(anyMat.metalness ?? 0.4, 0.75);
+                anyMat.envMapIntensity = 1.6;
+                anyMat.needsUpdate = true;
               }
-              mat.roughness = Math.min(mat.roughness ?? 0.4, 0.7);
-              mat.metalness = Math.max(mat.metalness ?? 0.4, 0.75);
-              mat.envMapIntensity = 1.6;
-              mat.needsUpdate = true;
             }
           }
         });
 
-        // BUG 2 (Step 5): Re-center model inside wrapper Group so pivot sits at bottom center between wheels
+        for (const child of toRemove) {
+          if (child.parent) child.parent.remove(child);
+          if ((child as THREE.Mesh).geometry) (child as THREE.Mesh).geometry.dispose();
+        }
+
+        // Re-center model inside wrapper Group so pivot sits at bottom center between wheels
         carModel.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(carModel);
         const size = new THREE.Vector3();
@@ -185,6 +224,119 @@ export class Car {
         // Center carModel inside wrapper group so pivot (0, 0, 0) is at bottom center between wheels
         carModel.position.set(-center.x, -box.min.y, -center.z);
         this.model.add(carModel);
+
+        // Merge static car body submeshes sharing materials (drops 20+ draw calls)
+        const staticMeshes: THREE.Mesh[] = [];
+        carModel.traverse((child) => {
+          if (child instanceof THREE.Mesh && !wheelMeshes.includes(child)) {
+            staticMeshes.push(child);
+          }
+        });
+
+        const matGroups = new Map<string, { material: THREE.Material; geometries: THREE.BufferGeometry[]; castShadow: boolean }>();
+        for (const sm of staticMeshes) {
+          sm.updateMatrixWorld(true);
+          const g = sm.geometry.clone();
+          const localMat = sm.matrix.clone();
+          let p = sm.parent;
+          while (p && p !== carModel) {
+            localMat.premultiply(p.matrix);
+            p = p.parent;
+          }
+          g.applyMatrix4(localMat);
+          g.clearGroups();
+
+          const mat = (Array.isArray(sm.material) ? sm.material[0] : sm.material) as THREE.Material;
+          const key = mat.uuid;
+          if (!matGroups.has(key)) {
+            matGroups.set(key, { material: mat, geometries: [], castShadow: sm.castShadow });
+          }
+          const grp = matGroups.get(key)!;
+          grp.geometries.push(g);
+          if (sm.castShadow) grp.castShadow = true;
+
+          if (sm.parent) sm.parent.remove(sm);
+        }
+
+        for (const { material, geometries, castShadow } of matGroups.values()) {
+          const merged = geometries.length === 1 ? geometries[0] : BufferGeometryUtils.mergeGeometries(geometries);
+          if (merged) {
+            merged.clearGroups();
+            const mergedMesh = new THREE.Mesh(merged, material);
+            mergedMesh.castShadow = castShadow;
+            mergedMesh.receiveShadow = true;
+            mergedMesh.matrixAutoUpdate = true;
+            carModel.add(mergedMesh);
+          }
+        }
+
+        // Build rigid 4-tier wheel assemblies anchored to carRoot (Bug 1 Fix)
+        this.model.updateMatrixWorld(true);
+        this.wheels = [];
+
+        for (const origMesh of wheelMeshes) {
+          origMesh.updateMatrixWorld(true);
+          const geom = origMesh.geometry.clone();
+          geom.applyMatrix4(origMesh.matrixWorld);
+
+          geom.computeBoundingBox();
+          const wBox = geom.boundingBox!;
+          const axlePos = new THREE.Vector3();
+          wBox.getCenter(axlePos);
+          const wSize = new THREE.Vector3();
+          wBox.getSize(wSize);
+          const radius = wSize.y * 0.5;
+
+          // Re-center geometry around (0, 0, 0)
+          geom.center();
+          geom.clearGroups();
+
+          // Detach from carModel so it cannot be affected by any nested parent rotation
+          if (origMesh.parent) {
+            origMesh.parent.remove(origMesh);
+          }
+
+          const wMat = origMesh.material as any;
+          if (wMat) {
+            if (wMat.transmission !== undefined) wMat.transmission = 0;
+            wMat.forceSinglePass = true;
+          }
+
+          const wheelMesh = new THREE.Mesh(geom, origMesh.material);
+          wheelMesh.name = origMesh.name + '_mesh';
+          wheelMesh.castShadow = true;
+          wheelMesh.receiveShadow = true;
+          wheelMesh.matrixAutoUpdate = true;
+
+          const spinPivot = new THREE.Object3D();
+          spinPivot.name = origMesh.name + '_spinPivot';
+          spinPivot.matrixAutoUpdate = true;
+          spinPivot.add(wheelMesh);
+
+          const steerPivot = new THREE.Object3D();
+          steerPivot.name = origMesh.name + '_steerPivot';
+          steerPivot.matrixAutoUpdate = true;
+          steerPivot.add(spinPivot);
+
+          const wheelAnchor = new THREE.Object3D();
+          wheelAnchor.name = origMesh.name + '_wheelAnchor';
+          wheelAnchor.position.copy(axlePos);
+          wheelAnchor.matrixAutoUpdate = true;
+          wheelAnchor.add(steerPivot);
+
+          this.model.add(wheelAnchor);
+
+          const isFront = axlePos.z > 0;
+          this.wheels.push({
+            name: origMesh.name,
+            isFront,
+            radius: Math.max(0.1, radius),
+            wheelAnchor,
+            steerPivot,
+            spinPivot,
+            wheelMesh
+          });
+        }
 
     } catch (error) {
         console.warn('GLB load failed, utilizing high-detail geometric fallback:', error);
@@ -221,23 +373,50 @@ export class Car {
       cabin.position.set(0, 1.15, -0.2);
       cabin.castShadow = true;
       carModel.add(cabin);
-
-      // Wheels
-      const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.3, 16);
-      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 });
-      wheelGeo.rotateZ(Math.PI / 2);
-      [
-        [-1.05, 0.38, 1.4],
-        [1.05, 0.38, 1.4],
-        [-1.05, 0.38, -1.4],
-        [1.05, 0.38, -1.4]
-      ].forEach(([x, y, z]) => {
-        const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-        wheel.position.set(x, y, z);
-        carModel.add(wheel);
-      });
-
       this.model.add(carModel);
+
+      // Wheels 4-tier assembly
+      this.wheels = [];
+      const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.3, 24);
+      wheelGeo.rotateZ(Math.PI / 2);
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 });
+      [
+        { name: 'fallback_FL', pos: [-1.05, 0.38, 1.4], isFront: true },
+        { name: 'fallback_FR', pos: [1.05, 0.38, 1.4], isFront: true },
+        { name: 'fallback_RL', pos: [-1.05, 0.38, -1.4], isFront: false },
+        { name: 'fallback_RR', pos: [1.05, 0.38, -1.4], isFront: false }
+      ].forEach(({ name, pos, isFront }) => {
+        const geom = wheelGeo.clone();
+        geom.center();
+        const wheelMesh = new THREE.Mesh(geom, wheelMat);
+        wheelMesh.castShadow = true;
+        wheelMesh.receiveShadow = true;
+        wheelMesh.matrixAutoUpdate = true;
+
+        const spinPivot = new THREE.Object3D();
+        spinPivot.matrixAutoUpdate = true;
+        spinPivot.add(wheelMesh);
+
+        const steerPivot = new THREE.Object3D();
+        steerPivot.matrixAutoUpdate = true;
+        steerPivot.add(spinPivot);
+
+        const wheelAnchor = new THREE.Object3D();
+        wheelAnchor.position.set(pos[0], pos[1], pos[2]);
+        wheelAnchor.matrixAutoUpdate = true;
+        wheelAnchor.add(steerPivot);
+
+        this.model!.add(wheelAnchor);
+        this.wheels.push({
+          name,
+          isFront,
+          radius: 0.38,
+          wheelAnchor,
+          steerPivot,
+          spinPivot,
+          wheelMesh
+        });
+      });
   }
 
   private setupLights(): void {
@@ -272,8 +451,24 @@ export class Car {
     this.model!.add(headlightR);
     this.headlights.push(headlightR);
 
+    // Front Headlight Glowing Lens Flare Plates (direct children of carRoot)
+    const hlFlareGeo = new THREE.PlaneGeometry(0.35, 0.35);
+    const hlFlareMat = new THREE.MeshBasicMaterial({
+      color: 0xfff6dc,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    [-0.7, 0.7].forEach(x => {
+      const flare = new THREE.Mesh(hlFlareGeo, hlFlareMat);
+      flare.position.set(x, 0.65, 2.22);
+      this.model!.add(flare);
+      this.headlightFlares.push(flare);
+    });
+
     // Thin volumetric cone beams: ConeGeometry with 36 radial segments, reaches ~25m forward
-    const coneRadius = 2.6;
+    const coneRadius = 2.4;
     const coneHeight = 25.0;
     const beamGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 36, 1, true);
     // Rotate so apex is at origin and expands forward along +Z
@@ -283,7 +478,7 @@ export class Car {
     const beamMat = new THREE.MeshBasicMaterial({
       color: 0xfff2cc,
       transparent: true,
-      opacity: 0.06,
+      opacity: 0.05,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.BackSide
@@ -291,22 +486,15 @@ export class Car {
 
     [-0.7, 0.7].forEach((x, idx) => {
       const beam = new THREE.Mesh(beamGeo, beamMat);
-      beam.position.set(x, 0.65, 2.2);
-      beam.rotation.x = -0.015;
+      // Positioned at lamp bezels and angled slightly down toward road to avoid hood clipping/spikes
+      beam.position.set(x, 0.62, 2.24);
+      beam.rotation.x = 0.025;
       beam.rotation.y = idx === 0 ? -0.01 : 0.01;
       this.model!.add(beam);
       this.volumetricBeams.push(beam);
     });
 
-    // 3. Taillights (subtle rear glow point lights)
-    [0.75, -0.75].forEach(x => {
-        const light = new THREE.PointLight(0xd41515, 1.0, 10, 2);
-        light.position.set(x, 0.55, -2.3);
-        this.model!.add(light);
-        this.taillights.push(light);
-    });
-
-    // 4. Taillight Glowing Lens Flare Plates
+    // Taillight Glowing Lens Flare Plates (direct children of carRoot, no giant ground glow blobs)
     const flareGeo = new THREE.PlaneGeometry(0.55, 0.25);
     const flareMat = new THREE.MeshBasicMaterial({
       color: 0xff1818,
@@ -337,7 +525,7 @@ export class Car {
     this.speed *= (1.0 - Math.min(1.0, this.DRAG * delta));
     this.speed = Math.max(0, Math.min(this.speed, this.MAX_SPEED));
 
-    // 2. Responsive Steering Scale & Interactive Front Wheel Turn
+    // 2. Responsive Steering Scale & Interactive Front Wheel Turn (Bug 1 Fix)
     const rotYBefore = this.heading;
     const speedRatio = Math.min(1.0, this.speed / 14);
     const turnRate = input.steer * this.MAX_TURN_RATE * speedRatio;
@@ -350,8 +538,20 @@ export class Car {
         console.log(`[STEERING CONVENTION] Input: ${input.steer.toFixed(2)}, Heading before: ${rotYBefore.toFixed(3)}, after: ${this.heading.toFixed(3)}, Forward: (${fwd.x.toFixed(3)}, ${fwd.y.toFixed(3)}, ${fwd.z.toFixed(3)}), Model facing: +Z`);
     }
 
-    if (this.wheelLF) this.wheelLF.rotation.y = input.steer * 0.45;
-    if (this.wheelRF) this.wheelRF.rotation.y = input.steer * 0.45;
+    // Clamp steerAngle to +/-0.5 rad and lerp smoothly
+    const targetSteerAngle = THREE.MathUtils.clamp(input.steer * 0.45, -0.5, 0.5);
+    this.steerAngle = THREE.MathUtils.lerp(this.steerAngle, targetSteerAngle, Math.min(1.0, 14.0 * delta));
+
+    // Update wheel pivots strictly: front wheels steer, all wheels spin, NEVER set runtime position
+    for (let i = 0; i < this.wheels.length; i++) {
+      const w = this.wheels[i];
+      if (w.isFront) {
+        w.steerPivot.rotation.y = this.steerAngle;
+      } else {
+        w.steerPivot.rotation.y = 0;
+      }
+      w.spinPivot.rotation.x += (this.speed / w.radius) * delta;
+    }
 
     // Road tangent & lateral geometry
     const roadTangent = roadData.tangent.clone().normalize();
@@ -448,10 +648,6 @@ export class Car {
     this.model.quaternion.slerp(targetQuat, Math.min(1.0, 16.0 * delta));
 
     // 7. Taillight Brightness & Flare on Braking
-    const brakeIntensity = input.brake > 0.1 ? 3.5 : 1.0;
-    for (let i = 0; i < this.taillights.length; i++) {
-        this.taillights[i].intensity = THREE.MathUtils.lerp(this.taillights[i].intensity, brakeIntensity, 0.25);
-    }
     const flareOpacity = input.brake > 0.1 ? 1.0 : 0.6;
     const flareScale = input.brake > 0.1 ? 1.35 : 1.0;
     for (let i = 0; i < this.taillightFlares.length; i++) {
