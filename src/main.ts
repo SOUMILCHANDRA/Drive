@@ -78,7 +78,8 @@ async function init() {
   (window as any).__renderer = renderer;
 
   // Expose systems for diagnostics & telemetry
-  (window as any).__NIGHTCALL__ = { car, road, input, renderer, cameraManager, traffic, RoadLanes, HANDLING };
+  (window as any).THREE = THREE;
+  (window as any).__NIGHTCALL__ = { car, road, input, renderer, cameraManager, traffic, RoadLanes, HANDLING, THREE };
 
   // Spawn car in lane aligned with road tangent using single source of truth (RoadLanes)
   const spawnInitialCar = () => {
@@ -196,9 +197,9 @@ async function init() {
     gameStarted = true;
     document.body.classList.add('game-active');
     
-    // Smooth transition: fade-in from black on start
     if (flash) {
-        flash.style.opacity = '0';
+        flash.style.opacity = '0.9';
+        setTimeout(() => { flash.style.opacity = '0'; }, 300);
     }
     
     if (titleScreen) titleScreen.classList.add('fade-out');

@@ -178,8 +178,8 @@ export class Car {
         const carModel = gltf.scene;
         carModel.name = 'carModel';
 
-        // Wrap GLB in parent Group and rotate child by Math.PI so it faces +Z
-        carModel.rotation.y = Math.PI;
+        // Raw GLB model faces +Z (hood points down highway (+Z), trunk faces chase camera (-Z))
+        carModel.rotation.y = 0;
         
         // Materials per Step 2 specifications
         const bodyMat = new THREE.MeshPhysicalMaterial({
