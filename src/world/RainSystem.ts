@@ -9,11 +9,11 @@ export class RainSystem {
     private particles: THREE.Points;
     private geometry: THREE.BufferGeometry;
     private velocities: Float32Array;
-    private maxCount: number = 12000;
-    private activeCount: number = 12000;
+    private maxCount: number = 8000;
+    private activeCount: number = 8000;
     private spread: number = 150;
 
-    constructor(scene: THREE.Scene, initialCount: number = 12000) {
+    constructor(scene: THREE.Scene, initialCount: number = 8000) {
         this.scene = scene;
         this.activeCount = initialCount;
 
@@ -84,6 +84,14 @@ export class RainSystem {
             }
         }
         
+        this.geometry.attributes.position.needsUpdate = true;
+    }
+
+    public shiftOrigin(offsetZ: number): void {
+        const pos = this.geometry.attributes.position.array as Float32Array;
+        for (let i = 0; i < this.activeCount; i++) {
+            pos[i * 3 + 2] -= offsetZ;
+        }
         this.geometry.attributes.position.needsUpdate = true;
     }
 }

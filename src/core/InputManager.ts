@@ -5,6 +5,7 @@ export interface InputState {
     throttle: number;
     brake: number;
     cameraToggle: boolean;
+    laneAssistToggle: boolean;
     pause: boolean;
 }
 
@@ -17,6 +18,7 @@ export class InputManager {
         throttle: 0,
         brake: 0,
         cameraToggle: false,
+        laneAssistToggle: false,
         pause: false
     };
 
@@ -34,6 +36,7 @@ export class InputManager {
             this.keys[e.code] = true;
             if (e.key === 'Escape') this.state.pause = !this.state.pause;
             if (e.key.toLowerCase() === 'c') this.state.cameraToggle = true;
+            if (e.key.toLowerCase() === 'l') this.state.laneAssistToggle = true;
         });
         window.addEventListener('keyup', (e) => {
             this.keys[e.key] = false;
@@ -68,6 +71,7 @@ export class InputManager {
         // Reset single-frame triggers
         const result = { ...this.state };
         this.state.cameraToggle = false;
+        this.state.laneAssistToggle = false;
         return result;
     }
 

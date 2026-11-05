@@ -8,10 +8,11 @@ import { CameraManager } from './core/CameraManager';
 import { LightingManager } from './world/LightingManager';
 import { SkyManager } from './world/SkyManager';
 import { RainSystem } from './world/RainSystem';
+import { WindshieldSystem } from './world/WindshieldSystem';
 import { TrafficManager } from './world/TrafficManager';
 import { RoadLanes } from './world/RoadLanes';
 import { Road } from './world/Road';
-import { Car } from './vehicle/Car';
+import { Car, HANDLING } from './vehicle/Car';
 import { SoundManager } from './audio/SoundManager';
 import { QualityManager } from './core/QualitySettings';
 import type { QualityTier } from './core/QualitySettings';
@@ -77,7 +78,7 @@ async function init() {
   (window as any).__renderer = renderer;
 
   // Expose systems for diagnostics & telemetry
-  (window as any).__NIGHTCALL__ = { car, road, input, renderer, cameraManager, traffic, RoadLanes };
+  (window as any).__NIGHTCALL__ = { car, road, input, renderer, cameraManager, traffic, RoadLanes, HANDLING };
 
   // Spawn car in lane aligned with road tangent using single source of truth (RoadLanes)
   const spawnInitialCar = () => {
@@ -105,6 +106,18 @@ async function init() {
   const camSelect = document.getElementById('camSelect') as HTMLSelectElement;
   const rearview = document.getElementById('rearview');
   const loadingStatus = document.getElementById('loading-status');
+  const loadingBar = document.getElementById('loading-bar');
+  const nearMissToast = document.getElementById('near-miss-toast');
+  const windshieldCanvas = document.getElementById('windshield-canvas') as HTMLCanvasElement;
+  const windshield = windshieldCanvas ? new WindshieldSystem(windshieldCanvas) : null;
+  let nearMissTimeout: any = null;
+  let lastCollisionTime = 0;
+
+  const updateLoadingProgress = (percent: number, statusText: string) => {
+      if (loadingBar) loadingBar.style.width = `${percent}%`;
+      if (loadingStatus) loadingStatus.innerText = statusText;
+  };
+
   const speedEl = document.getElementById('speed-val');
   const distEl = document.getElementById('dist-val');
   const fpsEl = document.getElementById('fps-val');
@@ -126,7 +139,22 @@ async function init() {
   const f3OncomingEl = document.getElementById('f3-oncoming');
   const f3SameDirEl = document.getElementById('f3-samedir');
   const f3NearestEl = document.getElementById('f3-nearest');
+  const f3ChunksCountEl = document.getElementById('f3-chunks-count');
+  const f3NearestChunkEl = document.getElementById('f3-nearest-chunk');
+  const f3FarthestChunkEl = document.getElementById('f3-farthest-chunk');
+  const f3RoadStatusEl = document.getElementById('f3-road-status');
   let f3OverlayVisible = false;
+  let diagLogTimer = 0;
+
+  const applyFloatingOrigin = (offsetZ: number) => {
+      car.shiftOrigin(offsetZ);
+      cameraManager.shiftOrigin(offsetZ);
+      road.shiftOrigin(offsetZ);
+      traffic.shiftOrigin(offsetZ);
+      rain.shiftOrigin(offsetZ);
+      renderer.shiftOrigin(offsetZ);
+      console.log(`[FLOATING ORIGIN] Shifted by ${offsetZ.toFixed(1)}m in ONE frame. Total World Z Offset: ${road.worldZOffset}m`);
+  };
 
   let gameStarted = false;
   let isReadyToStart = false;
@@ -168,9 +196,9 @@ async function init() {
     gameStarted = true;
     document.body.classList.add('game-active');
     
+    // Smooth transition: fade-in from black on start
     if (flash) {
-        flash.style.opacity = '0.9';
-        setTimeout(() => { flash.style.opacity = '0'; }, 300);
+        flash.style.opacity = '0';
     }
     
     if (titleScreen) titleScreen.classList.add('fade-out');
@@ -300,21 +328,25 @@ async function init() {
       if (pauseIcon) pauseIcon.classList.remove('visible');
   });
 
-  // 📦 Asset Loading (Failsafe & Fast)
+  // 📦 Asset Loading (Progress bar & Shader Pre-compilation)
   try {
-      if (loadingStatus) loadingStatus.innerText = "TUNING V8 ENGINE...";
-      
+      updateLoadingProgress(25, "CALIBRATING HIGHWAY & TERRAIN...");
+      await new Promise(r => setTimeout(r, 60));
+
+      updateLoadingProgress(55, "TUNING V8 ENGINE...");
       await car.load('/models/car/car.glb');
       spawnInitialCar();
 
-      // Load BGM asynchronously without blocking ignition
+      updateLoadingProgress(80, "COMPILING GRAPHICS SHADERS...");
+      if (car.model) lighting.setupCarLight(car.model);
       sound.loadBGM('/bgm.webm').catch(() => {});
 
-      if (car.model) lighting.setupCarLight(car.model);
+      // Pre-compile and warm-render 1 frame so the first gameplay frame never hitches or shows broken assets
+      renderer.render(0.016, 0);
 
+      updateLoadingProgress(100, "SYSTEMS READY - PRESS ENTER TO BEGIN");
       isReadyToStart = true;
       if (titleScreen) titleScreen.classList.add('ready');
-      if (loadingStatus) loadingStatus.innerText = "PRESS ENTER OR CLICK TO DRIVE";
 
       if (pendingStart) {
           startDrive();
@@ -322,6 +354,7 @@ async function init() {
   } catch (err) {
       console.error('Initialization fallback trigger:', err);
       spawnInitialCar();
+      updateLoadingProgress(100, "SYSTEMS READY - PRESS ENTER TO BEGIN");
       isReadyToStart = true;
       if (titleScreen) titleScreen.classList.add('ready');
   }
@@ -363,13 +396,24 @@ async function init() {
     }
     lastCamToggle = controls.cameraToggle;
 
+    // Check Floating Origin: when |player.z| > 2000, shift the origin in ONE function in the same frame
+    if (Math.abs(car.position.z) > 2000) {
+        applyFloatingOrigin(car.position.z);
+    }
+
     const carZ = car.position.z;
+    const totalCarZ = carZ + road.worldZOffset;
     const roadInfo = road.getRoadPositionAt(carZ);
-    const biomeParams = road.biomeManager.getParamsAt(carZ);
+    const biomeParams = road.biomeManager.getParamsAt(totalCarZ);
     
     const cruiseActive = (document.getElementById('cruiseToggle') as HTMLInputElement)?.checked ?? false;
 
     // Controls Handling
+    if (controls.laneAssistToggle) {
+        HANDLING.laneAssistEnabled = !HANDLING.laneAssistEnabled;
+        showAlert(`LANE ASSIST: ${HANDLING.laneAssistEnabled ? 'ON' : 'OFF'}`, HANDLING.laneAssistEnabled ? '#22e6ff' : '#ff2d95');
+    }
+
     const rawSteer    = controls.pause ? 0 : controls.steer;
     const rawThrottle = controls.pause ? 0 : controls.throttle;
     const rawBrake    = controls.pause ? 0 : controls.brake;
@@ -408,7 +452,8 @@ async function init() {
     lighting.update(car.position, biomeParams.ambientIntensity);
     sky.update(car.position);
     rain.update(delta, car.position, car.speed);
-    sound.update(car.speed, delta);
+    if (windshield) windshield.update(delta, car.speed, biomeParams.rainIntensity);
+    sound.update(car.speed, delta, cameraManager.mode === 'CHASE', biomeParams.rainIntensity);
 
     // Traffic Update & Player Interactions
     traffic.update(delta, carZ, car.currentLateralOffset, (z) => {
@@ -417,14 +462,25 @@ async function init() {
 
     const interaction = traffic.checkPlayerInteraction(car.position);
     if (interaction.collided) {
+        lastCollisionTime = performance.now();
         cameraManager.addTrauma(0.65);
         sound.playCollision();
-        car.speed = Math.max(0, car.speed * 0.55);
-        showAlert("IMPACT!", "#ff3333");
+        car.nudgeCollision(Math.random() > 0.5 ? 1 : -1);
+        showAlert("IMPACT!", "#ff2d95");
     } else if (interaction.nearMiss) {
-        cameraManager.addTrauma(0.2);
-        sound.playNearMiss();
-        showAlert("NEAR MISS", "#00ffef");
+        // Never trigger near miss during/immediately after a collision
+        if (performance.now() - lastCollisionTime > 1500) {
+            cameraManager.addTrauma(0.2);
+            sound.playNearMiss();
+            // Dedicated NEAR MISS toast: neon pink, 0.9s fade, once per car
+            if (nearMissToast) {
+                nearMissToast.classList.add('show');
+                clearTimeout(nearMissTimeout);
+                nearMissTimeout = setTimeout(() => {
+                    nearMissToast.classList.remove('show');
+                }, 900);
+            }
+        }
     }
     
     if (car.model) {
@@ -451,8 +507,15 @@ async function init() {
         speedEl.innerText = kmh.toString().padStart(3, '0');
     }
     if (distEl) {
-        const distM = Math.floor(car.position.z);
+        const distM = Math.floor(totalCarZ);
         distEl.innerText = distM >= 1000 ? (distM / 1000).toFixed(1) + ' KM' : distM + ' M';
+    }
+
+    // Diagnostic logging for road chunks every 5 seconds
+    diagLogTimer += delta;
+    if (diagLogTimer >= 5.0) {
+        diagLogTimer = 0;
+        road.logChunkDiagnostics(car.position.z);
     }
 
     // F3 Debug Overlay Telemetry Readouts
@@ -475,6 +538,15 @@ async function init() {
         if (f3SameDirEl) f3SameDirEl.innerText = traffic.getActiveSameDirCount().toString();
         const nearestDist = traffic.getNearestCarDistance(carZ);
         if (f3NearestEl) f3NearestEl.innerText = nearestDist !== null ? nearestDist.toFixed(1) : '--';
+
+        const chunkTelem = road.getChunkTelemetry(carZ);
+        if (f3ChunksCountEl) f3ChunksCountEl.innerText = chunkTelem.activeChunks.toString();
+        if (f3NearestChunkEl) f3NearestChunkEl.innerText = chunkTelem.nearestDist.toFixed(1);
+        if (f3FarthestChunkEl) f3FarthestChunkEl.innerText = '+' + chunkTelem.farthestDist.toFixed(1);
+        if (f3RoadStatusEl) {
+            f3RoadStatusEl.innerText = chunkTelem.isContinuous ? 'CONTINUOUS (OK)' : 'GAP DETECTED';
+            f3RoadStatusEl.style.color = chunkTelem.isContinuous ? '#00ff88' : '#ff3333';
+        }
     }
 
     frameCount++;

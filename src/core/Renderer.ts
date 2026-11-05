@@ -45,7 +45,7 @@ export class Renderer {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x02040c);
-    this.scene.fog = new THREE.FogExp2(0x0a1024, 0.00045);
+    this.scene.fog = new THREE.FogExp2(0x2e1538, 0.00045);
 
     this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.3, 3000);
     this.mirrorCamera = new THREE.PerspectiveCamera(45, 350 / 65, 0.2, 1000);
@@ -162,6 +162,12 @@ export class Renderer {
   public updateRoadMirror(_carPos: THREE.Vector3): void {
     // Legacy no-op kept for API compatibility.
     // Reflections are now efficiently rendered via the environment map!
+  }
+
+  public shiftOrigin(offsetZ: number): void {
+    if (this.cubeCamera) {
+      this.cubeCamera.position.z -= offsetZ;
+    }
   }
 
   public updateQuality(config: QualityConfig): void {

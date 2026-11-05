@@ -57,11 +57,12 @@ const MAX_GUARDRAILS = 80;
 const MAX_STUDS = 45;
 
 class SharedRoadAssets {
-    // Terrain: Rich nocturnal California landscape (deep indigo/moss tones)
+    // Terrain: Rich nocturnal California landscape (smooth normals, vertex-colored)
     public static terrainMaterial = new THREE.MeshStandardMaterial({
-        color: 0x0c0c18,
-        roughness: 0.95,
-        metalness: 0.05,
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: 0.92,
+        metalness: 0.06,
         flatShading: false,
     });
 
@@ -417,40 +418,54 @@ class SharedRoadAssets {
     }
 }
 
-// Inject procedural window shader into buildingBodyMat (Bug 3d)
+// Inject procedural window shader into buildingBodyMat (axis-aligned grid windows, no skew, ~20% lit)
 SharedRoadAssets.buildingBodyMat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace(
         '#include <common>',
         `#include <common>
-        varying vec3 vWorldPos;
-        varying vec3 vNormalVec;`
+        varying vec2 vFacadeCoord;
+        varying float vIsFacade;`
     );
     shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
-        vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-        vNormalVec = normalize((modelMatrix * vec4(normal, 0.0)).xyz);`
+        #ifdef USE_INSTANCING
+            float instW = length(instanceMatrix[0].xyz);
+            float instH = length(instanceMatrix[1].xyz);
+            float instD = length(instanceMatrix[2].xyz);
+            if (abs(normal.y) < 0.25) {
+                vIsFacade = 1.0;
+                if (abs(normal.x) > 0.5) {
+                    vFacadeCoord = vec2(position.z * instD, (position.y + 0.5) * instH);
+                } else {
+                    vFacadeCoord = vec2(position.x * instW, (position.y + 0.5) * instH);
+                }
+            } else {
+                vIsFacade = 0.0;
+                vFacadeCoord = vec2(0.0);
+            }
+        #else
+            vIsFacade = 0.0;
+            vFacadeCoord = vec2(0.0);
+        #endif`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
         '#include <common>',
         `#include <common>
-        varying vec3 vWorldPos;
-        varying vec3 vNormalVec;`
+        varying vec2 vFacadeCoord;
+        varying float vIsFacade;`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
         '#include <opaque_fragment>',
         `
-        // Procedural crisp rectangular window grid on building facades (Bug 3d)
-        if (abs(vNormalVec.y) < 0.3) {
-            float horiz = abs(vNormalVec.x) > abs(vNormalVec.z) ? vWorldPos.z : vWorldPos.x;
-            float vert = vWorldPos.y;
+        // Procedural crisp axis-aligned rectangular window grid on building facades (~20% lit, warm and cool)
+        if (vIsFacade > 0.5) {
+            float cellW = 2.6; // window cell width 2.6m
+            float cellH = 3.4; // window cell height 3.4m
 
-            float densityX = 0.35; // window every ~2.8m
-            float densityY = 0.30; // window floor every ~3.3m
-
-            vec2 cell = vec2(horiz * densityX, vert * densityY);
-            vec2 g = fract(cell);
-            vec2 cellId = floor(cell);
+            vec2 cellCoord = vec2(vFacadeCoord.x / cellW, vFacadeCoord.y / cellH);
+            vec2 g = fract(cellCoord);
+            vec2 cellId = floor(cellCoord);
 
             // Crisp window rectangle: width 0.58 of cell, height 0.64 of cell
             vec2 wBox = step(vec2(0.21, 0.18), g) * (1.0 - step(vec2(0.79, 0.82), g));
@@ -458,10 +473,10 @@ SharedRoadAssets.buildingBodyMat.onBeforeCompile = (shader) => {
 
             if (isWin > 0.5) {
                 float rnd = fract(sin(dot(cellId, vec2(12.9898, 78.233))) * 43758.5453);
-                // ~20% of windows lit with warm yellow / cool cyan emissive
-                if (rnd < 0.22) {
-                    vec3 winColor = rnd < 0.15 ? vec3(1.0, 0.76, 0.32) : vec3(0.25, 0.85, 1.0);
-                    outgoingLight += winColor * 1.6;
+                // ~20% of windows lit with warm gold / cool cyan emissive
+                if (rnd < 0.20) {
+                    vec3 winColor = (rnd < 0.14) ? vec3(1.0, 0.78, 0.35) : vec3(0.28, 0.88, 1.0);
+                    outgoingLight += winColor * 2.0;
                 }
             }
         }
@@ -528,15 +543,20 @@ class RoadChunk {
     constructor(roadMaterial: THREE.Material, yellowMat: THREE.Material, whiteMat: THREE.Material) {
         this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(14, 500, 1, 40), roadMaterial);
         this.mesh.receiveShadow = true;
+        this.mesh.frustumCulled = true;
 
         this.yellowLines = new THREE.LineSegments(new THREE.BufferGeometry(), yellowMat);
+        this.yellowLines.frustumCulled = true;
         this.whiteLines = new THREE.LineSegments(new THREE.BufferGeometry(), whiteMat);
+        this.whiteLines.frustumCulled = true;
         this.curve = new THREE.CatmullRomCurve3();
         this.cityGroup = new THREE.Group();
 
         // 1. Terrain Meshes
         this.leftTerrainMesh = this.initTerrainMesh();
         this.rightTerrainMesh = this.initTerrainMesh();
+        this.leftTerrainMesh.frustumCulled = true;
+        this.rightTerrainMesh.frustumCulled = true;
         this.cityGroup.add(this.leftTerrainMesh);
         this.cityGroup.add(this.rightTerrainMesh);
 
@@ -617,6 +637,7 @@ class RoadChunk {
             m.count = 0;
             m.castShadow = false;
             m.receiveShadow = false;
+            m.frustumCulled = false;
         }
         this.buildingMesh.castShadow = true;
         this.buildingMesh.receiveShadow = true;
@@ -664,6 +685,7 @@ class RoadChunk {
     private initTerrainMesh(): THREE.Mesh {
         const vertexCount = (SEG_X + 1) * (SEG_Z + 1);
         const positions = new Float32Array(vertexCount * 3);
+        const colors = new Float32Array(vertexCount * 3);
         const indices: number[] = [];
 
         for (let iz = 0; iz < SEG_Z; iz++) {
@@ -678,6 +700,7 @@ class RoadChunk {
 
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         geo.setIndex(indices);
 
         const mesh = new THREE.Mesh(geo, SharedRoadAssets.terrainMaterial);
@@ -685,11 +708,11 @@ class RoadChunk {
         return mesh;
     }
 
-    public activate(startZ: number, points: THREE.Vector3[], scene: THREE.Scene, params: BiomeParams): void {
+    public activate(startZ: number, points: THREE.Vector3[], scene: THREE.Scene, params: BiomeParams, worldZOffset: number = 0): void {
         this.startZ = startZ;
         this.curve = new THREE.CatmullRomCurve3(points);
         this.updateGeometry();
-        this.generateCity(scene, params);
+        this.generateCity(scene, params, worldZOffset);
     }
 
     private updateGeometry(): void {
@@ -708,6 +731,8 @@ class RoadChunk {
         }
         pos.needsUpdate = true;
         this.mesh.geometry.computeVertexNormals();
+        this.mesh.geometry.computeBoundingSphere();
+        this.mesh.geometry.computeBoundingBox();
         this.updateMarkings();
     }
 
@@ -754,10 +779,15 @@ class RoadChunk {
         }
 
         this.yellowLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(yellowPos, 3));
+        this.yellowLines.geometry.computeBoundingSphere();
+        this.yellowLines.geometry.computeBoundingBox();
+
         this.whiteLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(whitePos, 3));
+        this.whiteLines.geometry.computeBoundingSphere();
+        this.whiteLines.geometry.computeBoundingBox();
     }
 
-    private generateCity(scene: THREE.Scene, params: BiomeParams): void {
+    private generateCity(_scene: THREE.Scene, params: BiomeParams, worldZOffset: number = 0): void {
         while (this.billboardsGroup.children.length > 0) {
             this.billboardsGroup.remove(this.billboardsGroup.children[0]);
         }
@@ -769,8 +799,8 @@ class RoadChunk {
         this.streetlightGlows = [];
 
         // 1. Update Seamless Continuous Rolling Terrain (460m width each side)
-        this.updateTerrainMesh(this.leftTerrainMesh, -1);
-        this.updateTerrainMesh(this.rightTerrainMesh, 1);
+        this.updateTerrainMesh(this.leftTerrainMesh, -1, worldZOffset);
+        this.updateTerrainMesh(this.rightTerrainMesh, 1, worldZOffset);
 
         let buildingCount = 0;
         let amberWinCount = 0;
@@ -888,7 +918,6 @@ class RoadChunk {
                 gasTotemCount, gasSignFaceCount, exitRampCount, exitSignCount,
                 crossStreetCount, trafficSignalCount, signalLensCount
             );
-            scene.add(this.cityGroup);
             return;
         } else {
             this.tunnelArchesMesh.visible = false;
@@ -1143,7 +1172,6 @@ class RoadChunk {
             gasTotemCount, gasSignFaceCount, exitRampCount, exitSignCount,
             crossStreetCount, trafficSignalCount, signalLensCount
         );
-        scene.add(this.cityGroup);
     }
 
     private applyMeshCounts(
@@ -1260,19 +1288,37 @@ class RoadChunk {
         this.signalLensesMesh.visible = sLens > 0;
         this.signalLensesMesh.count = sLens;
         this.signalLensesMesh.instanceMatrix.needsUpdate = sLens > 0;
+
+        const allInstanced = [
+            this.buildingMesh, this.streetPolesMesh, this.streetArmsMesh, this.streetLampsMesh,
+            this.streetLampGlowsMesh, this.streetLightPoolsMesh, this.palmTrunksMesh, this.palmFrondsMesh,
+            this.tunnelArchesMesh, this.guardrailPostsMesh, this.guardrailBeamsMesh, this.guardrailReflectorsMesh,
+            this.roadStudsMesh, this.overpassMesh, this.bridgePylonsMesh, this.bridgeBeaconsMesh,
+            this.gasCanopyMesh, this.gasForecourtMesh, this.gasTotemMesh, this.gasSignFaceMesh,
+            this.exitRampsMesh, this.exitSignsMesh, this.crossStreetsMesh, this.trafficSignalsMesh,
+            this.signalLensesMesh
+        ];
+        for (const im of allInstanced) {
+            if (im.count > 0) {
+                im.computeBoundingSphere();
+                im.computeBoundingBox();
+            }
+        }
     }
 
-    private updateTerrainMesh(mesh: THREE.Mesh, side: number): void {
+    private updateTerrainMesh(mesh: THREE.Mesh, side: number, worldZOffset: number = 0): void {
         const posAttr = mesh.geometry.attributes.position as THREE.BufferAttribute;
+        const colAttr = mesh.geometry.attributes.color as THREE.BufferAttribute;
         const positions = posAttr.array as Float32Array;
+        const colors = colAttr.array as Float32Array;
         const terrainStart = 7.4;
         const terrainWidth = 460;
         let idx = 0;
 
         for (let iz = 0; iz <= SEG_Z; iz++) {
             const t = iz / SEG_Z;
-            // Bug 3f: Sample continuous analytical road position so adjacent chunk vertices match perfectly
-            const globalZ = this.startZ + t * 500;
+            const sceneZ = this.startZ + t * 500;
+            const globalZ = sceneZ + worldZOffset;
             const roadInfo = Road.evaluateRoadPosition(globalZ);
             const cp = roadInfo.position;
             const normal = roadInfo.normal;
@@ -1281,19 +1327,135 @@ class RoadChunk {
                 const u = ix / SEG_X;
                 const xDist = terrainStart + u * terrainWidth;
                 const bx = cp.x + normal.x * (side * xDist);
-                const bz = cp.z + normal.z * (side * xDist);
+                const bz = sceneZ + normal.z * (side * xDist);
+                const bz_global = globalZ + normal.z * (side * xDist);
 
                 // Multi-octave continuous elevation function shared across chunks & objects (Bug 3e & 3f)
-                const by = SharedRoadAssets.computeTerrainElevation(bx, bz, cp.y, xDist);
+                const by = SharedRoadAssets.computeTerrainElevation(bx, bz_global, cp.y, xDist);
 
-                positions[idx++] = bx;
-                positions[idx++] = by;
-                positions[idx++] = bz;
+                positions[idx] = bx;
+                positions[idx + 1] = by;
+                positions[idx + 2] = bz;
+
+                // Rich vertex-color gradient: dark gravel shoulder -> mossy foothills -> twilight violet crests
+                const relHeight = Math.max(0, by - cp.y);
+                const heightFactor = Math.min(1.0, relHeight / 85.0);
+                const distFactor = Math.pow(u, 0.7);
+
+                // Base nocturnal earth / shoulder
+                let r = 0.032 + heightFactor * 0.055 + distFactor * 0.025;
+                let g = 0.038 + heightFactor * 0.035 + distFactor * 0.020;
+                let b = 0.055 + heightFactor * 0.085 + distFactor * 0.045;
+
+                // Hilltop ridge highlight catching horizon glow
+                if (heightFactor > 0.45) {
+                    const crest = (heightFactor - 0.45) * 1.8;
+                    r += crest * 0.040;
+                    b += crest * 0.050;
+                }
+
+                colors[idx] = r;
+                colors[idx + 1] = g;
+                colors[idx + 2] = b;
+
+                idx += 3;
             }
         }
 
         posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
         mesh.geometry.computeVertexNormals();
+        mesh.geometry.computeBoundingSphere();
+        mesh.geometry.computeBoundingBox();
+    }
+
+    private shiftTerrainMesh(mesh: THREE.Mesh, offsetZ: number): void {
+        const posAttr = mesh.geometry.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i < posAttr.count; i++) {
+            posAttr.setZ(i, posAttr.getZ(i) - offsetZ);
+        }
+        posAttr.needsUpdate = true;
+        mesh.geometry.computeVertexNormals();
+        mesh.geometry.computeBoundingSphere();
+        mesh.geometry.computeBoundingBox();
+    }
+
+    public shiftOrigin(offsetZ: number): void {
+        this.startZ -= offsetZ;
+
+        // Shift road surface geometry
+        const roadPos = this.mesh.geometry.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i < roadPos.count; i++) {
+            roadPos.setZ(i, roadPos.getZ(i) - offsetZ);
+        }
+        roadPos.needsUpdate = true;
+        this.mesh.geometry.computeBoundingSphere();
+        this.mesh.geometry.computeBoundingBox();
+
+        // Shift road lines geometry
+        const yellowPos = this.yellowLines.geometry.attributes.position as THREE.BufferAttribute;
+        if (yellowPos) {
+            for (let i = 0; i < yellowPos.count; i++) {
+                yellowPos.setZ(i, yellowPos.getZ(i) - offsetZ);
+            }
+            yellowPos.needsUpdate = true;
+            this.yellowLines.geometry.computeBoundingSphere();
+            this.yellowLines.geometry.computeBoundingBox();
+        }
+
+        const whitePos = this.whiteLines.geometry.attributes.position as THREE.BufferAttribute;
+        if (whitePos) {
+            for (let i = 0; i < whitePos.count; i++) {
+                whitePos.setZ(i, whitePos.getZ(i) - offsetZ);
+            }
+            whitePos.needsUpdate = true;
+            this.whiteLines.geometry.computeBoundingSphere();
+            this.whiteLines.geometry.computeBoundingBox();
+        }
+
+        // Shift terrain meshes
+        this.shiftTerrainMesh(this.leftTerrainMesh, offsetZ);
+        this.shiftTerrainMesh(this.rightTerrainMesh, offsetZ);
+
+        // Shift CatmullRom curve points
+        for (let i = 0; i < this.curve.points.length; i++) {
+            this.curve.points[i].z -= offsetZ;
+        }
+
+        // Shift streetlight glow vectors
+        for (let i = 0; i < this.streetlightGlows.length; i++) {
+            this.streetlightGlows[i].z -= offsetZ;
+        }
+
+        // Shift neon signs
+        for (let i = 0; i < this.neonSigns.length; i++) {
+            this.neonSigns[i].position.z -= offsetZ;
+        }
+
+        // Shift instanced meshes
+        const mat = new THREE.Matrix4();
+        const instancedList = [
+            this.buildingMesh, this.windowAmberMesh, this.windowGoldMesh, this.windowCyanMesh,
+            this.streetPolesMesh, this.streetArmsMesh, this.streetLampsMesh, this.streetLampGlowsMesh,
+            this.streetLightPoolsMesh, this.palmTrunksMesh, this.palmFrondsMesh, this.tunnelArchesMesh,
+            this.guardrailPostsMesh, this.guardrailBeamsMesh, this.guardrailReflectorsMesh,
+            this.roadStudsMesh, this.overpassMesh, this.bridgePylonsMesh, this.bridgeBeaconsMesh,
+            this.gasCanopyMesh, this.gasForecourtMesh, this.gasTotemMesh, this.gasSignFaceMesh,
+            this.exitRampsMesh, this.exitSignsMesh, this.crossStreetsMesh, this.trafficSignalsMesh,
+            this.signalLensesMesh
+        ];
+        for (const im of instancedList) {
+            if (im.count > 0) {
+                for (let i = 0; i < im.count; i++) {
+                    im.getMatrixAt(i, mat);
+                    mat.elements[14] -= offsetZ;
+                    im.setMatrixAt(i, mat);
+                }
+                im.instanceMatrix.needsUpdate = true;
+                im.computeBoundingSphere();
+                im.computeBoundingBox();
+            }
+        }
     }
 
     public update(delta: number): void {
@@ -1365,18 +1527,19 @@ export class Road {
     public biomeManager: BiomeManager;
     private streetlights: THREE.PointLight[] = [];
     private neonLights: THREE.PointLight[] = [];
+    public worldZOffset: number = 0;
 
     constructor(scene: THREE.Scene) {
         this.scene = scene;
         this.biomeManager = new BiomeManager();
 
-        // Sleek wet asphalt highway surface
+        // Sleek wet asphalt highway surface (wet road roughness 0.25)
         this.material = new THREE.MeshStandardMaterial({
             color: 0x181c26,
-            roughness: 0.32,
+            roughness: 0.25,
             metalness: 0.45,
             side: THREE.DoubleSide,
-            envMapIntensity: 1.8,
+            envMapIntensity: 2.2,
         });
 
         // Double yellow divider lines
@@ -1433,7 +1596,7 @@ export class Road {
     }
 
     private spawnInitialChunks(): void {
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 2; i++) {
             const z = i * 500;
             this.spawnChunk(z, this.biomeManager.getParamsAt(z));
         }
@@ -1452,10 +1615,10 @@ export class Road {
         const points: THREE.Vector3[] = [];
         for (let s = 0; s <= 4; s++) {
             const pz = z + s * 125;
-            points.push(Road.evaluateRoadPosition(pz).position);
+            points.push(this.getRoadPositionAt(pz).position);
         }
-        chunk.activate(z, points, this.scene, params);
-        this.scene.add(chunk.mesh, chunk.yellowLines, chunk.whiteLines);
+        chunk.activate(z, points, this.scene, params, this.worldZOffset);
+        this.scene.add(chunk.mesh, chunk.yellowLines, chunk.whiteLines, chunk.cityGroup);
         this.chunks.push(chunk);
     }
 
@@ -1493,13 +1656,30 @@ export class Road {
     }
 
     public getRoadPositionAt(z: number): { position: THREE.Vector3; tangent: THREE.Vector3 } {
-        const info = Road.evaluateRoadPosition(z);
-        return { position: info.position, tangent: info.tangent };
+        const globalZ = z + this.worldZOffset;
+        const info = Road.evaluateRoadPosition(globalZ);
+        return { position: new THREE.Vector3(info.position.x, info.position.y, z), tangent: info.tangent };
     }
 
-    public update(carZ: number, carPos: THREE.Vector3, _carSpeed: number, delta: number, config: QualityConfig): void {
+    public update(carZ: number, carPos: THREE.Vector3, _carSpeed: number, delta: number, _config: QualityConfig): void {
         for (let i = 0; i < this.chunks.length; i++) {
             this.chunks[i].update(delta);
+        }
+
+        // 1. Recycle chunks behind player (continuous road: keeps coverage behind player >= 50m)
+        while (this.chunks.length > 1 && (this.chunks[0].startZ + this.chunks[0].length) < carZ - 80) {
+            const old = this.chunks.shift();
+            if (old) {
+                this.scene.remove(old.mesh, old.yellowLines, old.whiteLines, old.cityGroup);
+                this.pool.push(old);
+            }
+        }
+
+        // 2. Spawn chunks ahead until playerZ + VIEW_DISTANCE (continuous road: >= 600m ahead)
+        const VIEW_DISTANCE = 700;
+        while (this.chunks.length === 0 || (this.chunks[this.chunks.length - 1].startZ + this.chunks[this.chunks.length - 1].length) < carZ + VIEW_DISTANCE) {
+            const nextZ = this.chunks.length === 0 ? Math.floor((carZ - 100) / 500) * 500 : this.chunks[this.chunks.length - 1].startZ + 500;
+            this.spawnChunk(nextZ, this.biomeManager.getParamsAt(nextZ + this.worldZOffset));
         }
 
         // Re-assign the 6 PointLights to the 6 nearest lamps ahead of the player (Bug 3a)
@@ -1550,28 +1730,65 @@ export class Road {
             this.neonLights[neonIdx].intensity = 0;
             neonIdx++;
         }
+    }
 
-        // Recycling chunks (keep 3 active chunks: 1500m ahead, despawn behind at >450m)
-        const lookahead = Math.min(3, config.chunkLimit) * 500;
-        if (this.chunks.length > 0 && carZ - this.chunks[0].startZ > 450) {
-            const old = this.chunks.shift();
-            if (old) {
-                this.scene.remove(old.mesh, old.yellowLines, old.whiteLines, old.cityGroup);
-                this.pool.push(old);
-            }
+    public shiftOrigin(offsetZ: number): void {
+        this.worldZOffset += offsetZ;
+        for (let i = 0; i < this.chunks.length; i++) {
+            this.chunks[i].shiftOrigin(offsetZ);
         }
-        const lastChunk = this.chunks[this.chunks.length - 1];
-        if (lastChunk && lastChunk.startZ - carZ < lookahead) {
-            const nextZ = lastChunk.startZ + 500;
-            this.spawnChunk(nextZ, this.biomeManager.getParamsAt(nextZ));
+        for (let i = 0; i < this.waypoints.length; i++) {
+            this.waypoints[i].z -= offsetZ;
         }
+        for (let i = 0; i < this.streetlights.length; i++) {
+            this.streetlights[i].position.z -= offsetZ;
+        }
+        for (let i = 0; i < this.neonLights.length; i++) {
+            this.neonLights[i].position.z -= offsetZ;
+        }
+    }
+
+    public getChunkTelemetry(carZ: number): {
+        activeChunks: number;
+        nearestDist: number;
+        farthestDist: number;
+        minZ: number;
+        maxZ: number;
+        isContinuous: boolean;
+    } {
+        if (this.chunks.length === 0) {
+            return { activeChunks: 0, nearestDist: 0, farthestDist: 0, minZ: 0, maxZ: 0, isContinuous: false };
+        }
+        const minZ = this.chunks[0].startZ;
+        const maxZ = this.chunks[this.chunks.length - 1].startZ + this.chunks[this.chunks.length - 1].length;
+        const nearestDist = minZ - carZ;
+        const farthestDist = maxZ - carZ;
+        const isContinuous = (nearestDist <= -50) && (farthestDist >= 600);
+        return {
+            activeChunks: this.chunks.length,
+            nearestDist,
+            farthestDist,
+            minZ,
+            maxZ,
+            isContinuous
+        };
+    }
+
+    public logChunkDiagnostics(playerZ: number): void {
+        console.log(`=== ROAD CHUNK DIAGNOSTICS (Player Z: ${playerZ.toFixed(1)}, World Offset: ${this.worldZOffset}m) ===`);
+        this.chunks.forEach((chunk, index) => {
+            const mesh = chunk.mesh;
+            const bs = mesh.geometry.boundingSphere;
+            const distToPlayer = (chunk.startZ + chunk.length * 0.5) - playerZ;
+            console.log(`[Chunk #${index}] startZ: ${chunk.startZ}m, worldPos: (${mesh.position.x.toFixed(1)}, ${mesh.position.y.toFixed(1)}, ${mesh.position.z.toFixed(1)}), visible: ${mesh.visible}, parent: ${mesh.parent ? mesh.parent.type : 'none'}, frustumCulled: ${mesh.frustumCulled}, materials: ${Array.isArray(mesh.material) ? mesh.material.length : 1}, bsCenter: ${bs ? `(${bs.center.x.toFixed(1)}, ${bs.center.y.toFixed(1)}, ${bs.center.z.toFixed(1)})` : 'null'}, bsRadius: ${bs ? bs.radius.toFixed(1) : 'null'}, distToPlayer: ${distToPlayer.toFixed(1)}m`);
+        });
     }
 
     public setRoadEnvMap(envMap: THREE.Texture): void {
         this.material.envMap = envMap;
-        this.material.roughness = 0.32;
+        this.material.roughness = 0.25;
         this.material.metalness = 0.45;
-        this.material.envMapIntensity = 1.8;
+        this.material.envMapIntensity = 2.2;
         this.material.needsUpdate = true;
     }
 

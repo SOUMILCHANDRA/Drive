@@ -743,4 +743,12 @@ export class TrafficManager {
             console.log(`  Car #${car.index} (${dir}) - Pos: (${car.worldPosition.x.toFixed(2)}, ${car.worldPosition.y.toFixed(2)}, ${car.worldPosition.z.toFixed(2)}), Dist: ${dist}m, Scale: (1,1,1), frustumCulled: false, Side: Front/Double, Bounds: [x: ±1.0, y: [0, 1.25], z: ±2.2]`);
         }
     }
+
+    public shiftOrigin(offsetZ: number): void {
+        for (let i = 0; i < this.activeCars.length; i++) {
+            const car = this.activeCars[i];
+            car.currentZ -= offsetZ;
+            car.worldPosition.z -= offsetZ;
+        }
+    }
 }

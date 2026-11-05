@@ -18,7 +18,7 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;700&family=Mr+Dafoe&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="flash" class="screen-flash"></div>
@@ -117,8 +117,13 @@
     <!-- ═══ Title Screen ═══ -->
     <div id="title-screen">
       <div class="loading-backdrop"></div>
+      <div class="title-radial-glow"></div>
+      <div class="title-scanlines"></div>
       <div class="loading-content">
-        <img src="/loading-logo.png" alt="DRIVE" class="drive-logo-neon">
+        <h1 class="title-text neon-title">NIGHTCALL</h1>
+        <div class="loading-bar-container">
+          <div id="loading-bar" class="loading-bar-fill"></div>
+        </div>
         <div id="loading-status" class="loading-status">INITIALIZING SYSTEMS...</div>
         <p class="press-enter">PRESS ENTER TO BEGIN</p>
       </div>
@@ -152,12 +157,16 @@
       </div>
     </div>
 
+    <!-- ═══ Windshield Rain Streak Overlay ═══ -->
+    <canvas id="windshield-canvas" class="windshield-overlay"></canvas>
+
     <!-- ═══ HUD ═══ -->
     <div id="hud" class="hud-overlay">
       <div id="rearview" class="rearview-mirror">
         <canvas id="mirror-canvas"></canvas>
         <div class="mirror-overlay"></div>
       </div>
+      <div id="near-miss-toast" class="near-miss-toast">NEAR MISS</div>
       <div class="speed-display">
         <div><span id="speed-val">000</span> <span class="unit">KM/H</span></div>
         <div class="dist-display"><span id="dist-val">0 M</span></div>
@@ -181,6 +190,9 @@
       <div class="f3-row">ONCOMING CARS: <span id="f3-oncoming">0</span></div>
       <div class="f3-row">SAME-DIR CARS: <span id="f3-samedir">0</span></div>
       <div class="f3-row">NEAREST CAR: <span id="f3-nearest">--</span> M</div>
+      <div class="f3-row">ACTIVE CHUNKS: <span id="f3-chunks-count">0</span></div>
+      <div class="f3-row">CHUNK COVERAGE: <span id="f3-nearest-chunk">--</span> M to <span id="f3-farthest-chunk">--</span> M</div>
+      <div class="f3-row">ROAD CONTINUITY: <span id="f3-road-status">OK</span></div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

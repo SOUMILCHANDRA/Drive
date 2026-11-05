@@ -193,42 +193,62 @@ export class SkyManager {
 
         const skylineMat = new THREE.ShaderMaterial({
             vertexShader: `
-                varying vec3 vWorldPos;
-                varying vec3 vNormalVec;
+                varying vec2 vFacadeCoord;
+                varying float vIsFacade;
                 void main() {
-                    vNormalVec = normalize(normalMatrix * normal);
+                    float instW = length(instanceMatrix[0].xyz);
+                    float instH = length(instanceMatrix[1].xyz);
+                    float instD = length(instanceMatrix[2].xyz);
+                    if (abs(normal.y) < 0.25) {
+                        vIsFacade = 1.0;
+                        if (abs(normal.x) > 0.5) {
+                            vFacadeCoord = vec2(position.z * instD, (position.y + 0.5) * instH);
+                        } else {
+                            vFacadeCoord = vec2(position.x * instW, (position.y + 0.5) * instH);
+                        }
+                    } else {
+                        vIsFacade = 0.0;
+                        vFacadeCoord = vec2(0.0);
+                    }
                     vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
-                    vWorldPos = wp.xyz;
                     gl_Position = projectionMatrix * viewMatrix * wp;
                 }
             `,
             fragmentShader: `
-                varying vec3 vWorldPos;
-                varying vec3 vNormalVec;
+                varying vec2 vFacadeCoord;
+                varying float vIsFacade;
                 void main() {
                     // Deep indigo skyscraper body
                     vec3 baseColor = vec3(0.04, 0.06, 0.12);
 
-                    // Windows on vertical facades
-                    if (abs(vNormalVec.y) < 0.6) {
-                        vec2 grid = fract(vWorldPos.xz * 0.04 + vWorldPos.y * 0.032);
-                        float isWin = step(0.32, grid.x) * step(grid.y, 0.68);
+                    // Axis-aligned crisp rectangular windows on vertical facades (~20% lit)
+                    if (vIsFacade > 0.5) {
+                        float cellW = 3.6; // window cell width 3.6m
+                        float cellH = 4.2; // window floor height 4.2m
 
-                        vec2 cell = floor(vWorldPos.xz * 0.04 + vWorldPos.y * 0.032);
-                        float rand = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
-                        float lit = step(0.64, rand); // ~36% lit windows
+                        vec2 cellCoord = vec2(vFacadeCoord.x / cellW, vFacadeCoord.y / cellH);
+                        vec2 g = fract(cellCoord);
+                        vec2 cellId = floor(cellCoord);
 
-                        // Varied city lights: sodium amber, warm gold, cool cyan
-                        vec3 winColor;
-                        if (rand > 0.90) {
-                            winColor = vec3(0.4, 0.9, 1.0); // cool cyan office
-                        } else if (rand > 0.78) {
-                            winColor = vec3(1.0, 0.85, 0.5); // warm halogen
-                        } else {
-                            winColor = vec3(1.0, 0.60, 0.18); // sodium amber
+                        // Axis-aligned crisp window rectangle
+                        vec2 wBox = step(vec2(0.20, 0.18), g) * (1.0 - step(vec2(0.80, 0.82), g));
+                        float isWin = wBox.x * wBox.y;
+
+                        if (isWin > 0.5) {
+                            float rand = fract(sin(dot(cellId, vec2(12.9898, 78.233))) * 43758.5453);
+                            // ~20% lit windows (warm and cool)
+                            if (rand < 0.20) {
+                                vec3 winColor;
+                                if (rand < 0.06) {
+                                    winColor = vec3(0.35, 0.88, 1.0); // cool cyan
+                                } else if (rand < 0.13) {
+                                    winColor = vec3(1.0, 0.85, 0.52); // warm halogen
+                                } else {
+                                    winColor = vec3(1.0, 0.65, 0.24); // sodium amber
+                                }
+                                baseColor = winColor * 2.5;
+                            }
                         }
-
-                        baseColor = mix(baseColor, winColor * 2.2, isWin * lit);
                     }
 
                     gl_FragColor = vec4(baseColor, 1.0);

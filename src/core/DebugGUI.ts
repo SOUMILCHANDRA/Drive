@@ -4,6 +4,7 @@ import type { Renderer } from './Renderer';
 import type { LightingManager } from '../world/LightingManager';
 import type { Road } from '../world/Road';
 import type { RainSystem } from '../world/RainSystem';
+import { HANDLING } from '../vehicle/Car';
 
 export interface GameTuneConfig {
     exposure: number;
@@ -117,7 +118,31 @@ export class DebugGUI {
             rain.setCount(v);
         });
 
+        // 6. Handling (Slow Roads Dynamics)
+        const handlingFolder = this.gui.addFolder('Handling (Slow Roads)');
+        handlingFolder.add(HANDLING, 'cruiseSpeedMin', 50, 90, 5).name('Cruise Min (km/h)');
+        handlingFolder.add(HANDLING, 'cruiseSpeedMax', 90, 130, 5).name('Cruise Max (km/h)');
+        handlingFolder.add(HANDLING, 'softCapKmh', 140, 180, 5).name('Soft Cap (km/h)');
+        handlingFolder.add(HANDLING, 'dragThresholdKmh', 100, 140, 5).name('Drag Thresh (km/h)');
+        handlingFolder.add(HANDLING, 'baseDrag', 0.02, 0.25, 0.01).name('Base Drag');
+        handlingFolder.add(HANDLING, 'highSpeedDrag', 0.2, 1.5, 0.05).name('High Speed Drag');
+        handlingFolder.add(HANDLING, 'engineBraking', 0.1, 0.8, 0.02).name('Engine Braking');
+        handlingFolder.add(HANDLING, 'throttleRampTime', 0.3, 2.0, 0.1).name('Throttle Ramp (s)');
+        handlingFolder.add(HANDLING, 'baseAccel', 5, 25, 0.5).name('Base Accel (m/s²)');
+        handlingFolder.add(HANDLING, 'steerInputRate', 1.0, 5.0, 0.1).name('Steer Rate (/s)');
+        handlingFolder.add(HANDLING, 'steerReturnRate', 0.5, 4.0, 0.1).name('Steer Return (/s)');
+        handlingFolder.add(HANDLING, 'maxSteerLowSpeed', 0.2, 0.6, 0.01).name('Max Steer Low (rad)');
+        handlingFolder.add(HANDLING, 'maxSteerHighSpeed', 0.03, 0.15, 0.01).name('Max Steer High (rad)');
+        handlingFolder.add(HANDLING, 'understeerFactor', 0.0, 0.8, 0.05).name('High-Speed Understeer');
+        handlingFolder.add(HANDLING, 'laneAssistEnabled').name('Lane Assist (L)');
+        handlingFolder.add(HANDLING, 'laneAssistStrength', 0.0, 0.5, 0.02).name('Lane Assist Str');
+        handlingFolder.add(HANDLING, 'bodyRollMaxDeg', 0.5, 3.5, 0.1).name('Body Roll Max (deg)');
+        handlingFolder.add(HANDLING, 'pitchAccelDeg', 0.2, 1.5, 0.05).name('Pitch Accel (deg)');
+        handlingFolder.add(HANDLING, 'pitchBrakeDeg', 0.5, 2.5, 0.05).name('Pitch Brake (deg)');
+        handlingFolder.add(HANDLING, 'collisionSpeedScrub', 0.1, 0.7, 0.05).name('Collision Scrub');
+
         lightFolder.open();
         fogFolder.open();
+        handlingFolder.open();
     }
 }

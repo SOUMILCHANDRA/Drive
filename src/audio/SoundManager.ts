@@ -12,8 +12,10 @@ export class SoundManager {
     private ctx: AudioContext | null = null;
     private engineOsc!: OscillatorNode;
     private engineSubOsc!: OscillatorNode;
+    private engineFilter!: BiquadFilterNode;
     private engineGain!: GainNode;
     private rainGain!: GainNode;
+    private windGain!: GainNode;
 
     constructor() {
         this.masterVolume = parseFloat(localStorage.getItem('nightcall_volume') || '0.5');
@@ -35,24 +37,59 @@ export class SoundManager {
         this.engineSubOsc.type = 'triangle';
         this.engineSubOsc.frequency.value = 22.5;
 
-        const engineFilter = this.ctx.createBiquadFilter();
-        engineFilter.type = 'lowpass';
-        engineFilter.frequency.value = 350;
-        engineFilter.Q.value = 6;
+        this.engineFilter = this.ctx.createBiquadFilter();
+        this.engineFilter.type = 'lowpass';
+        this.engineFilter.frequency.value = 480; // Low-pass filter for chase camera
+        this.engineFilter.Q.value = 5.0;
         
         this.engineGain = this.ctx.createGain();
         this.engineGain.gain.value = 0; // Start silent
         
-        this.engineOsc.connect(engineFilter);
-        this.engineSubOsc.connect(engineFilter);
-        engineFilter.connect(this.engineGain);
+        this.engineOsc.connect(this.engineFilter);
+        this.engineSubOsc.connect(this.engineFilter);
+        this.engineFilter.connect(this.engineGain);
         this.engineGain.connect(this.ctx.destination);
 
         this.engineOsc.start();
         this.engineSubOsc.start();
 
-        // 🌧️ 2. Procedural Rain Ambience
+        // 🌧️ 2. Procedural Rain Ambience Bed
         this.rainGain = this.createRainAmbience(this.ctx);
+
+        // 💨 3. Procedural Wind Loop that scales with speed
+        this.windGain = this.createWindAmbience(this.ctx);
+    }
+
+    private createWindAmbience(ctx: AudioContext): GainNode {
+        const bufferSize = ctx.sampleRate * 2;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let lastOut = 0.0;
+        // Generate pink noise for soft realistic air rush
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            lastOut = (lastOut + 0.02 * white) / 1.02;
+            data[i] = lastOut * 0.75;
+        }
+
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 650;
+        filter.Q.value = 0.8;
+
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        source.start();
+
+        return gain;
     }
 
     private createRainAmbience(ctx: AudioContext): GainNode {
@@ -121,17 +158,38 @@ export class SoundManager {
         }
     }
 
-    public update(speed: number, _delta: number): void {
+    public update(speed: number, _delta: number, isChaseCam: boolean = true, rainIntensity: number = 0.5): void {
         if (!this.ctx || !this.engineOsc) return;
 
         const speedKmh = speed * 3.6;
-        const freq = 45 + (Math.min(speedKmh, 180) / 180) * 150;
+        // Engine hum pitch from RPM with a smooth curve
+        const rpmNorm = Math.pow(Math.min(speedKmh / 160, 1.0), 0.78);
+        const rpm = 800 + rpmNorm * 4600;
+        const freq = 36 + (rpm / 6000) * 145;
         
         this.engineOsc.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.08);
         this.engineSubOsc.frequency.setTargetAtTime(freq * 0.5, this.ctx.currentTime, 0.08);
         
+        // Low-pass filter when in the chase camera (warm atmospheric rumble)
+        if (this.engineFilter) {
+            const filterCutoff = isChaseCam ? 480 : 1200;
+            this.engineFilter.frequency.setTargetAtTime(filterCutoff, this.ctx.currentTime, 0.15);
+        }
+
         const targetGain = (0.05 + (speedKmh / 180) * 0.07) * this.masterVolume;
         this.engineGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.08);
+
+        // Soft wind loop that scales with speed
+        if (this.windGain) {
+            const windTarget = Math.pow(Math.min(speedKmh / 160, 1.0), 1.5) * 0.09 * this.masterVolume;
+            this.windGain.gain.setTargetAtTime(windTarget, this.ctx.currentTime, 0.12);
+        }
+
+        // Soft rain bed
+        if (this.rainGain) {
+            const rainTarget = Math.max(0.01, rainIntensity) * 0.045 * this.masterVolume;
+            this.rainGain.gain.setTargetAtTime(rainTarget, this.ctx.currentTime, 0.25);
+        }
     }
 
     public playNearMiss(): void {
@@ -196,6 +254,7 @@ export class SoundManager {
         if (this.ctx) {
             if (this.engineGain) this.engineGain.gain.setTargetAtTime(0.08 * this.masterVolume, this.ctx.currentTime, 0.3);
             if (this.rainGain) this.rainGain.gain.setTargetAtTime(0.035 * this.masterVolume, this.ctx.currentTime, 0.3);
+            if (this.windGain) this.windGain.gain.setTargetAtTime(0.04 * this.masterVolume, this.ctx.currentTime, 0.3);
         }
     }
 }
